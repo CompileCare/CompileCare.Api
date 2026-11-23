@@ -24,7 +24,7 @@ public static class TestJwtTokenFactory
     public static SecurityKey ValidationKey => SigningKey;
 
     public static string CreateToken(
-        string? subject = null,
+        string? subject = Subject,
         string? issuer = null,
         string? audience = null,
         DateTime? expiresUtc = null,
