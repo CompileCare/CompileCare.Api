@@ -26,6 +26,10 @@ app.MapGet("/", () => Results.Ok(new { service = "CompileCare.Api", status = "re
 app.MapHealthEndpoints();
 app.MapPlatformEndpoints();
 app.MapHospitalEndpoints();
+app.MapDepartmentEndpoints();
+app.MapWardEndpoints();
+app.MapRoomEndpoints();
+app.MapBedEndpoints();
 app.Run();
 
 public partial class Program;
