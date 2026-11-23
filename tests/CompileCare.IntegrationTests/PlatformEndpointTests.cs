@@ -19,9 +19,10 @@ public sealed class PlatformEndpointTests(FacilityApiFactory factory)
     public async Task InvalidTenantHeader_IsRejectedWithProblemDetails()
     {
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Test-Authenticated", "true");
-        client.DefaultRequestHeaders.Add("X-Test-Issuer", TestAuthenticationHandler.Issuer);
-        client.DefaultRequestHeaders.Add("X-Test-Subject", TestAuthenticationHandler.Subject);
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken());
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, "bad");
 
         var response = await client.GetAsync("/api/v1/platform/context");

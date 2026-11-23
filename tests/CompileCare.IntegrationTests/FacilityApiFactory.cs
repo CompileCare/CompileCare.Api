@@ -1,12 +1,13 @@
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 
 namespace CompileCare.IntegrationTests;
 
@@ -25,16 +26,33 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<CompileCareDbContext>(
                 options => options.UseNpgsql(_connectionString));
 
-            services
-                .AddAuthentication(options =>
+            // Keep the real JwtBearer handler and issuer-stamping event. Only replace
+            // discovery with a local signing key for deterministic integration tests.
+            services.PostConfigure<JwtBearerOptions>(
+                JwtBearerDefaults.AuthenticationScheme,
+                options =>
                 {
-                    options.DefaultAuthenticateScheme = TestAuthenticationHandler.TestScheme;
-                    options.DefaultChallengeScheme = TestAuthenticationHandler.TestScheme;
-                    options.DefaultForbidScheme = TestAuthenticationHandler.TestScheme;
-                })
-                .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
-                    TestAuthenticationHandler.TestScheme,
-                    _ => { });
+                    options.Authority = null;
+                    options.MetadataAddress = null;
+                    options.ConfigurationManager = null;
+                    options.Audience = TestJwtTokenFactory.Audience;
+                    options.RequireHttpsMetadata = false;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        RequireSignedTokens = true,
+                        RequireExpirationTime = true,
+                        ValidateIssuer = true,
+                        ValidIssuer = TestJwtTokenFactory.Issuer,
+                        ValidateAudience = true,
+                        ValidAudience = TestJwtTokenFactory.Audience,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = TestJwtTokenFactory.ValidationKey,
+                        NameClaimType = "sub",
+                        RoleClaimType = "role",
+                        ClockSkew = TimeSpan.FromSeconds(5)
+                    };
+                });
         });
     }
 
@@ -51,8 +69,8 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         db.TenantMemberships.Add(new TenantMembership
         {
             TenantId = tenantId,
-            Issuer = TestAuthenticationHandler.Issuer,
-            Subject = TestAuthenticationHandler.Subject,
+            Issuer = TestJwtTokenFactory.Issuer,
+            Subject = TestJwtTokenFactory.Subject,
             Role = role,
             IsActive = isActive
         });

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using CompileCare.Api.Middleware;
+using CompileCare.Api.Security;
 using CompileCare.Application.Tenancy;
 using Xunit;
 
@@ -15,6 +16,27 @@ public sealed class SecurityAuthorizationTests
     {
         _factory = factory;
         _factory.ResetDatabase();
+    }
+
+    [Fact]
+    public async Task JwtBearer_RejectsUntrustedIssuerAndAudience()
+    {
+        var wrongIssuer = _factory.CreateClient();
+        wrongIssuer.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken(issuer: "https://untrusted.example.test/"));
+        var issuerResponse = await wrongIssuer.GetAsync("/api/v1/hospitals");
+
+        var wrongAudience = _factory.CreateClient();
+        wrongAudience.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken(audience: "another-api"));
+        var audienceResponse = await wrongAudience.GetAsync("/api/v1/hospitals");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, issuerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, audienceResponse.StatusCode);
     }
 
     [Fact]
@@ -131,8 +153,11 @@ public sealed class SecurityAuthorizationTests
 
         // Simulate claims emitted by the configured identity provider. Only the
         // CompileCare membership row is authoritative for tenant role/permissions.
-        client.DefaultRequestHeaders.Add("X-Test-External-Permissions", TenantPermissions.FacilityWrite);
-        client.DefaultRequestHeaders.Add("X-Test-External-Roles", TenantRoles.HospitalAdmin);
+        client.Dispose();
+        client = CreateAuthenticatedClient(
+            tenantId,
+            new System.Security.Claims.Claim(AuthorizationPolicies.PermissionClaim, TenantPermissions.FacilityWrite),
+            new System.Security.Claims.Claim("role", TenantRoles.HospitalAdmin));
 
         var createResponse = await client.PostAsJsonAsync(
             "/api/v1/hospitals",
@@ -141,12 +166,13 @@ public sealed class SecurityAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, createResponse.StatusCode);
     }
 
-    private HttpClient CreateAuthenticatedClient(Guid? tenantId)
+    private HttpClient CreateAuthenticatedClient(Guid? tenantId, params System.Security.Claims.Claim[] externalClaims)
     {
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Test-Authenticated", "true");
-        client.DefaultRequestHeaders.Add("X-Test-Issuer", TestAuthenticationHandler.Issuer);
-        client.DefaultRequestHeaders.Add("X-Test-Subject", TestAuthenticationHandler.Subject);
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken(additionalClaims: externalClaims));
         if (tenantId.HasValue)
         {
             client.DefaultRequestHeaders.Add(

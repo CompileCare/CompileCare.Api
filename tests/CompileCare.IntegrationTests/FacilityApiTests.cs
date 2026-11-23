@@ -256,9 +256,10 @@ public sealed class FacilityApiTests
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin);
 
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Test-Authenticated", "true");
-        client.DefaultRequestHeaders.Add("X-Test-Issuer", TestAuthenticationHandler.Issuer);
-        client.DefaultRequestHeaders.Add("X-Test-Subject", TestAuthenticationHandler.Subject);
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken());
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
