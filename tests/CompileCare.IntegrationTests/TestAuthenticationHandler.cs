@@ -32,11 +32,11 @@ public sealed class TestAuthenticationHandler(
             new Claim("iss", issuer),
             new Claim("sub", subject)
         ],
-        Scheme,
+        TestScheme,
         "sub",
         "role");
 
         return Task.FromResult(AuthenticateResult.Success(
-            new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme)));
+            new AuthenticationTicket(new ClaimsPrincipal(identity), TestScheme)));
     }
 }
