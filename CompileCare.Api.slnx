@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CompileCare.Api/CompileCare.Api.csproj" />
+    <Project Path="src/CompileCare.Application/CompileCare.Application.csproj" />
+    <Project Path="src/CompileCare.Infrastructure/CompileCare.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CompileCare.UnitTests/CompileCare.UnitTests.csproj" />
+    <Project Path="tests/CompileCare.IntegrationTests/CompileCare.IntegrationTests.csproj" />
+  </Folder>
+</Solution>
