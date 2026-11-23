@@ -33,15 +33,18 @@ public sealed class TestAuthenticationHandler(
             new("sub", subject)
         };
 
-        claims.AddRange(Request.Headers["X-Test-External-Permissions"]
-            .Select(permission => new Claim("compilecare:permission", permission)));
-
-        claims.AddRange(Request.Headers["X-Test-External-Roles"]
-            .Select(role => new Claim("role", role)));
+        claims.AddRange(ReadClaims("X-Test-External-Permissions", "compilecare:permission"));
+        claims.AddRange(ReadClaims("X-Test-External-Roles", "role"));
 
         var identity = new ClaimsIdentity(claims, TestScheme, "sub", "role");
 
         return Task.FromResult(AuthenticateResult.Success(
             new AuthenticationTicket(new ClaimsPrincipal(identity), TestScheme)));
     }
+
+    private IEnumerable<Claim> ReadClaims(string headerName, string claimType) =>
+        Request.Headers[headerName]
+            .ToString()
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => new Claim(claimType, value));
 }
