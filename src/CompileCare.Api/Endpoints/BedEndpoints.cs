@@ -1,3 +1,4 @@
+using CompileCare.Api.Security;
 using CompileCare.Application.Facilities;
 
 namespace CompileCare.Api;
@@ -6,7 +7,7 @@ public static class BedEndpoints
 {
     public static IEndpointRouteBuilder MapBedEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1/rooms/{roomId:guid}/beds").WithTags("Beds");
+        var group = endpoints.MapGroup("/api/v1/rooms/{roomId:guid}/beds").WithTags("Beds").WithMetadata(TenantScopedEndpointMetadata.Instance).RequireAuthorization();
 
         group.MapGet("/", async (
             Guid roomId,
@@ -15,7 +16,7 @@ public static class BedEndpoints
             int pageSize = 50,
             CancellationToken ct = default) =>
                 Results.Ok(await service.ListBeds(roomId, new(page, pageSize), ct)))
-            .WithName("ListBeds");
+            .WithName("ListBeds").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapGet("/{id:guid}", async (
             Guid roomId,
@@ -23,7 +24,7 @@ public static class BedEndpoints
             IBedService service,
             CancellationToken ct) =>
                 FacilityHttp.From(await service.GetBed(roomId, id, ct)))
-            .WithName("GetBed");
+            .WithName("GetBed").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapPost("/", async (
             Guid roomId,
@@ -34,7 +35,7 @@ public static class BedEndpoints
                     await service.CreateBed(roomId, new(request.Number, request.IsActive), ct),
                     $"/api/v1/rooms/{roomId}/beds",
                     bed => bed.Id))
-            .WithName("CreateBed");
+            .WithName("CreateBed").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
 
         group.MapPut("/{id:guid}", async (
             Guid roomId,
@@ -43,7 +44,7 @@ public static class BedEndpoints
             IBedService service,
             CancellationToken ct) =>
                 FacilityHttp.From(await service.UpdateBed(roomId, id, new(request.Number, request.IsActive), ct)))
-            .WithName("UpdateBed");
+            .WithName("UpdateBed").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
 
         group.MapDelete("/{id:guid}", async (
             Guid roomId,
@@ -51,7 +52,7 @@ public static class BedEndpoints
             IBedService service,
             CancellationToken ct) =>
                 FacilityHttp.Deleted(await service.DeleteBed(roomId, id, ct)))
-            .WithName("DeleteBed");
+            .WithName("DeleteBed").RequireAuthorization(AuthorizationPolicies.FacilityDelete);
 
         return endpoints;
     }

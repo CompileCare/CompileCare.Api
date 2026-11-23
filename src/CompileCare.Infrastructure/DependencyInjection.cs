@@ -31,6 +31,7 @@ public static class DependencyInjection
             services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
         }
 
+        services.AddScoped<CompileCare.Application.Tenancy.ITenantMembershipReader, TenantMembershipReader>();
         services.AddScoped<FacilityService>();
         services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
         services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());

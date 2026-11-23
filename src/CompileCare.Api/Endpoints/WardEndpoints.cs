@@ -1,3 +1,4 @@
+using CompileCare.Api.Security;
 using CompileCare.Application.Facilities;
 
 namespace CompileCare.Api;
@@ -6,7 +7,7 @@ public static class WardEndpoints
 {
     public static IEndpointRouteBuilder MapWardEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1/departments/{departmentId:guid}/wards").WithTags("Wards");
+        var group = endpoints.MapGroup("/api/v1/departments/{departmentId:guid}/wards").WithTags("Wards").WithMetadata(TenantScopedEndpointMetadata.Instance).RequireAuthorization();
 
         group.MapGet("/", async (
             Guid departmentId,
@@ -15,7 +16,7 @@ public static class WardEndpoints
             int pageSize = 50,
             CancellationToken ct = default) =>
                 Results.Ok(await service.ListWards(departmentId, new(page, pageSize), ct)))
-            .WithName("ListWards");
+            .WithName("ListWards").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapGet("/{id:guid}", async (
             Guid departmentId,
@@ -23,7 +24,7 @@ public static class WardEndpoints
             IWardService service,
             CancellationToken ct) =>
                 FacilityHttp.From(await service.GetWard(departmentId, id, ct)))
-            .WithName("GetWard");
+            .WithName("GetWard").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapPost("/", async (
             Guid departmentId,
@@ -34,7 +35,7 @@ public static class WardEndpoints
                     await service.CreateWard(departmentId, new(request.Name), ct),
                     $"/api/v1/departments/{departmentId}/wards",
                     ward => ward.Id))
-            .WithName("CreateWard");
+            .WithName("CreateWard").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
 
         group.MapPut("/{id:guid}", async (
             Guid departmentId,
@@ -43,7 +44,7 @@ public static class WardEndpoints
             IWardService service,
             CancellationToken ct) =>
                 FacilityHttp.From(await service.UpdateWard(departmentId, id, new(request.Name), ct)))
-            .WithName("UpdateWard");
+            .WithName("UpdateWard").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
 
         group.MapDelete("/{id:guid}", async (
             Guid departmentId,
@@ -51,7 +52,7 @@ public static class WardEndpoints
             IWardService service,
             CancellationToken ct) =>
                 FacilityHttp.Deleted(await service.DeleteWard(departmentId, id, ct)))
-            .WithName("DeleteWard");
+            .WithName("DeleteWard").RequireAuthorization(AuthorizationPolicies.FacilityDelete);
 
         return endpoints;
     }

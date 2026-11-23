@@ -1,5 +1,6 @@
 using CompileCare.Api;
 using CompileCare.Api.Middleware;
+using CompileCare.Api.Security;
 using CompileCare.Application;
 using CompileCare.Infrastructure;
 using CompileCare.Observability.Extensions;
@@ -14,11 +15,15 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddOpenApi();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddCompileCareSecurity(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 app.UseExceptionHandler();
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseRouting();
+app.UseAuthentication();
 app.UseMiddleware<TenantContextMiddleware>();
+app.UseAuthorization();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
 app.MapPrometheusScrapingEndpoint();
