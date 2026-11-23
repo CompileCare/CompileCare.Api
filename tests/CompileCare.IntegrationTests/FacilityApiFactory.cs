@@ -1,4 +1,6 @@
+using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -19,12 +21,43 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.ConfigureTestServices(services =>
         {
-            // Replace any provider-less DbContext registration created when the
-            // application host has no regular CompileCare connection string.
             services.RemoveAll<DbContextOptions<CompileCareDbContext>>();
             services.AddDbContext<CompileCareDbContext>(
                 options => options.UseNpgsql(_connectionString));
+
+            services
+                .AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = TestAuthenticationHandler.Scheme;
+                    options.DefaultChallengeScheme = TestAuthenticationHandler.Scheme;
+                    options.DefaultForbidScheme = TestAuthenticationHandler.Scheme;
+                })
+                .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                    TestAuthenticationHandler.Scheme,
+                    _ => { });
         });
+    }
+
+    public async Task SeedTenantMembershipAsync(
+        Guid tenantId,
+        string role,
+        bool isActive = true)
+    {
+        using var scope = Services.CreateScope();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        tenantContext.SetTenant(tenantId);
+
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        db.TenantMemberships.Add(new TenantMembership
+        {
+            TenantId = tenantId,
+            Issuer = TestAuthenticationHandler.Issuer,
+            Subject = TestAuthenticationHandler.Subject,
+            Role = role,
+            IsActive = isActive
+        });
+
+        await db.SaveChangesAsync();
     }
 
     public void ResetDatabase()

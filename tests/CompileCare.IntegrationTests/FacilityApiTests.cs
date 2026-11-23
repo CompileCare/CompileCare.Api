@@ -24,7 +24,7 @@ public sealed class FacilityApiTests
     [Fact]
     public async Task FacilityHierarchyCrud_IsTenantScopedAndPreservesResourceLocations()
     {
-        using var client = CreateTenantClient(Guid.NewGuid());
+        using var client = await CreateTenantClientAsync(Guid.NewGuid());
 
         var hospitalCollection = "/api/v1/hospitals";
         var hospitalResponse = await client.PostAsJsonAsync(
@@ -146,7 +146,7 @@ public sealed class FacilityApiTests
         Assert.Equal("B-02", updatedBed.GetProperty("number").GetString());
         Assert.False(updatedBed.GetProperty("isActive").GetBoolean());
 
-        using var otherTenantClient = CreateTenantClient(Guid.NewGuid());
+        using var otherTenantClient = await CreateTenantClientAsync(Guid.NewGuid());
 
         // The same natural keys can be used by another tenant without disclosing
         // or linking to resources owned by the first tenant.
@@ -205,7 +205,7 @@ public sealed class FacilityApiTests
     public async Task TenantOwnedPersistence_RejectsStaleUpdatesAndCrossTenantAssignments()
     {
         var tenantId = Guid.NewGuid();
-        using var client = CreateTenantClient(tenantId);
+        using var client = await CreateTenantClientAsync(tenantId);
 
         var createResponse = await client.PostAsJsonAsync(
             "/api/v1/hospitals",
@@ -251,9 +251,14 @@ public sealed class FacilityApiTests
             () => invalidDb.SaveChangesAsync());
     }
 
-    private HttpClient CreateTenantClient(Guid tenantId)
+    private async Task<HttpClient> CreateTenantClientAsync(Guid tenantId)
     {
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin);
+
         var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Authenticated", "true");
+        client.DefaultRequestHeaders.Add("X-Test-Issuer", TestAuthenticationHandler.Issuer);
+        client.DefaultRequestHeaders.Add("X-Test-Subject", TestAuthenticationHandler.Subject);
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
