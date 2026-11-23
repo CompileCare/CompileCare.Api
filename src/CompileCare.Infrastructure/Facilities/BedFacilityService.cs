@@ -37,7 +37,7 @@ public sealed partial class FacilityService
             .FirstOrDefaultAsync(bed => bed.RoomId == roomId && bed.Id == id, ct);
 
         return bed is null
-            ? Missing<BedDto>()
+            ? NotFound<BedDto>()
             : FacilityResult<BedDto>.Success(new(bed.Id, bed.RoomId, bed.Number, bed.IsActive));
     }
 
@@ -47,17 +47,17 @@ public sealed partial class FacilityService
         CancellationToken ct)
     {
         if (!await db.Rooms.AnyAsync(room => room.Id == roomId, ct))
-            return Missing<BedDto>();
+            return NotFound<BedDto>();
 
-        var number = Clean(input.Number);
+        var number = NormalizeName(input.Number);
         if (string.IsNullOrWhiteSpace(number) || number.Length > 50)
-            return Invalid<BedDto>("number", "required, max 50 chars");
+            return ValidationFailure<BedDto>("number", "required, max 50 chars");
 
         if (await db.Beds.AnyAsync(
                 bed => bed.RoomId == roomId && bed.Number == number,
                 ct))
         {
-            return Duplicate<BedDto>("Bed number already exists.");
+            return Conflict<BedDto>("Bed number already exists.");
         }
 
         var bed = new Bed
@@ -74,14 +74,14 @@ public sealed partial class FacilityService
             await db.SaveChangesAsync(ct);
             return FacilityResult<BedDto>.Success(new(bed.Id, bed.RoomId, bed.Number, bed.IsActive));
         }
-        catch (DbUpdateException exception) when (Unique(exception))
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
         {
-            return Duplicate<BedDto>("Bed number already exists.");
+            return Conflict<BedDto>("Bed number already exists.");
         }
-        catch (DbUpdateException exception) when (ForeignKey(exception))
+        catch (DbUpdateException exception) when (IsForeignKeyViolation(exception))
         {
             // The parent may have been deleted after the existence check.
-            return Missing<BedDto>();
+            return NotFound<BedDto>();
         }
     }
 
@@ -96,11 +96,11 @@ public sealed partial class FacilityService
             ct);
 
         if (bed is null)
-            return Missing<BedDto>();
+            return NotFound<BedDto>();
 
-        var number = Clean(input.Number);
+        var number = NormalizeName(input.Number);
         if (string.IsNullOrWhiteSpace(number) || number.Length > 50)
-            return Invalid<BedDto>("number", "required, max 50 chars");
+            return ValidationFailure<BedDto>("number", "required, max 50 chars");
 
         if (await db.Beds.AnyAsync(
                 candidate => candidate.RoomId == roomId &&
@@ -108,7 +108,7 @@ public sealed partial class FacilityService
                     candidate.Number == number,
                 ct))
         {
-            return Duplicate<BedDto>("Bed number already exists.");
+            return Conflict<BedDto>("Bed number already exists.");
         }
 
         bed.Number = number;
@@ -121,11 +121,11 @@ public sealed partial class FacilityService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Concurrency<BedDto>();
+            return ConcurrencyConflict<BedDto>();
         }
-        catch (DbUpdateException exception) when (Unique(exception))
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
         {
-            return Duplicate<BedDto>("Bed number already exists.");
+            return Conflict<BedDto>("Bed number already exists.");
         }
     }
 
@@ -139,7 +139,7 @@ public sealed partial class FacilityService
             ct);
 
         if (bed is null)
-            return Missing<bool>();
+            return NotFound<bool>();
 
         db.Beds.Remove(bed);
 
@@ -150,11 +150,11 @@ public sealed partial class FacilityService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Concurrency<bool>();
+            return ConcurrencyConflict<bool>();
         }
-        catch (DbUpdateException exception) when (ForeignKey(exception))
+        catch (DbUpdateException exception) when (IsForeignKeyViolation(exception))
         {
-            return Duplicate<bool>("Bed cannot be deleted while referenced by another resource.");
+            return Conflict<bool>("Bed cannot be deleted while referenced by another resource.");
         }
     }
 }
