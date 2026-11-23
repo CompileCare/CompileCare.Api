@@ -72,7 +72,7 @@ public sealed class CompileCareDbContext(
                 if (entry.Entity.OccurredAtUtc == default)
                     entry.Entity.OccurredAtUtc = now;
             }
-            else if (entry.State is EntityState.Modified or EntityState.Deleted or EntityState.Added && entry.Entity.Id == Guid.Empty)
+            else if (entry.State is EntityState.Modified or EntityState.Deleted)
             {
                 throw new InvalidOperationException("Audit events are append-only and cannot be modified or deleted.");
             }

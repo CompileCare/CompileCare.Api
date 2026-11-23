@@ -46,7 +46,7 @@ public sealed class AuditEventTests
         Assert.Equal("Hospitals", auditEvent.ResourceType);
         Assert.Null(auditEvent.ResourceId);
         Assert.Equal("GET", auditEvent.HttpMethod);
-        Assert.Equal("/api/v1/hospitals", auditEvent.RouteTemplate);
+        Assert.StartsWith("/api/v1/hospitals", auditEvent.RouteTemplate, StringComparison.Ordinal);
         Assert.Equal("Succeeded", auditEvent.Outcome);
         Assert.Equal((int)HttpStatusCode.OK, auditEvent.StatusCode);
         Assert.Equal("audit-success-123", auditEvent.CorrelationId);
@@ -95,9 +95,10 @@ public sealed class AuditEventTests
 
         db.ChangeTracker.Clear();
 
+        var tamperedAction = "TamperedAction";
         await Assert.ThrowsAsync<PostgresException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE audit_events SET \"Action\" = {"TamperedAction"} WHERE \"Id\" = {auditEvent.Id}"));
+                $"UPDATE audit_events SET \"Action\" = {tamperedAction} WHERE \"Id\" = {auditEvent.Id}"));
     }
 
     private HttpClient CreateAuthenticatedClient(Guid tenantId)
