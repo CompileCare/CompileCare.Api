@@ -43,7 +43,7 @@ public sealed partial class FacilityService
                 ct);
 
         return department is null
-            ? Missing<DepartmentDto>()
+            ? NotFound<DepartmentDto>()
             : FacilityResult<DepartmentDto>.Success(new(
                 department.Id,
                 department.HospitalId,
@@ -57,23 +57,23 @@ public sealed partial class FacilityService
         CancellationToken ct)
     {
         if (!await db.Hospitals.AnyAsync(hospital => hospital.Id == hospitalId, ct))
-            return Missing<DepartmentDto>();
+            return NotFound<DepartmentDto>();
 
-        var name = Clean(input.Name);
-        var code = CleanCode(input.Code);
+        var name = NormalizeName(input.Name);
+        var code = NormalizeCode(input.Code);
 
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
-            return Invalid<DepartmentDto>("name", "required, max 200 chars");
+            return ValidationFailure<DepartmentDto>("name", "required, max 200 chars");
 
         if (code?.Length > 50)
-            return Invalid<DepartmentDto>("code", "max 50 chars");
+            return ValidationFailure<DepartmentDto>("code", "max 50 chars");
 
         if (await db.Departments.AnyAsync(
                 department => department.HospitalId == hospitalId &&
                     (department.Name == name || (code != null && department.Code == code)),
                 ct))
         {
-            return Duplicate<DepartmentDto>("Department name/code already exists.");
+            return Conflict<DepartmentDto>("Department name/code already exists.");
         }
 
         var department = new Department
@@ -94,14 +94,14 @@ public sealed partial class FacilityService
                 department.Name,
                 department.Code));
         }
-        catch (DbUpdateException exception) when (Unique(exception))
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
         {
-            return Duplicate<DepartmentDto>("Department name/code already exists.");
+            return Conflict<DepartmentDto>("Department name/code already exists.");
         }
-        catch (DbUpdateException exception) when (ForeignKey(exception))
+        catch (DbUpdateException exception) when (IsForeignKeyViolation(exception))
         {
             // The parent may have been deleted after the existence check.
-            return Missing<DepartmentDto>();
+            return NotFound<DepartmentDto>();
         }
     }
 
@@ -116,16 +116,16 @@ public sealed partial class FacilityService
             ct);
 
         if (department is null)
-            return Missing<DepartmentDto>();
+            return NotFound<DepartmentDto>();
 
-        var name = Clean(input.Name);
-        var code = CleanCode(input.Code);
+        var name = NormalizeName(input.Name);
+        var code = NormalizeCode(input.Code);
 
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
-            return Invalid<DepartmentDto>("name", "required, max 200 chars");
+            return ValidationFailure<DepartmentDto>("name", "required, max 200 chars");
 
         if (code?.Length > 50)
-            return Invalid<DepartmentDto>("code", "max 50 chars");
+            return ValidationFailure<DepartmentDto>("code", "max 50 chars");
 
         if (await db.Departments.AnyAsync(
                 candidate => candidate.HospitalId == hospitalId &&
@@ -133,7 +133,7 @@ public sealed partial class FacilityService
                     (candidate.Name == name || (code != null && candidate.Code == code)),
                 ct))
         {
-            return Duplicate<DepartmentDto>("Department name/code already exists.");
+            return Conflict<DepartmentDto>("Department name/code already exists.");
         }
 
         department.Name = name;
@@ -150,11 +150,11 @@ public sealed partial class FacilityService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Concurrency<DepartmentDto>();
+            return ConcurrencyConflict<DepartmentDto>();
         }
-        catch (DbUpdateException exception) when (Unique(exception))
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
         {
-            return Duplicate<DepartmentDto>("Department name/code already exists.");
+            return Conflict<DepartmentDto>("Department name/code already exists.");
         }
     }
 
@@ -168,7 +168,7 @@ public sealed partial class FacilityService
             ct);
 
         if (department is null)
-            return Missing<bool>();
+            return NotFound<bool>();
 
         db.Departments.Remove(department);
 
@@ -179,11 +179,11 @@ public sealed partial class FacilityService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Concurrency<bool>();
+            return ConcurrencyConflict<bool>();
         }
-        catch (DbUpdateException exception) when (ForeignKey(exception))
+        catch (DbUpdateException exception) when (IsForeignKeyViolation(exception))
         {
-            return Duplicate<bool>("Department contains wards and cannot be deleted.");
+            return Conflict<bool>("Department contains wards and cannot be deleted.");
         }
     }
 }
