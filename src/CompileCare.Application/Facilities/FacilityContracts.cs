@@ -28,31 +28,46 @@ public sealed record DepartmentInput(string? Name, string? Code);
 public sealed record NamedInput(string? Name);
 public sealed record BedInput(string? Number, bool IsActive = true);
 
-public interface IFacilityService
+public interface IHospitalService
 {
     Task<PagedResult<HospitalDto>> ListHospitals(PageRequest page, CancellationToken ct);
     Task<FacilityResult<HospitalDto>> GetHospital(Guid id, CancellationToken ct);
     Task<FacilityResult<HospitalDto>> CreateHospital(HospitalInput input, CancellationToken ct);
     Task<FacilityResult<HospitalDto>> UpdateHospital(Guid id, HospitalInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteHospital(Guid id, CancellationToken ct);
+}
+public interface IDepartmentService
+{
     Task<PagedResult<DepartmentDto>> ListDepartments(Guid hospitalId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> GetDepartment(Guid hospitalId, Guid id, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> CreateDepartment(Guid hospitalId, DepartmentInput input, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> UpdateDepartment(Guid hospitalId, Guid id, DepartmentInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteDepartment(Guid hospitalId, Guid id, CancellationToken ct);
+}
+public interface IWardService
+{
     Task<PagedResult<WardDto>> ListWards(Guid departmentId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<WardDto>> GetWard(Guid departmentId, Guid id, CancellationToken ct);
     Task<FacilityResult<WardDto>> CreateWard(Guid departmentId, NamedInput input, CancellationToken ct);
     Task<FacilityResult<WardDto>> UpdateWard(Guid departmentId, Guid id, NamedInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteWard(Guid departmentId, Guid id, CancellationToken ct);
+}
+public interface IRoomService
+{
     Task<PagedResult<RoomDto>> ListRooms(Guid wardId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<RoomDto>> GetRoom(Guid wardId, Guid id, CancellationToken ct);
     Task<FacilityResult<RoomDto>> CreateRoom(Guid wardId, NamedInput input, CancellationToken ct);
     Task<FacilityResult<RoomDto>> UpdateRoom(Guid wardId, Guid id, NamedInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteRoom(Guid wardId, Guid id, CancellationToken ct);
+}
+public interface IBedService
+{
     Task<PagedResult<BedDto>> ListBeds(Guid roomId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<BedDto>> GetBed(Guid roomId, Guid id, CancellationToken ct);
     Task<FacilityResult<BedDto>> CreateBed(Guid roomId, BedInput input, CancellationToken ct);
     Task<FacilityResult<BedDto>> UpdateBed(Guid roomId, Guid id, BedInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteBed(Guid roomId, Guid id, CancellationToken ct);
+}
+public interface IFacilityService : IHospitalService, IDepartmentService, IWardService, IRoomService, IBedService
+{
 }
