@@ -64,7 +64,7 @@ public sealed class SecurityAuthorizationTests
             ? string.Join("; ", failures)
             : "JWT validation succeeded; membership authorization returned a response.";
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode, diagnostic);
+        Assert.True(response.StatusCode == HttpStatusCode.Forbidden, diagnostic);
     }
 
     [Fact]
