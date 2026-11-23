@@ -10,7 +10,7 @@ public sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEven
         builder.ToTable("audit_events", table =>
             table.HasCheckConstraint(
                 "CK_audit_events_outcome",
-                "\"\"Outcome\"\" IN ('Succeeded', 'Denied', 'Rejected', 'Failed')"));
+                "\"Outcome\" IN ('Succeeded', 'Denied', 'Rejected', 'Failed')"));
 
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();

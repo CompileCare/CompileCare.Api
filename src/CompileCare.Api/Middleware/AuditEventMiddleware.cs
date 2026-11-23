@@ -9,10 +9,9 @@ using Serilog.Context;
 namespace CompileCare.Api.Middleware;
 
 /// <summary>
-/// Writes an append-only audit event for every tenant-scoped API request.
-/// The business operation and success/denial audit record share one transaction.
-/// Response bodies are buffered only for these bounded, paginated facility endpoints
-/// so a persistence failure cannot return a success response for a rolled-back write.
+/// Writes a metadata-only audit event for each tenant-scoped API request.
+/// Successful business changes and their audit event commit in one database transaction.
+/// No request/response bodies, query strings, or patient payloads are persisted.
 /// </summary>
 public sealed class AuditEventMiddleware(RequestDelegate next)
 {
@@ -38,20 +37,21 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         await using var responseBuffer = new MemoryStream();
         context.Response.Body = responseBuffer;
 
-        IDbContextTransaction transaction;
+        IDbContextTransaction? transaction = null;
         try
         {
             transaction = await db.Database.BeginTransactionAsync(CancellationToken.None);
         }
         catch (Exception exception)
         {
-            logger.LogCritical(exception,
+            logger.LogCritical(
+                exception,
                 "Cannot start the audit transaction for tenant-scoped endpoint {Endpoint}.",
                 endpoint.DisplayName);
 
             await WriteAuditUnavailableProblemAsync(context);
-            await CopyBufferedResponseAsync(responseBuffer, originalBody);
             context.Response.Body = originalBody;
+            await CopyBufferedResponseAsync(responseBuffer, originalBody);
             return;
         }
 
@@ -66,7 +66,15 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
             }
 
             pipelineCompleted = true;
-            db.AuditEvents.Add(CreateAuditEvent(context, endpoint, tenantContext, context.Response.StatusCode));
+
+            db.AuditEvents.Add(CreateAuditEvent(
+                context,
+                endpoint,
+                tenantContext,
+                context.Response.StatusCode));
+
+            // CompileCareDbContext and application services are scoped: the endpoint's
+            // SaveChanges and this audit insert participate in the same transaction.
             await db.SaveChangesAsync(CancellationToken.None);
             await transaction.CommitAsync(CancellationToken.None);
             responseReady = true;
@@ -79,8 +87,14 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
             }
             catch (Exception rollbackException)
             {
-                logger.LogError(rollbackException,
-                    "Failed to roll back the request transaction after an audit or endpoint failure.");
+                logger.LogError(
+                    rollbackException,
+                    "Failed to roll back the tenant-scoped request transaction.");
+            }
+            finally
+            {
+                await transaction.DisposeAsync();
+                transaction = null;
             }
 
             db.ChangeTracker.Clear();
@@ -96,18 +110,23 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
                 throw;
             }
 
-            // The endpoint completed, but the audit record could not be committed.
-            // The business changes have been rolled back; never return the buffered success response.
-            logger.LogCritical(exception,
+            // The endpoint completed but the audit insert/commit failed. Its business
+            // writes are rolled back, and the buffered success response is discarded.
+            logger.LogCritical(
+                exception,
                 "Audit persistence failed for tenant-scoped endpoint {Endpoint}; the request transaction was rolled back.",
                 endpoint.DisplayName);
 
+            responseBuffer.SetLength(0);
+            responseBuffer.Position = 0;
             await WriteAuditUnavailableProblemAsync(context);
             responseReady = true;
         }
         finally
         {
-            await transaction.DisposeAsync();
+            if (transaction is not null)
+                await transaction.DisposeAsync();
+
             context.Response.Body = originalBody;
         }
 
@@ -126,8 +145,6 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         var action = GetAction(endpoint, context);
         var tags = endpoint.Metadata.GetMetadata<ITagsMetadata>()?.Tags;
         var resourceType = tags?.FirstOrDefault() ?? "Unknown";
-        var resourceId = ParseRouteResourceId(context);
-        var requestedTenantId = ParseRequestedTenantId(context);
 
         var outcome = statusCode switch
         {
@@ -140,12 +157,12 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         return new AuditEvent
         {
             TenantId = tenantContext.TenantId,
-            RequestedTenantId = requestedTenantId,
+            RequestedTenantId = ParseRequestedTenantId(context),
             ActorIssuer = context.User.FindFirst(AuthorizationPolicies.ValidatedIssuerClaim)?.Value,
             ActorSubject = context.User.FindFirst("sub")?.Value,
             Action = Truncate(action, 128),
             ResourceType = Truncate(resourceType, 128),
-            ResourceId = resourceId,
+            ResourceId = ParseRouteResourceId(context),
             HttpMethod = Truncate(context.Request.Method, 10),
             RouteTemplate = Truncate(routeTemplate, 500),
             Outcome = outcome,
@@ -161,7 +178,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         if (!string.IsNullOrWhiteSpace(action))
             return action;
 
-        var route = (endpoint as RouteEndpoint)?.RoutePattern.RawText ?? context.Request.Path.Value ?? "/";
+        var route = (endpoint as RouteEndpoint)?.RoutePattern.RawText ?? "/";
         return $"{context.Request.Method} {route}";
     }
 
@@ -194,15 +211,24 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
     {
         try
         {
-            await using var failureTransaction = await db.Database.BeginTransactionAsync(CancellationToken.None);
-            db.AuditEvents.Add(CreateAuditEvent(context, endpoint, tenantContext, StatusCodes.Status500InternalServerError)
-                withOutcome(Failed));
+            await using var failureTransaction =
+                await db.Database.BeginTransactionAsync(CancellationToken.None);
+
+            var failureEvent = CreateAuditEvent(
+                context,
+                endpoint,
+                tenantContext,
+                StatusCodes.Status500InternalServerError);
+            failureEvent.Outcome = Failed;
+            db.AuditEvents.Add(failureEvent);
+
             await db.SaveChangesAsync(CancellationToken.None);
             await failureTransaction.CommitAsync(CancellationToken.None);
         }
         catch (Exception auditException)
         {
-            logger.LogCritical(auditException,
+            logger.LogCritical(
+                auditException,
                 "Failed to persist the failure audit event for tenant-scoped endpoint {Endpoint}.",
                 endpoint.DisplayName);
         }
@@ -212,6 +238,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
     {
         context.Response.Clear();
         context.Response.Headers[CorrelationIdMiddleware.HeaderName] = context.TraceIdentifier;
+
         await Results.Problem(
             type: "https://compilecare.in/problems/audit-unavailable",
             title: "Audit service unavailable",
@@ -221,21 +248,12 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
             extensions: new Dictionary<string, object?>
             {
                 ["traceId"] = context.TraceIdentifier
-            }).ExecuteAsync(context);
+            }).ExecuteAsync(context.HttpContext);
     }
 
     private static async Task CopyBufferedResponseAsync(Stream buffer, Stream destination)
     {
         buffer.Position = 0;
         await buffer.CopyToAsync(destination, CancellationToken.None);
-    }
-}
-
-internal static class AuditEventExtensions
-{
-    public static AuditEvent withOutcome(this AuditEvent auditEvent, string outcome)
-    {
-        auditEvent.Outcome = outcome;
-        return auditEvent;
     }
 }
