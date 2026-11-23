@@ -17,7 +17,7 @@ public sealed class CompileCareDbContextFactory : IDesignTimeDbContextFactory<Co
         return new CompileCareDbContext(options, new DesignTimeTenantContext());
     }
 
-    private sealed class DesignTimeTenantContext : Application.Tenancy.ITenantContext
+    private sealed class DesignTimeTenantContext : CompileCare.Application.Tenancy.ITenantContext
     {
         public Guid? TenantId => null;
         public void SetTenant(Guid tenantId) => throw new NotSupportedException("Design-time tenant context is not writable.");
