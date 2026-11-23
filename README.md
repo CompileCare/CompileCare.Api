@@ -112,7 +112,7 @@ Each collection supports bounded `page` and `pageSize` pagination (default 50, m
 
 ## Tenant isolation
 
-The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Before tenant-owned data is exposed, tenant identity must be bound to an authenticated principal and authorized against the requested resource. Persistence requires a validated tenant context for tenant-owned writes and applies tenant query filters. Tenant scope must also be enforced in audit, background jobs and message consumers. The platform context endpoint is diagnostic only.
+The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Facility and platform-context API routes now require a validated OIDC/JWT principal and an active CompileCare membership matching the token issuer, subject and selected tenant. Persistence requires the validated tenant context for tenant-owned writes and applies tenant query filters. Background jobs and message consumers must establish an equivalent trusted tenant context before accessing tenant-owned data. The platform context endpoint is diagnostic only.
 
 ## Pull request workflow
 
