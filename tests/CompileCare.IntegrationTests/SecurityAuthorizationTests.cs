@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using CompileCare.Api.Middleware;
 using CompileCare.Api.Security;
 using CompileCare.Application.Tenancy;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
