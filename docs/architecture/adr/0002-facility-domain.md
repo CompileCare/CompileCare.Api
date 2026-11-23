@@ -1,13 +1,13 @@
-# ADR-0002: Facility domain as the first persisted business module
+# ADR-0002: Hospital hierarchy as the first persisted business module
 
 - Status: Accepted
 - Date: 2026-11-23
 
 ## Decision
-Start the first persisted business capability with a tenant-owned Facility (hospital/clinic) entity. Facility records have a tenant-scoped unique code, standard audit metadata inherited from TenantOwnedEntity, and soft-state via IsActive. The first API slice exposes list, get, create, update, and delete endpoints under /api/v1/facilities.
+Establish the tenant-owned hierarchy Hospital → Department → Ward → Room → Bed as the first persisted business domain. Each entity includes audit/concurrency fields inherited from TenantOwnedEntity. Composite tenant-scoped foreign keys enforce same-tenant parent-child relationships. The first API slice provides CRUD for Hospital.
 
 ## Rationale
-Facilities are the root of the healthcare physical/organizational hierarchy and provide the parent for subsequent Department, Ward, Room, and Bed entities. This keeps the initial model small while establishing persistence, validation, tenant scoping, and endpoint conventions.
+The hierarchy forms the foundation for healthcare facility operations and gives later domains (patients, admissions, appointments, staff, and billing) a stable physical/organizational context.
 
 ## Security
-Tenant query filters and persistence tenant validation remain defense-in-depth. The current tenant header is not authentication or authorization. Facility APIs must not be considered production-secure until tenant context is bound to an authenticated principal and membership is authorized.
+Tenant query filters and persistence tenant checks are defense-in-depth. The tenant header is not authentication or authorization; tenant membership must be validated against an authenticated principal before production access.
