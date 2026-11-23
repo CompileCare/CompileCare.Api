@@ -22,6 +22,7 @@ app.UseExceptionHandler();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<AuditEventMiddleware>();
 app.UseMiddleware<TenantContextMiddleware>();
 app.UseAuthorization();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();

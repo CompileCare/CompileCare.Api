@@ -14,6 +14,7 @@ public sealed class CompileCareDbContext(
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Bed> Beds => Set<Bed>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +47,37 @@ public sealed class CompileCareDbContext(
     private void ApplyAuditAndTenantRules()
     {
         var now = DateTimeOffset.UtcNow;
+
+        foreach (var entry in ChangeTracker.Entries<AuditEvent>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                if (entry.Entity.TenantId.HasValue &&
+                    (CurrentTenantId is null || entry.Entity.TenantId != CurrentTenantId))
+                {
+                    throw new InvalidOperationException("An audit event cannot claim an unvalidated tenant context.");
+                }
+
+                entry.Entity.TenantId = CurrentTenantId;
+
+                if (entry.Entity.Id == Guid.Empty ||
+                    string.IsNullOrWhiteSpace(entry.Entity.Action) ||
+                    string.IsNullOrWhiteSpace(entry.Entity.ResourceType) ||
+                    string.IsNullOrWhiteSpace(entry.Entity.Outcome) ||
+                    string.IsNullOrWhiteSpace(entry.Entity.CorrelationId))
+                {
+                    throw new InvalidOperationException("An audit event requires its identifier, action, resource type, outcome and correlation ID.");
+                }
+
+                if (entry.Entity.OccurredAtUtc == default)
+                    entry.Entity.OccurredAtUtc = now;
+            }
+            else if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new InvalidOperationException("Audit events are append-only and cannot be modified or deleted.");
+            }
+        }
+
         foreach (var entry in ChangeTracker.Entries<TenantOwnedEntity>())
         {
             if (entry.State is EntityState.Added)
