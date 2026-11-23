@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using CompileCare.Api.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
@@ -30,7 +31,8 @@ public sealed class TestAuthenticationHandler(
         var claims = new List<Claim>
         {
             new("iss", issuer),
-            new("sub", subject)
+            new("sub", subject),
+            new(AuthorizationPolicies.ValidatedIssuerClaim, issuer)
         };
 
         claims.AddRange(ReadClaims("X-Test-External-Permissions", "compilecare:permission"));

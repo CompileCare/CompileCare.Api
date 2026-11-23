@@ -41,7 +41,7 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
 
         // JWT claim mapping is disabled. These values come from the validated
         // token, not from an email address or a caller-controlled identity header.
-        var issuer = context.User.FindFirst("iss")?.Value;
+        var issuer = context.User.FindFirst(AuthorizationPolicies.ValidatedIssuerClaim)?.Value;
         var subject = context.User.FindFirst("sub")?.Value;
         if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject))
         {
@@ -85,6 +85,7 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             AuthorizationPolicies.TenantIdClaim,
             AuthorizationPolicies.TenantRoleClaim,
             AuthorizationPolicies.PermissionClaim,
+            AuthorizationPolicies.ValidatedIssuerClaim,
             "role",
             "roles",
             ClaimTypes.Role
@@ -103,6 +104,7 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
         // Only server-loaded membership data creates CompileCare permission claims.
         var membershipClaims = new List<Claim>
         {
+            new(AuthorizationPolicies.ValidatedIssuerClaim, issuer),
             new(AuthorizationPolicies.TenantIdClaim, tenantId.ToString("D")),
             new(AuthorizationPolicies.TenantRoleClaim, membership.Role)
         };
@@ -111,7 +113,7 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
 
         context.User.AddIdentity(new ClaimsIdentity(
             membershipClaims,
-            authenticationType: "CompileCareTenantMembership"));
+            authenticationType: AuthorizationPolicies.MembershipIdentityAuthenticationType));
 
         tenantContext.SetTenant(tenantId);
         using (LogContext.PushProperty("TenantId", tenantId))

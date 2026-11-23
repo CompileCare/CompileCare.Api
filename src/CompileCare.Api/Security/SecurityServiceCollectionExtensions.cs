@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -49,6 +50,34 @@ public static class SecurityServiceCollectionExtensions
                     NameClaimType = "sub",
                     RoleClaimType = "role",
                     ClockSkew = TimeSpan.FromMinutes(1)
+                };
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = context =>
+                    {
+                        var issuer = context.SecurityToken.Issuer;
+                        var identity = context.Principal?.Identities.FirstOrDefault(candidate =>
+                            candidate.IsAuthenticated &&
+                            candidate.HasClaim(claim => claim.Type == "sub"));
+
+                        if (string.IsNullOrWhiteSpace(issuer) || identity is null)
+                        {
+                            context.Fail("The validated access token must contain an issuer and subject.");
+                            return Task.CompletedTask;
+                        }
+
+                        // Replace any identically named claim from the token with the
+                        // issuer read from the validated SecurityToken instance.
+                        foreach (var existing in identity.FindAll(AuthorizationPolicies.ValidatedIssuerClaim).ToArray())
+                            identity.RemoveClaim(existing);
+
+                        identity.AddClaim(new Claim(
+                            AuthorizationPolicies.ValidatedIssuerClaim,
+                            issuer,
+                            ClaimValueTypes.String,
+                            issuer));
+                        return Task.CompletedTask;
+                    }
                 };
             });
 

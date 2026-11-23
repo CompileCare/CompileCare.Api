@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CompileCare.Application.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 
@@ -12,16 +13,29 @@ public static class AuthorizationPolicies
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
     public const string PermissionClaim = "compilecare:permission";
+    public const string ValidatedIssuerClaim = "compilecare:validated_issuer";
+    public const string MembershipIdentityAuthenticationType = "CompileCareTenantMembership";
 
     public static void Configure(AuthorizationOptions options)
     {
         options.AddPolicy(FacilityRead, policy =>
-            policy.RequireAuthenticatedUser().RequireClaim(PermissionClaim, TenantPermissions.FacilityRead));
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.FacilityRead)));
 
         options.AddPolicy(FacilityWrite, policy =>
-            policy.RequireAuthenticatedUser().RequireClaim(PermissionClaim, TenantPermissions.FacilityWrite));
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.FacilityWrite)));
 
         options.AddPolicy(FacilityDelete, policy =>
-            policy.RequireAuthenticatedUser().RequireClaim(PermissionClaim, TenantPermissions.FacilityDelete));
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.FacilityDelete)));
     }
+
+    private static bool HasMembershipPermission(ClaimsPrincipal principal, string permission) =>
+        principal.Identities.Any(identity =>
+            string.Equals(
+                identity.AuthenticationType,
+                MembershipIdentityAuthenticationType,
+                StringComparison.Ordinal) &&
+            identity.HasClaim(PermissionClaim, permission));
 }
