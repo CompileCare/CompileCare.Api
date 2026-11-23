@@ -248,7 +248,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
             extensions: new Dictionary<string, object?>
             {
                 ["traceId"] = context.TraceIdentifier
-            }).ExecuteAsync(context.HttpContext);
+            }).ExecuteAsync(context);
     }
 
     private static async Task CopyBufferedResponseAsync(Stream buffer, Stream destination)
