@@ -69,7 +69,19 @@ dotnet test CompileCare.Api.slnx
 dotnet run --project src/CompileCare.Api
 ```
 
-Endpoints: `/`, `/health/live`, `/health/ready`, `/metrics`, `/api/v1/platform/context`, and (Development only) `/openapi/v1.json`.
+Platform endpoints: `/`, `/health/live`, `/health/ready`, `/metrics`, `/api/v1/platform/context`, and (Development only) `/openapi/v1.json`.
+
+## Facility hierarchy API
+
+The facility module exposes CRUD for the hierarchy **Hospital → Department → Ward → Room → Bed**:
+
+- Hospitals: `/api/v1/hospitals`
+- Departments: `/api/v1/hospitals/{hospitalId}/departments`
+- Wards: `/api/v1/departments/{departmentId}/wards`
+- Rooms: `/api/v1/wards/{wardId}/rooms`
+- Beds: `/api/v1/rooms/{roomId}/beds`
+
+Each collection supports bounded `page` and `pageSize` pagination (default 50, maximum 100). See [the facility module documentation](docs/modules/facilities/README.md) for route behavior, resource constraints, and response metadata.
 
 ## Tenant isolation
 
