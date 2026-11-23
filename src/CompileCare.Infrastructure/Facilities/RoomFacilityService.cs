@@ -49,7 +49,7 @@ public sealed partial class FacilityService
         if (!await db.Wards.AnyAsync(ward => ward.Id == wardId, ct))
             return NotFound<RoomDto>();
 
-        var name = NormalizeName(input.Name);
+        var name = NormalizeText(input.Name);
         if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
             return ValidationFailure<RoomDto>("name", "required, max 100 chars");
 
@@ -97,7 +97,7 @@ public sealed partial class FacilityService
         if (room is null)
             return NotFound<RoomDto>();
 
-        var name = NormalizeName(input.Name);
+        var name = NormalizeText(input.Name);
         if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
             return ValidationFailure<RoomDto>("name", "required, max 100 chars");
 
