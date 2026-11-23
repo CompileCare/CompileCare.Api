@@ -11,11 +11,15 @@ using Xunit;
 namespace CompileCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
-public sealed class FacilityApiTests(FacilityApiFactory factory)
+public sealed class FacilityApiTests
 {
-    private readonly FacilityApiFactory _factory = factory;
+    private readonly FacilityApiFactory _factory;
 
-    public void ResetDatabaseForTest() => _factory.ResetDatabase();
+    public FacilityApiTests(FacilityApiFactory factory)
+    {
+        _factory = factory;
+        _factory.ResetDatabase();
+    }
 
     [Fact]
     public async Task FacilityHierarchyCrud_IsTenantScopedAndPreservesResourceLocations()
