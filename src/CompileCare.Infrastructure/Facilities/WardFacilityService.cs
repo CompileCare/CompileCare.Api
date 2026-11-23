@@ -39,7 +39,7 @@ public sealed partial class FacilityService
                 ct);
 
         return ward is null
-            ? Missing<WardDto>()
+            ? NotFound<WardDto>()
             : FacilityResult<WardDto>.Success(new(ward.Id, ward.DepartmentId, ward.Name));
     }
 
@@ -49,17 +49,17 @@ public sealed partial class FacilityService
         CancellationToken ct)
     {
         if (!await db.Departments.AnyAsync(department => department.Id == departmentId, ct))
-            return Missing<WardDto>();
+            return NotFound<WardDto>();
 
-        var name = Clean(input.Name);
+        var name = NormalizeName(input.Name);
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
-            return Invalid<WardDto>("name", "required, max 200 chars");
+            return ValidationFailure<WardDto>("name", "required, max 200 chars");
 
         if (await db.Wards.AnyAsync(
                 ward => ward.DepartmentId == departmentId && ward.Name == name,
                 ct))
         {
-            return Duplicate<WardDto>("Ward name already exists.");
+            return Conflict<WardDto>("Ward name already exists.");
         }
 
         var ward = new Ward
@@ -75,14 +75,14 @@ public sealed partial class FacilityService
             await db.SaveChangesAsync(ct);
             return FacilityResult<WardDto>.Success(new(ward.Id, ward.DepartmentId, ward.Name));
         }
-        catch (DbUpdateException exception) when (Unique(exception))
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
         {
-            return Duplicate<WardDto>("Ward name already exists.");
+            return Conflict<WardDto>("Ward name already exists.");
         }
-        catch (DbUpdateException exception) when (ForeignKey(exception))
+        catch (DbUpdateException exception) when (IsForeignKeyViolation(exception))
         {
             // The parent may have been deleted after the existence check.
-            return Missing<WardDto>();
+            return NotFound<WardDto>();
         }
     }
 
@@ -97,11 +97,11 @@ public sealed partial class FacilityService
             ct);
 
         if (ward is null)
-            return Missing<WardDto>();
+            return NotFound<WardDto>();
 
-        var name = Clean(input.Name);
+        var name = NormalizeName(input.Name);
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
-            return Invalid<WardDto>("name", "required, max 200 chars");
+            return ValidationFailure<WardDto>("name", "required, max 200 chars");
 
         if (await db.Wards.AnyAsync(
                 candidate => candidate.DepartmentId == departmentId &&
@@ -109,7 +109,7 @@ public sealed partial class FacilityService
                     candidate.Name == name,
                 ct))
         {
-            return Duplicate<WardDto>("Ward name already exists.");
+            return Conflict<WardDto>("Ward name already exists.");
         }
 
         ward.Name = name;
@@ -121,11 +121,11 @@ public sealed partial class FacilityService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Concurrency<WardDto>();
+            return ConcurrencyConflict<WardDto>();
         }
-        catch (DbUpdateException exception) when (Unique(exception))
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
         {
-            return Duplicate<WardDto>("Ward name already exists.");
+            return Conflict<WardDto>("Ward name already exists.");
         }
     }
 
@@ -139,7 +139,7 @@ public sealed partial class FacilityService
             ct);
 
         if (ward is null)
-            return Missing<bool>();
+            return NotFound<bool>();
 
         db.Wards.Remove(ward);
 
@@ -150,11 +150,11 @@ public sealed partial class FacilityService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Concurrency<bool>();
+            return ConcurrencyConflict<bool>();
         }
-        catch (DbUpdateException exception) when (ForeignKey(exception))
+        catch (DbUpdateException exception) when (IsForeignKeyViolation(exception))
         {
-            return Duplicate<bool>("Ward contains rooms and cannot be deleted.");
+            return Conflict<bool>("Ward contains rooms and cannot be deleted.");
         }
     }
 }
