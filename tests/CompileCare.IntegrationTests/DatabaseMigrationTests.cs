@@ -48,9 +48,12 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
 
+        var appliedBefore = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
+
         await db.Database.MigrateAsync();
 
+        var appliedAfter = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
+        Assert.Equal(appliedBefore, appliedAfter);
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
-        Assert.Single(await db.Database.GetAppliedMigrationsAsync());
     }
 }
