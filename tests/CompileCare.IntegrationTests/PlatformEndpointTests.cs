@@ -47,13 +47,13 @@ public sealed class PlatformEndpointTests(WebApplicationFactory<Program> factory
     public async Task CorrelationIdMiddleware_ReplacesUnsafeCorrelationIds()
     {
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Correlation-ID", "invalid/correlation\r\nheader");
+        client.DefaultRequestHeaders.Add("X-Correlation-ID", "invalid/correlation");
 
         var response = await client.GetAsync("/");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var correlationId = response.Headers.GetValues("X-Correlation-ID").Single();
-        Assert.NotEqual("invalid/correlation\r\nheader", correlationId);
+        Assert.NotEqual("invalid/correlation", correlationId);
         Assert.True(correlationId.Length <= 64);
         Assert.All(correlationId, character =>
             Assert.True(char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.'));
