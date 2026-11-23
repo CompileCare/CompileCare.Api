@@ -57,8 +57,23 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
                     var configuredEvents = options.Events;
                     options.Events = new JwtBearerEvents
                     {
-                        OnTokenValidated = configuredEvents.OnTokenValidated,
-                        OnChallenge = configuredEvents.OnChallenge,
+                        OnMessageReceived = async context =>
+                        {
+                            context.Response.Headers["X-Test-Bearer-Header"] =
+                                context.Request.Headers.Authorization.Count > 0 ? "present" : "missing";
+                            await configuredEvents.OnMessageReceived(context);
+                        },
+                        OnTokenValidated = async context =>
+                        {
+                            context.Response.Headers["X-Test-Jwt-Validated"] = "true";
+                            await configuredEvents.OnTokenValidated(context);
+                        },
+                        OnChallenge = async context =>
+                        {
+                            context.Response.Headers["X-Test-Challenge-AuthenticateFailure"] =
+                                context.AuthenticateFailure?.GetType().Name ?? "none";
+                            await configuredEvents.OnChallenge(context);
+                        },
                         OnForbidden = configuredEvents.OnForbidden,
                         OnAuthenticationFailed = async context =>
                         {

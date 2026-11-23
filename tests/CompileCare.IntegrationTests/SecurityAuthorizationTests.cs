@@ -19,6 +19,16 @@ public sealed class SecurityAuthorizationTests
     }
 
     [Fact]
+    public async Task JwtBearer_IsDefaultAuthenticationScheme()
+    {
+        var schemes = _factory.Services.GetRequiredService<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>();
+        var authenticate = await schemes.GetDefaultAuthenticateSchemeAsync();
+        var challenge = await schemes.GetDefaultChallengeSchemeAsync();
+        Assert.Equal(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, authenticate?.Name);
+        Assert.Equal(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, challenge?.Name);
+    }
+
+    [Fact]
     public async Task JwtBearer_RejectsUntrustedIssuerAndAudience()
     {
         var wrongIssuer = _factory.CreateClient();
@@ -64,8 +74,17 @@ public sealed class SecurityAuthorizationTests
             ? string.Join("; ", failures)
             : "OnAuthenticationFailed was not invoked.";
         var challenge = string.Join("; ", response.Headers.WwwAuthenticate.Select(value => value.ToString()));
+        var bearerHeader = response.Headers.TryGetValues("X-Test-Bearer-Header", out var headerValues)
+            ? string.Join(",", headerValues)
+            : "not-emitted";
+        var tokenValidated = response.Headers.TryGetValues("X-Test-Jwt-Validated", out var validatedValues)
+            ? string.Join(",", validatedValues)
+            : "not-emitted";
+        var challengeFailure = response.Headers.TryGetValues("X-Test-Challenge-AuthenticateFailure", out var challengeValues)
+            ? string.Join(",", challengeValues)
+            : "not-emitted";
         var body = await response.Content.ReadAsStringAsync();
-        var diagnostic = $"JWT failure: {jwtFailure}; challenge: {challenge}; response: {body}";
+        var diagnostic = $"JWT failure: {jwtFailure}; bearer header: {bearerHeader}; token validated: {tokenValidated}; challenge failure: {challengeFailure}; challenge: {challenge}; response: {body}";
 
         Assert.True(response.StatusCode == HttpStatusCode.Forbidden, diagnostic);
     }
