@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace CompileCare.IntegrationTests;
 
@@ -12,7 +13,7 @@ public sealed class TestAuthenticationHandler(
     UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
-    public const string Scheme = "CompileCareTest";
+    public const string TestScheme = "CompileCareTest";
     public const string Issuer = "https://identity.compilecare.test/";
     public const string Subject = "integration-test-user";
 

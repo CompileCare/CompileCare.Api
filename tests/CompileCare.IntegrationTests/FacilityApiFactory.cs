@@ -28,12 +28,12 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
             services
                 .AddAuthentication(options =>
                 {
-                    options.DefaultAuthenticateScheme = TestAuthenticationHandler.Scheme;
-                    options.DefaultChallengeScheme = TestAuthenticationHandler.Scheme;
-                    options.DefaultForbidScheme = TestAuthenticationHandler.Scheme;
+                    options.DefaultAuthenticateScheme = TestAuthenticationHandler.TestScheme;
+                    options.DefaultChallengeScheme = TestAuthenticationHandler.TestScheme;
+                    options.DefaultForbidScheme = TestAuthenticationHandler.TestScheme;
                 })
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
-                    TestAuthenticationHandler.Scheme,
+                    TestAuthenticationHandler.TestScheme,
                     _ => { });
         });
     }
