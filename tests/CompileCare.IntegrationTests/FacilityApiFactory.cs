@@ -40,6 +40,6 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         }
 
         db.Database.EnsureDeleted();
-        db.Database.EnsureCreated();
+        db.Database.Migrate();
     }
 }
