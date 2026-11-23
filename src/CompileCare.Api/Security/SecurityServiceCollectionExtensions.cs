@@ -77,6 +77,33 @@ public static class SecurityServiceCollectionExtensions
                             ClaimValueTypes.String,
                             issuer));
                         return Task.CompletedTask;
+                    },
+                    OnChallenge = async context =>
+                    {
+                        context.HandleResponse();
+                        await Results.Problem(
+                            type: "https://compilecare.in/problems/authentication-required",
+                            title: "Authentication required",
+                            detail: "A valid bearer access token is required.",
+                            statusCode: StatusCodes.Status401Unauthorized,
+                            instance: context.Request.Path,
+                            extensions: new Dictionary<string, object?>
+                            {
+                                ["traceId"] = context.HttpContext.TraceIdentifier
+                            }).ExecuteAsync(context.HttpContext);
+                    },
+                    OnForbidden = async context =>
+                    {
+                        await Results.Problem(
+                            type: "https://compilecare.in/problems/access-denied",
+                            title: "Access denied",
+                            detail: "The authenticated identity is not authorized for this operation.",
+                            statusCode: StatusCodes.Status403Forbidden,
+                            instance: context.Request.Path,
+                            extensions: new Dictionary<string, object?>
+                            {
+                                ["traceId"] = context.HttpContext.TraceIdentifier
+                            }).ExecuteAsync(context.HttpContext);
                     }
                 };
             });
