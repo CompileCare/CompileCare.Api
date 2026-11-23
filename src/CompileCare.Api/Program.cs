@@ -25,6 +25,7 @@ app.MapPrometheusScrapingEndpoint();
 app.MapGet("/", () => Results.Ok(new { service = "CompileCare.Api", status = "ready" }));
 app.MapHealthEndpoints();
 app.MapPlatformEndpoints();
+app.MapHospitalEndpoints();
 app.Run();
 
 public partial class Program;
