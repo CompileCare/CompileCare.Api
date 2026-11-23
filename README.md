@@ -16,7 +16,9 @@ The first delivery is a **modular monolith** with explicit capability boundaries
 
 ## Foundation
 
-- .NET 9 / ASP.NET Core
+- .NET 10 / ASP.NET Core
+- EF Core 10
+- PostgreSQL via Npgsql
 - Versioned platform endpoint
 - OpenAPI in Development
 - Shared `CompileCare.Observability` library for structured logging, OpenTelemetry traces/metrics and health checks
@@ -26,28 +28,39 @@ The first delivery is a **modular monolith** with explicit capability boundaries
 - Problem Details exception handling
 - Dockerfile and GitHub Actions CI
 
-## Observability configuration
+## Database configuration
 
-The API consumes the stable shared packages from the CompileCare GitHub Packages NuGet feed. CI uses `GITHUB_TOKEN` with `packages: read`; in each package's Settings → Manage Actions access, grant the `CompileCare.Api` repository read access (otherwise NuGet restore returns 403).
+Set `ConnectionStrings__CompileCare` through environment variables or a secret store. Do not commit credentials.
 
-Set these configuration values (environment variables use the standard ASP.NET Core double-underscore convention):
+Example local connection string:
 
-- `OpenTelemetry__ServiceName=CompileCare.Api`
-- `OpenTelemetry__OtlpEndpoint=http://localhost:4318`
-- `ElasticConfiguration__Uri` (optional; Elasticsearch logging is enabled when configured)
-
-Example:
-
-```bash
-OpenTelemetry__ServiceName=CompileCare.Api
-OpenTelemetry__OtlpEndpoint=http://localhost:4318
+```
+Host=localhost;Database=compilecare;Username=compilecare;Password=replace-me
 ```
 
-The API enriches request logs with correlation ID and tenant ID when available. Do not log patient data, credentials, tokens, or other sensitive healthcare information.
+Infrastructure registers EF Core/Npgsql and database readiness only when the connection string is configured. Migrations are created with the EF Core CLI from the Infrastructure project.
+
+```bash
+dotnet ef migrations add InitialPersistence --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
+dotnet ef database update --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
+```
+
+The design-time factory supports `ConnectionStrings__CompileCare`; its local fallback is tooling-only. Never use it in production.
+
+## Observability configuration
+
+The API consumes stable shared packages from the CompileCare GitHub Packages NuGet feed. CI uses `GITHUB_TOKEN` with `packages: read`; grant the API repository read access in each package's Settings → Manage Actions access.
+
+Set:
+- `OpenTelemetry__ServiceName=CompileCare.Api`
+- `OpenTelemetry__OtlpEndpoint=http://localhost:4318`
+- `ElasticConfiguration__Uri` (optional)
+
+Do not log patient data, credentials, tokens, or other sensitive healthcare information.
 
 ## Run
 
-Requires the .NET 9 SDK and access to the CompileCare GitHub Packages feed for the shared observability packages.
+Requires the .NET 10 SDK and access to the CompileCare GitHub Packages feed.
 
 ```bash
 dotnet restore CompileCare.Api.slnx
@@ -60,11 +73,7 @@ Endpoints: `/`, `/health/live`, `/health/ready`, `/metrics`, `/api/v1/platform/c
 
 ## Tenant isolation
 
-The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Before tenant-owned data is exposed, tenant identity must be bound to an authenticated principal and authorized against the requested resource. Tenant scope must be enforced in persistence, audit, background jobs and message consumers. The platform context endpoint is diagnostic only.
-
-## Decisions intentionally left open
-
-Database engine, identity provider, messaging broker, API gateway and deployment platform remain subject to approved architecture decision records. Do not add provider-specific runtime dependencies until those decisions are made.
+The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Before tenant-owned data is exposed, tenant identity must be bound to an authenticated principal and authorized against the requested resource. Persistence requires a validated tenant context for tenant-owned writes and applies tenant query filters. Tenant scope must also be enforced in audit, background jobs and message consumers. The platform context endpoint is diagnostic only.
 
 ## Pull request workflow
 
