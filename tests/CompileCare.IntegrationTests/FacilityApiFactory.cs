@@ -45,6 +45,14 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
                         new StaticConfigurationManager<OpenIdConnectConfiguration>(discoveryConfiguration);
                     options.Audience = TestJwtTokenFactory.Audience;
                     options.RequireHttpsMetadata = false;
+                    options.Events.OnAuthenticationFailed = context =>
+                    {
+                        var logger = context.HttpContext.RequestServices
+                            .GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("CompileCare.TestJwtBearer");
+                        logger.LogError(context.Exception, "Test JWT bearer validation failed.");
+                        return Task.CompletedTask;
+                    };
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         RequireSignedTokens = true,
