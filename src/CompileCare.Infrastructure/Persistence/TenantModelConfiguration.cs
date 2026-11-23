@@ -15,12 +15,17 @@ internal static class TenantModelConfiguration
 
             var parameter = Expression.Parameter(entityType.ClrType, "entity");
             var tenantProperty = Expression.Property(parameter, nameof(TenantOwnedEntity.TenantId));
-            var currentTenant = Expression.Property(Expression.Constant(context), nameof(context.CurrentTenantId));
-            var predicate = Expression.Equal(
-                tenantProperty,
-                Expression.Property(currentTenant, nameof(Nullable<Guid>.Value)));
-            var hasTenant = Expression.Property(currentTenant, nameof(Nullable<Guid>.HasValue));
-            var filter = Expression.Lambda(Expression.AndAlso(hasTenant, predicate), parameter);
+            var nullableEntityTenant = Expression.Convert(tenantProperty, typeof(Guid?));
+            var currentTenant = Expression.Property(
+                Expression.Constant(context),
+                nameof(context.CurrentTenantId));
+
+            // Comparing nullable values avoids eagerly evaluating Nullable<Guid>.Value
+            // when no tenant is set. A null context therefore matches no tenant-owned rows.
+            var filter = Expression.Lambda(
+                Expression.Equal(nullableEntityTenant, currentTenant),
+                parameter);
+
             modelBuilder.Entity(entityType.ClrType).HasQueryFilter(filter);
         }
     }

@@ -1,3 +1,4 @@
+using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,8 +24,15 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
             migration.EndsWith("_InitialFacilityHierarchy", StringComparison.Ordinal));
         Assert.Empty(pendingMigrations);
 
-        // These checks ensure the versioned schema is queryable, not just recorded
-        // in __EFMigrationsHistory.
+        // A missing tenant context must safely expose no tenant-owned data.
+        // It must not evaluate Nullable<Guid>.Value or throw.
+        Assert.Equal(0, await db.Hospitals.CountAsync());
+
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        tenantContext.SetTenant(Guid.NewGuid());
+
+        // These checks ensure the versioned schema is queryable for a tenant,
+        // not just recorded in __EFMigrationsHistory.
         Assert.Equal(0, await db.Hospitals.CountAsync());
         Assert.Equal(0, await db.Departments.CountAsync());
         Assert.Equal(0, await db.Wards.CountAsync());
