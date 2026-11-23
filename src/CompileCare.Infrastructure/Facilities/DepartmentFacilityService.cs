@@ -59,7 +59,7 @@ public sealed partial class FacilityService
         if (!await db.Hospitals.AnyAsync(hospital => hospital.Id == hospitalId, ct))
             return NotFound<DepartmentDto>();
 
-        var name = NormalizeName(input.Name);
+        var name = NormalizeText(input.Name);
         var code = NormalizeCode(input.Code);
 
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
@@ -118,7 +118,7 @@ public sealed partial class FacilityService
         if (department is null)
             return NotFound<DepartmentDto>();
 
-        var name = NormalizeName(input.Name);
+        var name = NormalizeText(input.Name);
         var code = NormalizeCode(input.Code);
 
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
