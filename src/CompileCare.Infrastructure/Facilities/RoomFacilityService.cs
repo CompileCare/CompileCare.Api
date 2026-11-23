@@ -1,22 +1,158 @@
 using CompileCare.Application.Facilities;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace CompileCare.Infrastructure.Facilities;
 
 public sealed partial class FacilityService
 {
-    public async Task<PagedResult<RoomDto>> ListRooms(Guid p, PageRequest page, CancellationToken ct)
+    public async Task<PagedResult<RoomDto>> ListRooms(
+        Guid wardId,
+        PageRequest page,
+        CancellationToken ct)
     {
-        var query = db.Rooms.AsNoTracking().Where(x => x.WardId == p);
+        var query = db.Rooms
+            .AsNoTracking()
+            .Where(room => room.WardId == wardId);
+
         var total = await query.CountAsync(ct);
-        var items = await query.OrderBy(x => x.Name).ThenBy(x => x.Id).Skip(page.Skip).Take(page.SafePageSize)
-            .Select(x => new RoomDto(x.Id, x.WardId, x.Name)).ToListAsync(ct);
+        var items = await query
+            .OrderBy(room => room.Name)
+            .ThenBy(room => room.Id)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
+            .Select(room => new RoomDto(room.Id, room.WardId, room.Name))
+            .ToListAsync(ct);
+
         return new(items, page.SafePage, page.SafePageSize, total);
     }
-    public async Task<FacilityResult<RoomDto>> GetRoom(Guid p,Guid id,CancellationToken ct){var x=await db.Rooms.AsNoTracking().FirstOrDefaultAsync(x=>x.WardId==p&&x.Id==id,ct);return x is null?Missing<RoomDto>():FacilityResult<RoomDto>.Success(new(x.Id,x.WardId,x.Name));}
-    public async Task<FacilityResult<RoomDto>> CreateRoom(Guid p,NamedInput input,CancellationToken ct){if(!await db.Wards.AnyAsync(x=>x.Id==p,ct))return Missing<RoomDto>();var n=Clean(input.Name);if(string.IsNullOrWhiteSpace(n)||n.Length>100)return Invalid<RoomDto>("name","required, max 100 chars");if(await db.Rooms.AnyAsync(x=>x.WardId==p&&x.Name==n,ct))return Duplicate<RoomDto>("Room name already exists.");var e=new Room{WardId=p,Name=n};db.Add(e);try{await db.SaveChangesAsync(ct);return FacilityResult<RoomDto>.Success(new(e.Id,e.WardId,e.Name));}catch(DbUpdateException ex)when(Unique(ex)){return Duplicate<RoomDto>("Room name already exists.");}}
-    public async Task<FacilityResult<RoomDto>> UpdateRoom(Guid p,Guid id,NamedInput input,CancellationToken ct){var e=await db.Rooms.FirstOrDefaultAsync(x=>x.WardId==p&&x.Id==id,ct);if(e is null)return Missing<RoomDto>();var n=Clean(input.Name);if(string.IsNullOrWhiteSpace(n)||n.Length>100)return Invalid<RoomDto>("name","required, max 100 chars");if(await db.Rooms.AnyAsync(x=>x.WardId==p&&x.Id!=id&&x.Name==n,ct))return Duplicate<RoomDto>("Room name already exists.");e.Name=n;try{await db.SaveChangesAsync(ct);return FacilityResult<RoomDto>.Success(new(e.Id,e.WardId,e.Name));}catch(DbUpdateConcurrencyException){return Concurrency<RoomDto>();}catch(DbUpdateException ex)when(Unique(ex)){return Duplicate<RoomDto>("Room name already exists.");}}
-    public async Task<FacilityResult<bool>> DeleteRoom(Guid p,Guid id,CancellationToken ct){var e=await db.Rooms.FirstOrDefaultAsync(x=>x.WardId==p&&x.Id==id,ct);if(e is null)return Missing<bool>();db.Remove(e);try{await db.SaveChangesAsync(ct);return FacilityResult<bool>.Success(true);}catch(DbUpdateConcurrencyException){return Concurrency<bool>();}catch(DbUpdateException ex)when(ForeignKey(ex)){return Duplicate<bool>("Room contains beds and cannot be deleted.");}}
+
+    public async Task<FacilityResult<RoomDto>> GetRoom(
+        Guid wardId,
+        Guid id,
+        CancellationToken ct)
+    {
+        var room = await db.Rooms
+            .AsNoTracking()
+            .FirstOrDefaultAsync(room => room.WardId == wardId && room.Id == id, ct);
+
+        return room is null
+            ? Missing<RoomDto>()
+            : FacilityResult<RoomDto>.Success(new(room.Id, room.WardId, room.Name));
+    }
+
+    public async Task<FacilityResult<RoomDto>> CreateRoom(
+        Guid wardId,
+        NamedInput input,
+        CancellationToken ct)
+    {
+        if (!await db.Wards.AnyAsync(ward => ward.Id == wardId, ct))
+            return Missing<RoomDto>();
+
+        var name = Clean(input.Name);
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
+            return Invalid<RoomDto>("name", "required, max 100 chars");
+
+        if (await db.Rooms.AnyAsync(
+                room => room.WardId == wardId && room.Name == name,
+                ct))
+        {
+            return Duplicate<RoomDto>("Room name already exists.");
+        }
+
+        var room = new Room
+        {
+            WardId = wardId,
+            Name = name
+        };
+
+        db.Rooms.Add(room);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return FacilityResult<RoomDto>.Success(new(room.Id, room.WardId, room.Name));
+        }
+        catch (DbUpdateException exception) when (Unique(exception))
+        {
+            return Duplicate<RoomDto>("Room name already exists.");
+        }
+        catch (DbUpdateException exception) when (ForeignKey(exception))
+        {
+            // The parent may have been deleted after the existence check.
+            return Missing<RoomDto>();
+        }
+    }
+
+    public async Task<FacilityResult<RoomDto>> UpdateRoom(
+        Guid wardId,
+        Guid id,
+        NamedInput input,
+        CancellationToken ct)
+    {
+        var room = await db.Rooms.FirstOrDefaultAsync(
+            room => room.WardId == wardId && room.Id == id,
+            ct);
+
+        if (room is null)
+            return Missing<RoomDto>();
+
+        var name = Clean(input.Name);
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
+            return Invalid<RoomDto>("name", "required, max 100 chars");
+
+        if (await db.Rooms.AnyAsync(
+                candidate => candidate.WardId == wardId &&
+                    candidate.Id != id &&
+                    candidate.Name == name,
+                ct))
+        {
+            return Duplicate<RoomDto>("Room name already exists.");
+        }
+
+        room.Name = name;
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return FacilityResult<RoomDto>.Success(new(room.Id, room.WardId, room.Name));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Concurrency<RoomDto>();
+        }
+        catch (DbUpdateException exception) when (Unique(exception))
+        {
+            return Duplicate<RoomDto>("Room name already exists.");
+        }
+    }
+
+    public async Task<FacilityResult<bool>> DeleteRoom(
+        Guid wardId,
+        Guid id,
+        CancellationToken ct)
+    {
+        var room = await db.Rooms.FirstOrDefaultAsync(
+            room => room.WardId == wardId && room.Id == id,
+            ct);
+
+        if (room is null)
+            return Missing<bool>();
+
+        db.Rooms.Remove(room);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return FacilityResult<bool>.Success(true);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Concurrency<bool>();
+        }
+        catch (DbUpdateException exception) when (ForeignKey(exception))
+        {
+            return Duplicate<bool>("Room contains beds and cannot be deleted.");
+        }
+    }
 }
