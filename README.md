@@ -28,7 +28,7 @@ The first delivery is a **modular monolith** with explicit capability boundaries
 
 ## Observability configuration
 
-The API consumes the stable shared packages from the CompileCare GitHub Packages NuGet feed. CI requires package read access for the repository's `GITHUB_TOKEN`.
+The API consumes the stable shared packages from the CompileCare GitHub Packages NuGet feed. CI uses `GITHUB_TOKEN` with `packages: read`; in each package's Settings → Manage Actions access, grant the `CompileCare.Api` repository read access (otherwise NuGet restore returns 403).
 
 Set these configuration values (environment variables use the standard ASP.NET Core double-underscore convention):
 
@@ -40,7 +40,7 @@ Example:
 
 ```bash
 OpenTelemetry__ServiceName=CompileCare.Api
-OpenTelemetry__OtlpEndpoint=http://localhost:4317
+OpenTelemetry__OtlpEndpoint=http://localhost:4318
 ```
 
 The API enriches request logs with correlation ID and tenant ID when available. Do not log patient data, credentials, tokens, or other sensitive healthcare information.
