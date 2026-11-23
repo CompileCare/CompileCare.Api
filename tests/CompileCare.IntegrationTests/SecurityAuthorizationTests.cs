@@ -84,8 +84,17 @@ public sealed class SecurityAuthorizationTests
         var challengeFailure = response.Headers.TryGetValues("X-Test-Challenge-AuthenticateFailure", out var challengeValues)
             ? string.Join(",", challengeValues)
             : "not-emitted";
+        var tokenIssuer = response.Headers.TryGetValues("X-Test-Jwt-Issuer", out var issuerValues)
+            ? string.Join(",", issuerValues)
+            : "not-emitted";
+        var tokenClaims = response.Headers.TryGetValues("X-Test-Jwt-Claim-Types", out var claimValues)
+            ? string.Join(",", claimValues)
+            : "not-emitted";
+        var callbackResult = response.Headers.TryGetValues("X-Test-Jwt-Callback-Result", out var callbackValues)
+            ? string.Join(",", callbackValues)
+            : "not-emitted";
         var body = await response.Content.ReadAsStringAsync();
-        var diagnostic = $"JWT failure: {jwtFailure}; bearer header: {bearerHeader}; token validated: {tokenValidated}; challenge failure: {challengeFailure}; challenge: {challenge}; response: {body}";
+        var diagnostic = $"JWT failure: {jwtFailure}; bearer header: {bearerHeader}; token validated: {tokenValidated}; token issuer: {tokenIssuer}; claims: {tokenClaims}; token callback: {callbackResult}; challenge failure: {challengeFailure}; challenge: {challenge}; response: {body}";
 
         Assert.True(response.StatusCode == HttpStatusCode.Forbidden, diagnostic);
     }
