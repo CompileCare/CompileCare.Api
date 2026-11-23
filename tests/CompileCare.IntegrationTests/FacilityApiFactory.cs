@@ -66,7 +66,14 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
                         OnTokenValidated = async context =>
                         {
                             context.Response.Headers["X-Test-Jwt-Validated"] = "true";
+                            context.Response.Headers["X-Test-Jwt-Issuer"] =
+                                context.SecurityToken?.Issuer ?? "(null)";
+                            context.Response.Headers["X-Test-Jwt-Claim-Types"] =
+                                string.Join("|", context.Principal?.Claims.Select(claim => claim.Type) ?? []);
                             await configuredEvents.OnTokenValidated(context);
+                            context.Response.Headers["X-Test-Jwt-Callback-Result"] =
+                                context.Result?.Failure?.Message ??
+                                (context.Result?.Succeeded == true ? "success" : "no-result");
                         },
                         OnChallenge = async context =>
                         {
