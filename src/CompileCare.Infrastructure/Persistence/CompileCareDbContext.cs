@@ -1,4 +1,5 @@
 using CompileCare.Application.Tenancy;
+using CompileCare.Infrastructure.Facilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace CompileCare.Infrastructure.Persistence;
@@ -8,12 +9,7 @@ public sealed class CompileCareDbContext(
     ITenantContext tenantContext) : DbContext(options)
 {
     public Guid? CurrentTenantId => tenantContext.TenantId;
-
-    public DbSet<Hospital> Hospitals => Set<Hospital>();
-    public DbSet<Department> Departments => Set<Department>();
-    public DbSet<Ward> Wards => Set<Ward>();
-    public DbSet<Room> Rooms => Set<Room>();
-    public DbSet<Bed> Beds => Set<Bed>();
+    public DbSet<Facility> Facilities => Set<Facility>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,9 +24,7 @@ public sealed class CompileCareDbContext(
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
-    public override Task<int> SaveChangesAsync(
-        bool acceptAllChangesOnSuccess,
-        CancellationToken cancellationToken = default)
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         ApplyAuditAndTenantRules();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
