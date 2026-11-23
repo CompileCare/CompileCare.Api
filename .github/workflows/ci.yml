@@ -13,6 +13,22 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: compilecare
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d compilecare"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      ConnectionStrings__CompileCare: Host=localhost;Port=5432;Database=compilecare;Username=postgres;Password=postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
