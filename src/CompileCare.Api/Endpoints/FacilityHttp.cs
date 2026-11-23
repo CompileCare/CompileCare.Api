@@ -21,7 +21,11 @@ internal static class FacilityHttp
     public static IResult Created<T>(FacilityResult<T> result, string location)
     {
         if (!result.IsSuccess) return From(result);
-        return Results.Created(location, result.Value);
+        var resourceId = result.Value?.GetType().GetProperty("Id")?.GetValue(result.Value)?.ToString();
+        var resourceLocation = string.IsNullOrWhiteSpace(resourceId)
+            ? location
+            : $"{location.TrimEnd('/')}/{Uri.EscapeDataString(resourceId)}";
+        return Results.Created(resourceLocation, result.Value);
     }
 
     public static IResult Deleted(FacilityResult<bool> result)
