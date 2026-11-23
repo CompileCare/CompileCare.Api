@@ -31,7 +31,7 @@ public sealed partial class FacilityService(CompileCareDbContext db) : IFacility
             SqlState: PostgresErrorCodes.ForeignKeyViolation
         };
 
-    private static string? NormalizeName(string? value) => value?.Trim();
+    private static string? NormalizeText(string? value) => value?.Trim();
 
     private static string? NormalizeCode(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
