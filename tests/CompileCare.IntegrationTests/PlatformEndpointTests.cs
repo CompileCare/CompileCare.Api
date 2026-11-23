@@ -1,16 +1,24 @@
 using System.Net;
+using System.Net.Http.Headers;
 using CompileCare.Api.Middleware;
-using Xunit;
 
 namespace CompileCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
-public sealed class PlatformEndpointTests(FacilityApiFactory factory)
+public sealed class PlatformEndpointTests
 {
+    private readonly FacilityApiFactory _factory;
+
+    public PlatformEndpointTests(FacilityApiFactory factory)
+    {
+        _factory = factory;
+        _factory.ResetDatabase();
+    }
+
     [Fact]
     public async Task LiveEndpoint_IsHealthy()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var response = await client.GetAsync("/health/live");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -18,11 +26,7 @@ public sealed class PlatformEndpointTests(FacilityApiFactory factory)
     [Fact]
     public async Task InvalidTenantHeader_IsRejectedWithProblemDetails()
     {
-        using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue(
-                "Bearer",
-                TestJwtTokenFactory.CreateToken());
+        using var client = CreateAuthenticatedClient();
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, "bad");
 
         var response = await client.GetAsync("/api/v1/platform/context");
@@ -36,7 +40,7 @@ public sealed class PlatformEndpointTests(FacilityApiFactory factory)
     [Fact]
     public async Task CorrelationIdMiddleware_PreservesValidOpaqueCorrelationIds()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Correlation-ID", "request-correlation-123");
 
         var response = await client.GetAsync("/");
@@ -50,7 +54,7 @@ public sealed class PlatformEndpointTests(FacilityApiFactory factory)
     [Fact]
     public async Task CorrelationIdMiddleware_ReplacesUnsafeCorrelationIds()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Correlation-ID", "invalid/correlation");
 
         var response = await client.GetAsync("/");
@@ -61,5 +65,13 @@ public sealed class PlatformEndpointTests(FacilityApiFactory factory)
         Assert.True(correlationId.Length <= 64);
         Assert.All(correlationId, character =>
             Assert.True(char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.'));
+    }
+
+    private HttpClient CreateAuthenticatedClient()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+        return client;
     }
 }

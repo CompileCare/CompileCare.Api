@@ -99,6 +99,9 @@ public sealed class AuditEventTests
         await Assert.ThrowsAsync<PostgresException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"UPDATE audit_events SET \"Action\" = {tamperedAction} WHERE \"Id\" = {auditEvent.Id}"));
+
+        await Assert.ThrowsAsync<PostgresException>(() =>
+            db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE audit_events"));
     }
 
     private HttpClient CreateAuthenticatedClient(Guid tenantId)
