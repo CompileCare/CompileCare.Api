@@ -2,6 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CompileCare.Api.Middleware;
+using CompileCare.Application.Tenancy;
+using CompileCare.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
@@ -194,6 +198,56 @@ public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
         Assert.Equal(
             HttpStatusCode.NoContent,
             (await client.DeleteAsync($"{hospitalCollection}/{secondHospitalId:D}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task TenantOwnedPersistence_RejectsStaleUpdatesAndCrossTenantAssignments()
+    {
+        var tenantId = Guid.NewGuid();
+        using var client = CreateTenantClient(tenantId);
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/v1/hospitals",
+            new { name = "Concurrency Hospital", code = "CONCURRENT" });
+        var hospitalId = await AssertCreatedAsync(createResponse, "/api/v1/hospitals");
+
+        using var firstScope = _factory.Services.CreateScope();
+        var firstTenant = firstScope.ServiceProvider.GetRequiredService<ITenantContext>();
+        firstTenant.SetTenant(tenantId);
+        var firstDb = firstScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var firstCopy = await firstDb.Hospitals.SingleAsync(hospital => hospital.Id == hospitalId);
+
+        using var secondScope = _factory.Services.CreateScope();
+        var secondTenant = secondScope.ServiceProvider.GetRequiredService<ITenantContext>();
+        secondTenant.SetTenant(tenantId);
+        var secondDb = secondScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var staleCopy = await secondDb.Hospitals.SingleAsync(hospital => hospital.Id == hospitalId);
+
+        var originalVersion = firstCopy.Version;
+        Assert.NotEqual(Guid.Empty, originalVersion);
+        Assert.NotEqual(default, firstCopy.CreatedAtUtc);
+        Assert.NotEqual(default, firstCopy.UpdatedAtUtc);
+
+        firstCopy.Name = "First successful update";
+        await firstDb.SaveChangesAsync();
+
+        Assert.NotEqual(originalVersion, firstCopy.Version);
+        staleCopy.Name = "Stale update";
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
+            () => secondDb.SaveChangesAsync());
+
+        using var invalidScope = _factory.Services.CreateScope();
+        var invalidTenant = invalidScope.ServiceProvider.GetRequiredService<ITenantContext>();
+        invalidTenant.SetTenant(tenantId);
+        var invalidDb = invalidScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        invalidDb.Hospitals.Add(new Hospital
+        {
+            TenantId = Guid.NewGuid(),
+            Name = "Cross-tenant assignment"
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => invalidDb.SaveChangesAsync());
     }
 
     private HttpClient CreateTenantClient(Guid tenantId)
