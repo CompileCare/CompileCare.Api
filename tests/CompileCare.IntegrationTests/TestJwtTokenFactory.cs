@@ -27,12 +27,7 @@ public static class TestJwtTokenFactory
         DateTime? expiresUtc = null,
         IEnumerable<Claim>? additionalClaims = null)
     {
-        var claims = new List<Claim>();
-        if (subject is not null)
-            claims.Add(new Claim("sub", subject));
-
-        if (additionalClaims is not null)
-            claims.AddRange(additionalClaims);
+        var claims = additionalClaims?.ToList() ?? [];
 
         var now = DateTime.UtcNow;
         var descriptor = new SecurityTokenDescriptor
@@ -40,6 +35,9 @@ public static class TestJwtTokenFactory
             Issuer = issuer ?? Issuer,
             Audience = audience ?? Audience,
             Subject = new ClaimsIdentity(claims),
+            Claims = subject is null
+                ? new Dictionary<string, object>()
+                : new Dictionary<string, object> { ["sub"] = subject },
             NotBefore = now.AddSeconds(-5),
             IssuedAt = now,
             Expires = expiresUtc ?? now.AddMinutes(5),
