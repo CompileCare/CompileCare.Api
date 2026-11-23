@@ -46,7 +46,7 @@ public static class RoomEndpoints
             db.Remove(entity);
             try { await db.SaveChangesAsync(ct); return Results.NoContent(); }
             catch (DbUpdateConcurrencyException) { return ConflictConcurrency(); }
-            catch (DbUpdateException ex) when (ForeignKey(ex) { return Results.Conflict(new { message = "Room cannot be deleted while it contains beds." }); }
+            catch (DbUpdateException ex) when (ForeignKey(ex)) { return Results.Conflict(new { message = "Room cannot be deleted while it contains beds." }); }
         });
         return endpoints;
     }
