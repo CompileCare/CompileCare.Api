@@ -99,7 +99,7 @@ public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
         await AssertResourceNameAsync(client, $"{departmentCollection}/{departmentId:D}", "Cardiology");
         await AssertResourceNameAsync(client, $"{wardCollection}/{wardId:D}", "Intensive Care");
         await AssertResourceNameAsync(client, $"{roomCollection}/{roomId:D}", "Room 101");
-        await AssertResourceNameAsync(client, $"{bedCollection}/{bedId:D}", "B-01");
+        await AssertResourceNumberAsync(client, $"{bedCollection}/{bedId:D}", "B-01");
 
         await AssertCollectionCountAsync(client, departmentCollection, expectedCount: 1);
         await AssertCollectionCountAsync(client, wardCollection, expectedCount: 1);
@@ -226,6 +226,18 @@ public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(expectedName, body.GetProperty("name").GetString());
+    }
+
+    private static async Task AssertResourceNumberAsync(
+        HttpClient client,
+        string resourceLocation,
+        string expectedNumber)
+    {
+        var response = await client.GetAsync(resourceLocation);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(expectedNumber, body.GetProperty("number").GetString());
     }
 
     private static async Task AssertCollectionCountAsync(
