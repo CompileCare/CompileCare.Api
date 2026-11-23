@@ -6,6 +6,8 @@ public sealed record FacilityResult<T>(T? Value, string? Error, int StatusCode)
     public static FacilityResult<T> Success(T value) => new(value, null, 200);
     public static FacilityResult<T> Failure(string error, int statusCode) => new(default, error, statusCode);
 }
+public sealed record HospitalDto(Guid Id, string Name, string? Code);
+public sealed record HospitalInput(string? Name, string? Code);
 public sealed record DepartmentDto(Guid Id, Guid HospitalId, string Name, string? Code);
 public sealed record WardDto(Guid Id, Guid DepartmentId, string Name);
 public sealed record RoomDto(Guid Id, Guid WardId, string Name);
@@ -16,6 +18,11 @@ public sealed record BedInput(string? Number, bool IsActive = true);
 
 public interface IFacilityService
 {
+    Task<IReadOnlyList<HospitalDto>> ListHospitals(CancellationToken ct);
+    Task<FacilityResult<HospitalDto>> GetHospital(Guid id, CancellationToken ct);
+    Task<FacilityResult<HospitalDto>> CreateHospital(HospitalInput input, CancellationToken ct);
+    Task<FacilityResult<HospitalDto>> UpdateHospital(Guid id, HospitalInput input, CancellationToken ct);
+    Task<FacilityResult<bool>> DeleteHospital(Guid id, CancellationToken ct);
     Task<IReadOnlyList<DepartmentDto>> ListDepartments(Guid hospitalId, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> GetDepartment(Guid hospitalId, Guid id, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> CreateDepartment(Guid hospitalId, DepartmentInput input, CancellationToken ct);
