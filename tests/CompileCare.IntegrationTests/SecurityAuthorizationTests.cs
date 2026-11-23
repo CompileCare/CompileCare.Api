@@ -149,12 +149,9 @@ public sealed class SecurityAuthorizationTests
     {
         var tenantId = Guid.NewGuid();
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.FacilityViewer);
-        using var client = CreateAuthenticatedClient(tenantId);
-
         // Simulate claims emitted by the configured identity provider. Only the
         // CompileCare membership row is authoritative for tenant role/permissions.
-        client.Dispose();
-        client = CreateAuthenticatedClient(
+        using var client = CreateAuthenticatedClient(
             tenantId,
             new System.Security.Claims.Claim(AuthorizationPolicies.PermissionClaim, TenantPermissions.FacilityWrite),
             new System.Security.Claims.Claim("role", TenantRoles.HospitalAdmin));
