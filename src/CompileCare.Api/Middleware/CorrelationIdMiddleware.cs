@@ -1,3 +1,5 @@
+using Serilog.Context;
+
 namespace CompileCare.Api.Middleware;
 
 public sealed class CorrelationIdMiddleware(RequestDelegate next)
@@ -13,10 +15,14 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
         if (!IsValidCorrelationId(value))
             value = Guid.NewGuid().ToString("N");
 
-        context.TraceIdentifier = value!;
-        context.Response.Headers[HeaderName] = value!;
+        var correlationId = value!;
+        context.TraceIdentifier = correlationId;
+        context.Response.Headers[HeaderName] = correlationId;
 
-        await next(context);
+        using (LogContext.PushProperty("CorrelationId", correlationId))
+        {
+            await next(context);
+        }
     }
 
     private static bool IsValidCorrelationId(string? value) =>
