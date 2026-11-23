@@ -45,11 +45,42 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                 name: "IX_audit_events_TenantId_OccurredAtUtc",
                 table: "audit_events",
                 columns: new[] { "TenantId", "OccurredAtUtc" });
+
+            // Enforce append-only semantics in PostgreSQL, including raw SQL writes.
+            migrationBuilder.Sql(
+                """
+                CREATE OR REPLACE FUNCTION prevent_audit_event_mutation()
+                RETURNS trigger
+                LANGUAGE plpgsql
+                AS $
+                BEGIN
+                    RAISE EXCEPTION 'audit_events is append-only'
+                        USING ERRCODE = '55000';
+                END;
+                $;
+
+                CREATE TRIGGER trg_audit_events_no_update_delete
+                BEFORE UPDATE OR DELETE ON audit_events
+                FOR EACH ROW
+                EXECUTE FUNCTION prevent_audit_event_mutation();
+
+                CREATE TRIGGER trg_audit_events_no_truncate
+                BEFORE TRUNCATE ON audit_events
+                FOR EACH STATEMENT
+                EXECUTE FUNCTION prevent_audit_event_mutation();
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                """
+                DROP TRIGGER IF EXISTS trg_audit_events_no_truncate ON audit_events;
+                DROP TRIGGER IF EXISTS trg_audit_events_no_update_delete ON audit_events;
+                DROP FUNCTION IF EXISTS prevent_audit_event_mutation();
+                """);
+
             migrationBuilder.DropTable(
                 name: "audit_events");
         }
