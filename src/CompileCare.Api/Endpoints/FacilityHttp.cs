@@ -8,29 +8,43 @@ internal static class FacilityHttp
 {
     public static IResult From<T>(FacilityResult<T> result)
     {
-        if (result.IsSuccess) return Results.Ok(result.Value);
+        if (result.IsSuccess)
+            return Results.Ok(result.Value);
+
         return result.StatusCode switch
         {
-            400 => Results.BadRequest(new { message = result.Error }),
-            404 => Results.NotFound(new { message = result.Error }),
-            409 => Results.Conflict(new { message = result.Error }),
+            StatusCodes.Status400BadRequest => Results.BadRequest(new { message = result.Error }),
+            StatusCodes.Status404NotFound => Results.NotFound(new { message = result.Error }),
+            StatusCodes.Status409Conflict => Results.Conflict(new { message = result.Error }),
             _ => Results.Problem(statusCode: result.StatusCode, title: result.Error)
         };
     }
 
-    public static IResult Created<T>(FacilityResult<T> result, string location)
+    public static IResult Created<T>(
+        FacilityResult<T> result,
+        string collectionLocation,
+        Func<T, Guid> resourceIdSelector)
     {
-        if (!result.IsSuccess) return From(result);
-        var resourceId = result.Value?.GetType().GetProperty("Id")?.GetValue(result.Value)?.ToString();
-        var resourceLocation = string.IsNullOrWhiteSpace(resourceId)
-            ? location
-            : $"{location.TrimEnd('/')}/{Uri.EscapeDataString(resourceId)}";
+        if (!result.IsSuccess)
+            return From(result);
+
+        if (result.Value is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "The facility service returned no resource after a successful create.");
+        }
+
+        var resourceId = resourceIdSelector(result.Value);
+        var resourceLocation = $"{collectionLocation.TrimEnd('/')}/{resourceId:D}";
         return Results.Created(resourceLocation, result.Value);
     }
 
     public static IResult Deleted(FacilityResult<bool> result)
     {
-        if (!result.IsSuccess) return From(result);
+        if (!result.IsSuccess)
+            return From(result);
+
         return Results.NoContent();
     }
 }
