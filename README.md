@@ -19,15 +19,35 @@ The first delivery is a **modular monolith** with explicit capability boundaries
 - .NET 9 / ASP.NET Core
 - Versioned platform endpoint
 - OpenAPI in Development
-- Liveness and readiness endpoints
+- Shared `CompileCare.Observability` library for structured logging, OpenTelemetry traces/metrics and health checks
+- Liveness/readiness endpoints provided by the shared observability package
 - Correlation ID propagation through `X-Correlation-ID`
 - Request-scoped tenant context through `X-Tenant-ID`
 - Problem Details exception handling
 - Dockerfile and GitHub Actions CI
 
+## Observability configuration
+
+The API consumes the stable shared packages from the CompileCare GitHub Packages NuGet feed. CI uses `GITHUB_TOKEN` with `packages: read`; in each package's Settings → Manage Actions access, grant the `CompileCare.Api` repository read access (otherwise NuGet restore returns 403).
+
+Set these configuration values (environment variables use the standard ASP.NET Core double-underscore convention):
+
+- `OpenTelemetry__ServiceName=CompileCare.Api`
+- `OpenTelemetry__OtlpEndpoint=http://localhost:4318`
+- `ElasticConfiguration__Uri` (optional; Elasticsearch logging is enabled when configured)
+
+Example:
+
+```bash
+OpenTelemetry__ServiceName=CompileCare.Api
+OpenTelemetry__OtlpEndpoint=http://localhost:4318
+```
+
+The API enriches request logs with correlation ID and tenant ID when available. Do not log patient data, credentials, tokens, or other sensitive healthcare information.
+
 ## Run
 
-Requires the .NET 9 SDK.
+Requires the .NET 9 SDK and access to the CompileCare GitHub Packages feed for the shared observability packages.
 
 ```bash
 dotnet restore CompileCare.Api.slnx
@@ -36,7 +56,7 @@ dotnet test CompileCare.Api.slnx
 dotnet run --project src/CompileCare.Api
 ```
 
-Endpoints: `/`, `/health/live`, `/health/ready`, `/api/v1/platform/context`, and (Development only) `/openapi/v1.json`.
+Endpoints: `/`, `/health/live`, `/health/ready`, `/metrics`, `/api/v1/platform/context`, and (Development only) `/openapi/v1.json`.
 
 ## Tenant isolation
 

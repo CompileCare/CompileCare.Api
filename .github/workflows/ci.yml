@@ -1,14 +1,18 @@
 name: CI
+
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+
 permissions:
   contents: read
+  packages: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -17,6 +21,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
+      - name: Configure GitHub Packages credentials
+        run: dotnet nuget update source github --username "$GITHUB_ACTOR" --password "$GITHUB_TOKEN" --store-password-in-clear-text
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: dotnet restore CompileCare.Api.slnx
       - run: dotnet build CompileCare.Api.slnx --configuration Release --no-restore
       - run: dotnet test CompileCare.Api.slnx --configuration Release --no-build
