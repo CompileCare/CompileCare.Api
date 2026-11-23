@@ -39,7 +39,7 @@ public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
         var duplicateHospital = await client.PostAsJsonAsync(
             hospitalCollection,
             new { name = "Central Hospital", code = "OTHER" });
-        Assert.Equal(HttpStatusCode.Conflict, duplicateHospital.StatusCode);
+        await AssertProblemDetailsAsync(duplicateHospital, HttpStatusCode.Conflict, "Resource conflict");
 
         var duplicateHospitalUpdate = await client.PutAsJsonAsync(
             $"{hospitalCollection}/{hospitalId:D}",
@@ -156,7 +156,7 @@ public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
 
         var crossTenantRead = await otherTenantClient.GetAsync(
             $"{hospitalCollection}/{hospitalId:D}");
-        Assert.Equal(HttpStatusCode.NotFound, crossTenantRead.StatusCode);
+        await AssertProblemDetailsAsync(crossTenantRead, HttpStatusCode.NotFound, "Resource not found");
 
         var crossTenantList = await otherTenantClient.GetFromJsonAsync<JsonElement>(hospitalCollection);
         Assert.Equal(1, crossTenantList.GetProperty("totalCount").GetInt32());
@@ -255,6 +255,22 @@ public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
+    }
+
+
+    private static async Task AssertProblemDetailsAsync(
+        HttpResponseMessage response,
+        HttpStatusCode expectedStatus,
+        string expectedTitle)
+    {
+        Assert.Equal(expectedStatus, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var problem = document.RootElement;
+        Assert.Equal((int)expectedStatus, problem.GetProperty("status").GetInt32());
+        Assert.Equal(expectedTitle, problem.GetProperty("title").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(problem.GetProperty("detail").GetString()));
     }
 
     private static async Task<Guid> AssertCreatedAsync(

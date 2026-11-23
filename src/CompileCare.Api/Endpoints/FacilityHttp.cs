@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace CompileCare.Api;
 
-/// <summary>Maps facility application results to consistent HTTP responses.</summary>
+/// <summary>Maps application results to the platform's RFC 9457 HTTP error contract.</summary>
 internal static class FacilityHttp
 {
     public static IResult From<T>(FacilityResult<T> result)
@@ -11,13 +11,20 @@ internal static class FacilityHttp
         if (result.IsSuccess)
             return Results.Ok(result.Value);
 
-        return result.StatusCode switch
+        var title = result.StatusCode switch
         {
-            StatusCodes.Status400BadRequest => Results.BadRequest(new { message = result.Error }),
-            StatusCodes.Status404NotFound => Results.NotFound(new { message = result.Error }),
-            StatusCodes.Status409Conflict => Results.Conflict(new { message = result.Error }),
-            _ => Results.Problem(statusCode: result.StatusCode, title: result.Error)
+            StatusCodes.Status400BadRequest => "Validation failed",
+            StatusCodes.Status404NotFound => "Resource not found",
+            StatusCodes.Status409Conflict => "Resource conflict",
+            StatusCodes.Status401Unauthorized => "Authentication required",
+            StatusCodes.Status403Forbidden => "Access denied",
+            _ => "The request could not be completed"
         };
+
+        return Results.Problem(
+            statusCode: result.StatusCode,
+            title: title,
+            detail: result.Error);
     }
 
     public static IResult Created<T>(
