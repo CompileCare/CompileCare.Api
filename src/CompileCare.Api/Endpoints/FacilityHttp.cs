@@ -1,7 +1,7 @@
 using CompileCare.Application.Facilities;
 using Microsoft.AspNetCore.Http;
 
-namespace CompileCare.Api.Endpoints;
+namespace CompileCare.Api;
 
 /// <summary>Maps application results to the platform's RFC 9457 HTTP error contract.</summary>
 internal static class FacilityHttp
