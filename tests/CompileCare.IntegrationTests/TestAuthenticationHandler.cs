@@ -1,3 +1,4 @@
+using CompileCare.Api.Security;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;

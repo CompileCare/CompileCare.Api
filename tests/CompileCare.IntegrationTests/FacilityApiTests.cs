@@ -10,7 +10,8 @@ using Xunit;
 
 namespace CompileCare.IntegrationTests;
 
-public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
+[Collection("PostgreSQL integration")]
+public sealed class FacilityApiTests
 {
     private readonly FacilityApiFactory _factory;
 

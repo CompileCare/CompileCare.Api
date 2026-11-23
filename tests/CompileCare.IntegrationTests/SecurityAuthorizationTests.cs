@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using CompileCare.Api.Middleware;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
 
-public sealed class SecurityAuthorizationTests(FacilityApiFactory factory) : IClassFixture<FacilityApiFactory>
+[Collection("PostgreSQL integration")]
+public sealed class SecurityAuthorizationTests(FacilityApiFactory factory)
 {
     [Fact]
     public async Task FacilityEndpoints_RejectAnonymousRequests()
@@ -78,10 +80,10 @@ public sealed class SecurityAuthorizationTests(FacilityApiFactory factory) : ICl
             new { name = "Managed Hospital", code = "MANAGED" });
 
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
-        var created = await createResponse.Content.ReadFromJsonAsync<HospitalResponse>();
-        Assert.NotNull(created);
+        using var document = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+        var hospitalId = document.RootElement.GetProperty("id").GetGuid();
 
-        var deleteResponse = await client.DeleteAsync($"/api/v1/hospitals/{created!.Id:D}");
+        var deleteResponse = await client.DeleteAsync($"/api/v1/hospitals/{hospitalId:D}");
 
         Assert.Equal(HttpStatusCode.Forbidden, deleteResponse.StatusCode);
     }
@@ -99,12 +101,11 @@ public sealed class SecurityAuthorizationTests(FacilityApiFactory factory) : ICl
         var createResponse = await client.PostAsJsonAsync(
             "/api/v1/hospitals",
             new { name = "Admin Hospital", code = "ADMIN" });
-        var created = await createResponse.Content.ReadFromJsonAsync<HospitalResponse>();
-
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
-        Assert.NotNull(created);
+        using var document = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+        var hospitalId = document.RootElement.GetProperty("id").GetGuid();
 
-        var deleteResponse = await client.DeleteAsync($"/api/v1/hospitals/{created!.Id:D}");
+        var deleteResponse = await client.DeleteAsync($"/api/v1/hospitals/{hospitalId:D}");
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
     }
@@ -127,5 +128,4 @@ public sealed class SecurityAuthorizationTests(FacilityApiFactory factory) : ICl
         return client;
     }
 
-    private sealed record HospitalResponse(Guid Id);
 }

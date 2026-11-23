@@ -3,7 +3,8 @@ using Xunit;
 
 namespace CompileCare.IntegrationTests;
 
-public sealed class PlatformEndpointTests(FacilityApiFactory factory) : IClassFixture<FacilityApiFactory>
+[Collection("PostgreSQL integration")]
+public sealed class PlatformEndpointTests(FacilityApiFactory factory)
 {
     [Fact]
     public async Task LiveEndpoint_IsHealthy()
