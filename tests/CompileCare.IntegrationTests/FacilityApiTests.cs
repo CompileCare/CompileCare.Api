@@ -147,7 +147,7 @@ public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
         // or linking to resources owned by the first tenant.
         var otherTenantHospital = await otherTenantClient.PostAsJsonAsync(
             hospitalCollection,
-            new { name = "Central Hospital", code = "CENTRAL" });
+            new { name = "Central City Hospital", code = "CENTRAL-UPDATED" });
         _ = await AssertCreatedAsync(otherTenantHospital, hospitalCollection);
 
         var crossTenantRead = await otherTenantClient.GetAsync(
