@@ -33,7 +33,7 @@ The API consumes the stable shared packages from the CompileCare GitHub Packages
 Set these configuration values (environment variables use the standard ASP.NET Core double-underscore convention):
 
 - `OpenTelemetry__ServiceName=CompileCare.Api`
-- `OpenTelemetry__OtlpEndpoint=http://localhost:4317`
+- `OpenTelemetry__OtlpEndpoint=http://localhost:4318`
 - `ElasticConfiguration__Uri` (optional; Elasticsearch logging is enabled when configured)
 
 Example:
@@ -56,7 +56,7 @@ dotnet test CompileCare.Api.slnx
 dotnet run --project src/CompileCare.Api
 ```
 
-Endpoints: `/`, `/health/live`, `/health/ready`, `/api/v1/platform/context`, and (Development only) `/openapi/v1.json`.
+Endpoints: `/`, `/health/live`, `/health/ready`, `/metrics`, `/api/v1/platform/context`, and (Development only) `/openapi/v1.json`.
 
 ## Tenant isolation
 
