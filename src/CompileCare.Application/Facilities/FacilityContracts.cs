@@ -6,6 +6,18 @@ public sealed record FacilityResult<T>(T? Value, string? Error, int StatusCode)
     public static FacilityResult<T> Success(T value) => new(value, null, 200);
     public static FacilityResult<T> Failure(string error, int statusCode) => new(default, error, statusCode);
 }
+public sealed record PageRequest(int Page = 1, int PageSize = 50)
+{
+    public const int DefaultPageSize = 50;
+    public const int MaxPageSize = 100;
+    public int SafePage => Page < 1 ? 1 : Math.Min(Page, int.MaxValue / MaxPageSize);
+    public int SafePageSize => PageSize < 1 ? DefaultPageSize : Math.Min(PageSize, MaxPageSize);
+    public int Skip => (SafePage - 1) * SafePageSize;
+}
+public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)
+{
+    public int TotalPages => TotalCount == 0 ? 0 : (int)Math.Ceiling((double)TotalCount / PageSize);
+}
 public sealed record HospitalDto(Guid Id, string Name, string? Code);
 public sealed record HospitalInput(string? Name, string? Code);
 public sealed record DepartmentDto(Guid Id, Guid HospitalId, string Name, string? Code);
@@ -18,27 +30,27 @@ public sealed record BedInput(string? Number, bool IsActive = true);
 
 public interface IFacilityService
 {
-    Task<IReadOnlyList<HospitalDto>> ListHospitals(CancellationToken ct);
+    Task<PagedResult<HospitalDto>> ListHospitals(PageRequest page, CancellationToken ct);
     Task<FacilityResult<HospitalDto>> GetHospital(Guid id, CancellationToken ct);
     Task<FacilityResult<HospitalDto>> CreateHospital(HospitalInput input, CancellationToken ct);
     Task<FacilityResult<HospitalDto>> UpdateHospital(Guid id, HospitalInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteHospital(Guid id, CancellationToken ct);
-    Task<IReadOnlyList<DepartmentDto>> ListDepartments(Guid hospitalId, CancellationToken ct);
+    Task<PagedResult<DepartmentDto>> ListDepartments(Guid hospitalId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> GetDepartment(Guid hospitalId, Guid id, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> CreateDepartment(Guid hospitalId, DepartmentInput input, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> UpdateDepartment(Guid hospitalId, Guid id, DepartmentInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteDepartment(Guid hospitalId, Guid id, CancellationToken ct);
-    Task<IReadOnlyList<WardDto>> ListWards(Guid departmentId, CancellationToken ct);
+    Task<PagedResult<WardDto>> ListWards(Guid departmentId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<WardDto>> GetWard(Guid departmentId, Guid id, CancellationToken ct);
     Task<FacilityResult<WardDto>> CreateWard(Guid departmentId, NamedInput input, CancellationToken ct);
     Task<FacilityResult<WardDto>> UpdateWard(Guid departmentId, Guid id, NamedInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteWard(Guid departmentId, Guid id, CancellationToken ct);
-    Task<IReadOnlyList<RoomDto>> ListRooms(Guid wardId, CancellationToken ct);
+    Task<PagedResult<RoomDto>> ListRooms(Guid wardId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<RoomDto>> GetRoom(Guid wardId, Guid id, CancellationToken ct);
     Task<FacilityResult<RoomDto>> CreateRoom(Guid wardId, NamedInput input, CancellationToken ct);
     Task<FacilityResult<RoomDto>> UpdateRoom(Guid wardId, Guid id, NamedInput input, CancellationToken ct);
     Task<FacilityResult<bool>> DeleteRoom(Guid wardId, Guid id, CancellationToken ct);
-    Task<IReadOnlyList<BedDto>> ListBeds(Guid roomId, CancellationToken ct);
+    Task<PagedResult<BedDto>> ListBeds(Guid roomId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<BedDto>> GetBed(Guid roomId, Guid id, CancellationToken ct);
     Task<FacilityResult<BedDto>> CreateBed(Guid roomId, BedInput input, CancellationToken ct);
     Task<FacilityResult<BedDto>> UpdateBed(Guid roomId, Guid id, BedInput input, CancellationToken ct);
