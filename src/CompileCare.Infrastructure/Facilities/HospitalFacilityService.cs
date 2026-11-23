@@ -26,7 +26,7 @@ public sealed partial class FacilityService
     {
         if (db.CurrentTenantId is null || db.CurrentTenantId == Guid.Empty)
             return FacilityResult<HospitalDto>.Failure("Tenant context required.", 400);
-        var name = NormalizeName(input.Name); var code = NormalizeCode(input.Code);
+        var name = NormalizeText(input.Name); var code = NormalizeCode(input.Code);
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return ValidationFailure<HospitalDto>("name", "required, max 200 chars");
         if (code?.Length > 50) return ValidationFailure<HospitalDto>("code", "max 50 chars");
@@ -42,7 +42,7 @@ public sealed partial class FacilityService
     {
         var entity = await db.Hospitals.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (entity is null) return NotFound<HospitalDto>();
-        var name = NormalizeName(input.Name); var code = NormalizeCode(input.Code);
+        var name = NormalizeText(input.Name); var code = NormalizeCode(input.Code);
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return ValidationFailure<HospitalDto>("name", "required, max 200 chars");
         if (code?.Length > 50) return ValidationFailure<HospitalDto>("code", "max 50 chars");
