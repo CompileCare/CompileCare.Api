@@ -5,15 +5,15 @@ public static class WardEndpoints
     public static IEndpointRouteBuilder MapWardEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/v1/departments/{departmentId:guid}/wards").WithTags("Wards");
-        group.MapGet("/", async (Guid departmentId, IFacilityService service, int page = 1, int pageSize = 50, CancellationToken ct = default) =>
+        group.MapGet("/", async (Guid departmentId, IWardService service, int page = 1, int pageSize = 50, CancellationToken ct = default) =>
             Results.Ok(await service.ListWards(departmentId, new(page, pageSize), ct)));
-        group.MapGet("/{id:guid}", async (Guid departmentId, Guid id, IFacilityService service, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (Guid departmentId, Guid id, IWardService service, CancellationToken ct) =>
             FacilityHttp.From(await service.GetWard(departmentId, id, ct)));
-        group.MapPost("/", async (Guid departmentId, NamedFacilityRequest request, IFacilityService service, CancellationToken ct) =>
+        group.MapPost("/", async (Guid departmentId, NamedFacilityRequest request, IWardService service, CancellationToken ct) =>
             FacilityHttp.Created(await service.CreateWard(departmentId, new(request.Name), ct), $"/api/v1/departments/{departmentId}/wards"));
-        group.MapPut("/{id:guid}", async (Guid departmentId, Guid id, NamedFacilityRequest request, IFacilityService service, CancellationToken ct) =>
+        group.MapPut("/{id:guid}", async (Guid departmentId, Guid id, NamedFacilityRequest request, IWardService service, CancellationToken ct) =>
             FacilityHttp.From(await service.UpdateWard(departmentId, id, new(request.Name), ct)));
-        group.MapDelete("/{id:guid}", async (Guid departmentId, Guid id, IFacilityService service, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid departmentId, Guid id, IWardService service, CancellationToken ct) =>
             FacilityHttp.Deleted(await service.DeleteWard(departmentId, id, ct)));
         return endpoints;
     }
