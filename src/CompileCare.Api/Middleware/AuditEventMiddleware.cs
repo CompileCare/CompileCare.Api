@@ -67,6 +67,12 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
 
             pipelineCompleted = true;
 
+            // The endpoint may have returned a conflict after a database exception.
+            // Remove failed/pending business entity states so the audit SaveChanges
+            // cannot retry them inside the transaction and poison the audit commit.
+            // Successful endpoint writes are already persisted inside this transaction.
+            db.ChangeTracker.Clear();
+
             db.AuditEvents.Add(CreateAuditEvent(
                 context,
                 endpoint,
