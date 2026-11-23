@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CompileCare.IntegrationTests;
@@ -33,8 +35,14 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
                 options =>
                 {
                     options.Authority = null;
-                    options.MetadataAddress = null;
-                    options.ConfigurationManager = null;
+                    options.MetadataAddress = "https://identity.compilecare.test/.well-known/openid-configuration";
+                    var discoveryConfiguration = new OpenIdConnectConfiguration
+                    {
+                        Issuer = TestJwtTokenFactory.Issuer
+                    };
+                    discoveryConfiguration.SigningKeys.Add(TestJwtTokenFactory.ValidationKey);
+                    options.ConfigurationManager =
+                        new StaticConfigurationManager<OpenIdConnectConfiguration>(discoveryConfiguration);
                     options.Audience = TestJwtTokenFactory.Audience;
                     options.RequireHttpsMetadata = false;
                     options.TokenValidationParameters = new TokenValidationParameters
