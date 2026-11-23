@@ -253,6 +253,9 @@ public sealed class FacilityApiTests : IClassFixture<FacilityApiFactory>
     private HttpClient CreateTenantClient(Guid tenantId)
     {
         var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Authenticated", "true");
+        client.DefaultRequestHeaders.Add("X-Test-Tenant-Ids", tenantId.ToString("D"));
+        client.DefaultRequestHeaders.Add("X-Test-Roles", "HospitalAdmin");
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
