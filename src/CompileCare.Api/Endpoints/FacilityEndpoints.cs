@@ -1,6 +1,7 @@
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CompileCare.Api;
 
@@ -26,49 +27,105 @@ public static class HospitalEndpoints
         {
             if (tenant.TenantId is null || tenant.TenantId == Guid.Empty)
                 return Results.Problem(statusCode: 400, title: "Tenant context required");
-            var name = request.Name?.Trim();
-            var code = request.Code?.Trim().ToUpperInvariant();
-            if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = ["Name is required and must be at most 200 characters."] });
-            if (code is not null && code.Length > 50)
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["code"] = ["Code must be at most 50 characters."] });
+
+            var name = NormalizeName(request.Name);
+            var code = NormalizeCode(request.Code);
+            var validation = Validate(name, code);
+            if (validation is not null) return validation;
+
             if (await db.Hospitals.AnyAsync(x => x.Name == name || (code != null && x.Code == code), ct))
-                return Results.Conflict(new { message = "A hospital with this name or code already exists for the tenant." });
-            var hospital = new Hospital { Name = name, Code = code };
+                return DuplicateConflict();
+
+            var hospital = new Hospital { Name = name!, Code = code };
             db.Hospitals.Add(hospital);
-            await db.SaveChangesAsync(ct);
-            return Results.Created($"/api/v1/hospitals/{hospital.Id}", HospitalResponse.From(hospital));
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                return Results.Created($"/api/v1/hospitals/{hospital.Id}", HospitalResponse.From(hospital));
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                return DuplicateConflict();
+            }
         }).WithName("CreateHospital");
 
         group.MapPut("/{id:guid}", async (Guid id, UpdateHospitalRequest request, CompileCareDbContext db, CancellationToken ct) =>
         {
             var hospital = await db.Hospitals.FirstOrDefaultAsync(x => x.Id == id, ct);
             if (hospital is null) return Results.NotFound();
-            var name = request.Name?.Trim();
-            var code = request.Code?.Trim().ToUpperInvariant();
-            if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = ["Name is required and must be at most 200 characters."] });
-            if (code is not null && code.Length > 50)
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["code"] = ["Code must be at most 50 characters."] });
+
+            var name = NormalizeName(request.Name);
+            var code = NormalizeCode(request.Code);
+            var validation = Validate(name, code);
+            if (validation is not null) return validation;
+
             if (await db.Hospitals.AnyAsync(x => x.Id != id && (x.Name == name || (code != null && x.Code == code)), ct))
-                return Results.Conflict(new { message = "A hospital with this name or code already exists for the tenant." });
-            hospital.Name = name;
+                return DuplicateConflict();
+
+            hospital.Name = name!;
             hospital.Code = code;
-            await db.SaveChangesAsync(ct);
-            return Results.Ok(HospitalResponse.From(hospital));
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                return Results.Ok(HospitalResponse.From(hospital));
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return ConcurrencyConflict();
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                return DuplicateConflict();
+            }
         }).WithName("UpdateHospital");
 
         group.MapDelete("/{id:guid}", async (Guid id, CompileCareDbContext db, CancellationToken ct) =>
         {
             var hospital = await db.Hospitals.FirstOrDefaultAsync(x => x.Id == id, ct);
             if (hospital is null) return Results.NotFound();
+
             db.Hospitals.Remove(hospital);
-            await db.SaveChangesAsync(ct);
-            return Results.NoContent();
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                return Results.NoContent();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return ConcurrencyConflict();
+            }
+            catch (DbUpdateException ex) when (IsForeignKeyViolation(ex))
+            {
+                return Results.Conflict(new { message = "Hospital cannot be deleted while it contains departments." });
+            }
         }).WithName("DeleteHospital");
 
         return endpoints;
     }
+
+    private static string? NormalizeName(string? name) => name?.Trim();
+    private static string? NormalizeCode(string? code) => string.IsNullOrWhiteSpace(code) ? null : code.Trim().ToUpperInvariant();
+
+    private static IResult? Validate(string? name, string? code)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = ["Name is required and must be at most 200 characters."] });
+        if (code is not null && code.Length > 50)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["code"] = ["Code must be at most 50 characters."] });
+        return null;
+    }
+
+    private static IResult DuplicateConflict() =>
+        Results.Conflict(new { message = "A hospital with this name or code already exists for the tenant." });
+
+    private static IResult ConcurrencyConflict() =>
+        Results.Conflict(new { message = "The hospital was changed by another request. Reload and retry." });
+
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+
+    private static bool IsForeignKeyViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation };
 }
 
 public sealed record CreateHospitalRequest(string? Name, string? Code);
