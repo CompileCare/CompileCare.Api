@@ -68,4 +68,56 @@ public sealed class FacilityService(CompileCareDbContext db) : IFacilityService
     public async Task<FacilityResult<BedDto>> CreateBed(Guid p,BedInput input,CancellationToken ct){if(!await db.Rooms.AnyAsync(x=>x.Id==p,ct))return Missing<BedDto>();var n=Clean(input.Number);if(string.IsNullOrWhiteSpace(n)||n.Length>50)return Invalid<BedDto>("number","required, max 50 chars");if(await db.Beds.AnyAsync(x=>x.RoomId==p&&x.Number==n,ct))return Duplicate<BedDto>("Bed number already exists.");var e=new Bed{RoomId=p,Number=n,IsActive=input.IsActive};db.Add(e);try{await db.SaveChangesAsync(ct);return FacilityResult<BedDto>.Success(new(e.Id,e.RoomId,e.Number,e.IsActive));}catch(DbUpdateException ex)when(Unique(ex)){return Duplicate<BedDto>("Bed number already exists.");}}
     public async Task<FacilityResult<BedDto>> UpdateBed(Guid p,Guid id,BedInput input,CancellationToken ct){var e=await db.Beds.FirstOrDefaultAsync(x=>x.RoomId==p&&x.Id==id,ct);if(e is null)return Missing<BedDto>();var n=Clean(input.Number);if(string.IsNullOrWhiteSpace(n)||n.Length>50)return Invalid<BedDto>("number","required, max 50 chars");if(await db.Beds.AnyAsync(x=>x.RoomId==p&&x.Id!=id&&x.Number==n,ct))return Duplicate<BedDto>("Bed number already exists.");e.Number=n;e.IsActive=input.IsActive;try{await db.SaveChangesAsync(ct);return FacilityResult<BedDto>.Success(new(e.Id,e.RoomId,e.Number,e.IsActive));}catch(DbUpdateConcurrencyException){return Concurrency<BedDto>();}catch(DbUpdateException ex)when(Unique(ex)){return Duplicate<BedDto>("Bed number already exists.");}}
     public async Task<FacilityResult<bool>> DeleteBed(Guid p,Guid id,CancellationToken ct){var e=await db.Beds.FirstOrDefaultAsync(x=>x.RoomId==p&&x.Id==id,ct);if(e is null)return Missing<bool>();db.Remove(e);try{await db.SaveChangesAsync(ct);return FacilityResult<bool>.Success(true);}catch(DbUpdateConcurrencyException){return Concurrency<bool>();}}
+    public async Task<IReadOnlyList<HospitalDto>> ListHospitals(CancellationToken ct) =>
+        await db.Hospitals.AsNoTracking().OrderBy(x => x.Name)
+            .Select(x => new HospitalDto(x.Id, x.Name, x.Code)).ToListAsync(ct);
+
+    public async Task<FacilityResult<HospitalDto>> GetHospital(Guid id, CancellationToken ct)
+    {
+        var x = await db.Hospitals.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        return x is null ? Missing<HospitalDto>() : FacilityResult<HospitalDto>.Success(new(x.Id, x.Name, x.Code));
+    }
+
+    public async Task<FacilityResult<HospitalDto>> CreateHospital(HospitalInput input, CancellationToken ct)
+    {
+        if (db.CurrentTenantId is null || db.CurrentTenantId == Guid.Empty)
+            return FacilityResult<HospitalDto>.Failure("Tenant context required.", 400);
+        var name = Clean(input.Name); var code = CleanCode(input.Code);
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
+            return Invalid<HospitalDto>("name", "required, max 200 chars");
+        if (code?.Length > 50) return Invalid<HospitalDto>("code", "max 50 chars");
+        if (await db.Hospitals.AnyAsync(x => x.Name == name || (code != null && x.Code == code), ct))
+            return Duplicate<HospitalDto>("Hospital name/code already exists for this tenant.");
+        var entity = new Hospital { Name = name, Code = code };
+        db.Hospitals.Add(entity);
+        try { await db.SaveChangesAsync(ct); return FacilityResult<HospitalDto>.Success(new(entity.Id, entity.Name, entity.Code)); }
+        catch (DbUpdateException ex) when (Unique(ex)) { return Duplicate<HospitalDto>("Hospital name/code already exists for this tenant."); }
+    }
+
+    public async Task<FacilityResult<HospitalDto>> UpdateHospital(Guid id, HospitalInput input, CancellationToken ct)
+    {
+        var entity = await db.Hospitals.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null) return Missing<HospitalDto>();
+        var name = Clean(input.Name); var code = CleanCode(input.Code);
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
+            return Invalid<HospitalDto>("name", "required, max 200 chars");
+        if (code?.Length > 50) return Invalid<HospitalDto>("code", "max 50 chars");
+        if (await db.Hospitals.AnyAsync(x => x.Id != id && (x.Name == name || (code != null && x.Code == code)), ct))
+            return Duplicate<HospitalDto>("Hospital name/code already exists for this tenant.");
+        entity.Name = name; entity.Code = code;
+        try { await db.SaveChangesAsync(ct); return FacilityResult<HospitalDto>.Success(new(entity.Id, entity.Name, entity.Code)); }
+        catch (DbUpdateConcurrencyException) { return Concurrency<HospitalDto>(); }
+        catch (DbUpdateException ex) when (Unique(ex)) { return Duplicate<HospitalDto>("Hospital name/code already exists for this tenant."); }
+    }
+
+    public async Task<FacilityResult<bool>> DeleteHospital(Guid id, CancellationToken ct)
+    {
+        var entity = await db.Hospitals.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null) return Missing<bool>();
+        db.Hospitals.Remove(entity);
+        try { await db.SaveChangesAsync(ct); return FacilityResult<bool>.Success(true); }
+        catch (DbUpdateConcurrencyException) { return Concurrency<bool>(); }
+        catch (DbUpdateException ex) when (ForeignKey(ex)) { return Duplicate<bool>("Hospital contains departments and cannot be deleted."); }
+    }
+
 }
