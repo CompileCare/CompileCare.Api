@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -13,9 +12,7 @@ public static class SecurityServiceCollectionExtensions
     {
         var section = configuration.GetSection(OidcAuthenticationOptions.SectionName);
 
-        if (!environment.IsEnvironment("Testing"))
-        {
-            services.AddOptions<OidcAuthenticationOptions>()
+        services.AddOptions<OidcAuthenticationOptions>()
                 .Bind(section)
                 .Validate(options =>
                     Uri.TryCreate(options.Authority, UriKind.Absolute, out var authority) &&
@@ -28,7 +25,6 @@ public static class SecurityServiceCollectionExtensions
                 .Validate(options => options.RequireHttpsMetadata || environment.IsDevelopment(),
                     "Authentication:RequireHttpsMetadata can be disabled only in Development.")
                 .ValidateOnStart();
-        }
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -57,10 +53,15 @@ public static class SecurityServiceCollectionExtensions
                     {
                         var issuer = context.SecurityToken.Issuer;
                         var identity = context.Principal?.Identities.FirstOrDefault(candidate =>
-                            candidate.IsAuthenticated &&
-                            candidate.HasClaim(claim => claim.Type == "sub"));
+                            candidate.IsAuthenticated);
+                        var subjects = identity?.FindAll("sub").ToArray() ?? [];
 
-                        if (string.IsNullOrWhiteSpace(issuer) || identity is null)
+                        if (string.IsNullOrWhiteSpace(issuer) ||
+                            issuer.Length > 255 ||
+                            identity is null ||
+                            subjects.Length != 1 ||
+                            string.IsNullOrWhiteSpace(subjects[0].Value) ||
+                            subjects[0].Value.Length > 255)
                         {
                             context.Fail("The validated access token must contain an issuer and subject.");
                             return Task.CompletedTask;

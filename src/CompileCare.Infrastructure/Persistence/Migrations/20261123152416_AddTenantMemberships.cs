@@ -16,8 +16,8 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Issuer = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    Subject = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Issuer = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    Subject = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     Role = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),

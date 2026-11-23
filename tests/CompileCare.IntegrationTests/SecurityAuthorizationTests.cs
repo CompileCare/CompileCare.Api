@@ -4,6 +4,8 @@ using CompileCare.Api.Middleware;
 using CompileCare.Api.Security;
 using CompileCare.Application.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
@@ -22,11 +24,12 @@ public sealed class SecurityAuthorizationTests
     [Fact]
     public async Task JwtBearer_IsDefaultAuthenticationScheme()
     {
-        var schemes = _factory.Services.GetRequiredService<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>();
+        var schemes = _factory.Services.GetRequiredService<IAuthenticationSchemeProvider>();
         var authenticate = await schemes.GetDefaultAuthenticateSchemeAsync();
         var challenge = await schemes.GetDefaultChallengeSchemeAsync();
-        Assert.Equal(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, authenticate?.Name);
-        Assert.Equal(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, challenge?.Name);
+
+        Assert.Equal(JwtBearerDefaults.AuthenticationScheme, authenticate?.Name);
+        Assert.Equal(JwtBearerDefaults.AuthenticationScheme, challenge?.Name);
     }
 
     [Fact]
@@ -71,32 +74,29 @@ public sealed class SecurityAuthorizationTests
         using var client = CreateAuthenticatedClient(Guid.NewGuid());
 
         var response = await client.GetAsync("/api/v1/hospitals");
-        var jwtFailure = response.Headers.TryGetValues("X-Test-Jwt-Failure", out var failures)
-            ? string.Join("; ", failures)
-            : "OnAuthenticationFailed was not invoked.";
-        var challenge = string.Join("; ", response.Headers.WwwAuthenticate.Select(value => value.ToString()));
-        var bearerHeader = response.Headers.TryGetValues("X-Test-Bearer-Header", out var headerValues)
-            ? string.Join(",", headerValues)
-            : "not-emitted";
-        var tokenValidated = response.Headers.TryGetValues("X-Test-Jwt-Validated", out var validatedValues)
-            ? string.Join(",", validatedValues)
-            : "not-emitted";
-        var challengeFailure = response.Headers.TryGetValues("X-Test-Challenge-AuthenticateFailure", out var challengeValues)
-            ? string.Join(",", challengeValues)
-            : "not-emitted";
-        var tokenIssuer = response.Headers.TryGetValues("X-Test-Jwt-Issuer", out var issuerValues)
-            ? string.Join(",", issuerValues)
-            : "not-emitted";
-        var tokenClaims = response.Headers.TryGetValues("X-Test-Jwt-Claim-Types", out var claimValues)
-            ? string.Join(",", claimValues)
-            : "not-emitted";
-        var callbackResult = response.Headers.TryGetValues("X-Test-Jwt-Callback-Result", out var callbackValues)
-            ? string.Join(",", callbackValues)
-            : "not-emitted";
-        var body = await response.Content.ReadAsStringAsync();
-        var diagnostic = $"JWT failure: {jwtFailure}; bearer header: {bearerHeader}; token validated: {tokenValidated}; token issuer: {tokenIssuer}; claims: {tokenClaims}; token callback: {callbackResult}; challenge failure: {challengeFailure}; challenge: {challenge}; response: {body}";
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
 
-        Assert.True(response.StatusCode == HttpStatusCode.Forbidden, diagnostic);
+    [Fact]
+    public async Task JwtBearer_RejectsMissingSubjectAndExpiredTokens()
+    {
+        using var missingSubject = _factory.CreateClient();
+        missingSubject.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken(subject: null));
+        var missingSubjectResponse = await missingSubject.GetAsync("/api/v1/hospitals");
+
+        using var expiredToken = _factory.CreateClient();
+        expiredToken.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken(expiresUtc: DateTime.UtcNow.AddMinutes(-5)));
+        var expiredTokenResponse = await expiredToken.GetAsync("/api/v1/hospitals");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, missingSubjectResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, expiredTokenResponse.StatusCode);
     }
 
     [Fact]

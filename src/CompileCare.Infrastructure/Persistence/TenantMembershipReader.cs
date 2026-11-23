@@ -17,7 +17,9 @@ public sealed class TenantMembershipReader(CompileCareDbContext db) : ITenantMem
     {
         if (tenantId == Guid.Empty ||
             string.IsNullOrWhiteSpace(issuer) ||
-            string.IsNullOrWhiteSpace(subject))
+            string.IsNullOrWhiteSpace(subject) ||
+            issuer.Length > 255 ||
+            subject.Length > 255)
         {
             return null;
         }

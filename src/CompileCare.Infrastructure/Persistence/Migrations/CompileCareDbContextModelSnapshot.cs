@@ -194,8 +194,8 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Issuer")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -204,8 +204,8 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Subject")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");

@@ -1,15 +1,13 @@
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Protocols;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CompileCare.IntegrationTests;
@@ -23,6 +21,13 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:Authority"] = TestJwtTokenFactory.Issuer,
+                ["Authentication:Audience"] = TestJwtTokenFactory.Audience,
+                ["Authentication:RequireHttpsMetadata"] = "true"
+            }));
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<CompileCareDbContext>>();
@@ -30,65 +35,19 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
                 options => options.UseNpgsql(_connectionString));
 
             // Keep the real JwtBearer handler and issuer-stamping event. Only replace
-            // discovery with a local signing key for deterministic integration tests.
+            // discovery metadata/signing keys for deterministic integration tests.
             services.PostConfigure<JwtBearerOptions>(
                 JwtBearerDefaults.AuthenticationScheme,
                 options =>
                 {
-                    options.Authority = null;
-                    options.MetadataAddress = "https://identity.compilecare.test/.well-known/openid-configuration";
-                    var discoveryConfiguration = new OpenIdConnectConfiguration
+                    var discoveryConfiguration = new Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectConfiguration
                     {
                         Issuer = TestJwtTokenFactory.Issuer
                     };
                     discoveryConfiguration.SigningKeys.Add(TestJwtTokenFactory.ValidationKey);
                     options.ConfigurationManager =
-                        new StaticConfigurationManager<OpenIdConnectConfiguration>(discoveryConfiguration);
-                    options.Audience = TestJwtTokenFactory.Audience;
-                    options.RequireHttpsMetadata = false;
-                    options.Events.OnAuthenticationFailed = context =>
-                    {
-                        var logger = context.HttpContext.RequestServices
-                            .GetRequiredService<ILoggerFactory>()
-                            .CreateLogger("CompileCare.TestJwtBearer");
-                        logger.LogError(context.Exception, "Test JWT bearer validation failed.");
-                        return Task.CompletedTask;
-                    };
-                    var configuredEvents = options.Events;
-                    options.Events = new JwtBearerEvents
-                    {
-                        OnMessageReceived = async context =>
-                        {
-                            context.Response.Headers["X-Test-Bearer-Header"] =
-                                context.Request.Headers.Authorization.Count > 0 ? "present" : "missing";
-                            await configuredEvents.OnMessageReceived(context);
-                        },
-                        OnTokenValidated = async context =>
-                        {
-                            context.Response.Headers["X-Test-Jwt-Validated"] = "true";
-                            context.Response.Headers["X-Test-Jwt-Issuer"] =
-                                context.SecurityToken?.Issuer ?? "(null)";
-                            context.Response.Headers["X-Test-Jwt-Claim-Types"] =
-                                string.Join("|", context.Principal?.Claims.Select(claim => claim.Type) ?? []);
-                            await configuredEvents.OnTokenValidated(context);
-                            context.Response.Headers["X-Test-Jwt-Callback-Result"] =
-                                context.Result?.Failure?.Message ??
-                                (context.Result?.Succeeded == true ? "success" : "no-result");
-                        },
-                        OnChallenge = async context =>
-                        {
-                            context.Response.Headers["X-Test-Challenge-AuthenticateFailure"] =
-                                context.AuthenticateFailure?.GetType().Name ?? "none";
-                            await configuredEvents.OnChallenge(context);
-                        },
-                        OnForbidden = configuredEvents.OnForbidden,
-                        OnAuthenticationFailed = async context =>
-                        {
-                            context.Response.Headers["X-Test-Jwt-Failure"] =
-                                $"{context.Exception.GetType().Name}: {context.Exception.Message}";
-                            await configuredEvents.OnAuthenticationFailed(context);
-                        }
-                    };
+                        new Microsoft.IdentityModel.Protocols.StaticConfigurationManager<Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectConfiguration>(
+                            discoveryConfiguration);
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         RequireSignedTokens = true,
