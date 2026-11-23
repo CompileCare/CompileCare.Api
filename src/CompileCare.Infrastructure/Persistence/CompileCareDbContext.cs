@@ -9,10 +9,15 @@ public sealed class CompileCareDbContext(
 {
     public Guid? CurrentTenantId => tenantContext.TenantId;
 
+    public DbSet<Hospital> Hospitals => Set<Hospital>();
+    public DbSet<Department> Departments => Set<Department>();
+    public DbSet<Ward> Wards => Set<Ward>();
+    public DbSet<Room> Rooms => Set<Room>();
+    public DbSet<Bed> Beds => Set<Bed>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CompileCareDbContext).Assembly);
         TenantModelConfiguration.ApplyTenantFilters(modelBuilder, this);
     }
@@ -40,10 +45,8 @@ public sealed class CompileCareDbContext(
             {
                 if (CurrentTenantId is null || CurrentTenantId == Guid.Empty)
                     throw new InvalidOperationException("A validated tenant context is required to persist tenant-owned data.");
-
                 if (entry.Entity.TenantId != Guid.Empty && entry.Entity.TenantId != CurrentTenantId)
                     throw new InvalidOperationException("The entity tenant does not match the current tenant context.");
-
                 entry.Entity.TenantId = CurrentTenantId.Value;
                 entry.Entity.CreatedAtUtc = now;
                 entry.Entity.UpdatedAtUtc = now;
@@ -53,7 +56,6 @@ public sealed class CompileCareDbContext(
             {
                 if (CurrentTenantId is null || entry.Entity.TenantId != CurrentTenantId)
                     throw new InvalidOperationException("Tenant context mismatch while updating tenant-owned data.");
-
                 entry.Property(x => x.TenantId).IsModified = false;
                 entry.Property(x => x.CreatedAtUtc).IsModified = false;
                 entry.Entity.UpdatedAtUtc = now;
