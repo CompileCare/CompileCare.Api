@@ -13,6 +13,7 @@ public sealed class CompileCareDbContext(
     public DbSet<Ward> Wards => Set<Ward>();
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Bed> Beds => Set<Bed>();
+    public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

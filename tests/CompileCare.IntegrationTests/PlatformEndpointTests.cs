@@ -1,11 +1,11 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
+using CompileCare.Api.Middleware;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
 
-public sealed class PlatformEndpointTests(WebApplicationFactory<Program> factory)
-    : IClassFixture<WebApplicationFactory<Program>>
+[Collection("PostgreSQL integration")]
+public sealed class PlatformEndpointTests(FacilityApiFactory factory)
 {
     [Fact]
     public async Task LiveEndpoint_IsHealthy()
@@ -19,7 +19,11 @@ public sealed class PlatformEndpointTests(WebApplicationFactory<Program> factory
     public async Task InvalidTenantHeader_IsRejectedWithProblemDetails()
     {
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Tenant-ID", "bad");
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken());
+        client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, "bad");
 
         var response = await client.GetAsync("/api/v1/platform/context");
 

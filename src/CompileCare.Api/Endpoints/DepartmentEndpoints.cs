@@ -1,3 +1,4 @@
+using CompileCare.Api.Security;
 using CompileCare.Application.Facilities;
 
 namespace CompileCare.Api;
@@ -6,7 +7,7 @@ public static class DepartmentEndpoints
 {
     public static IEndpointRouteBuilder MapDepartmentEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1/hospitals/{hospitalId:guid}/departments").WithTags("Departments");
+        var group = endpoints.MapGroup("/api/v1/hospitals/{hospitalId:guid}/departments").WithTags("Departments").WithMetadata(TenantScopedEndpointMetadata.Instance).RequireAuthorization();
 
         group.MapGet("/", async (
             Guid hospitalId,
@@ -15,7 +16,7 @@ public static class DepartmentEndpoints
             int pageSize = 50,
             CancellationToken ct = default) =>
                 Results.Ok(await service.ListDepartments(hospitalId, new(page, pageSize), ct)))
-            .WithName("ListDepartments");
+            .WithName("ListDepartments").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapGet("/{id:guid}", async (
             Guid hospitalId,
@@ -23,7 +24,7 @@ public static class DepartmentEndpoints
             IDepartmentService service,
             CancellationToken ct) =>
                 FacilityHttp.From(await service.GetDepartment(hospitalId, id, ct)))
-            .WithName("GetDepartment");
+            .WithName("GetDepartment").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapPost("/", async (
             Guid hospitalId,
@@ -34,7 +35,7 @@ public static class DepartmentEndpoints
                     await service.CreateDepartment(hospitalId, new(request.Name, request.Code), ct),
                     $"/api/v1/hospitals/{hospitalId}/departments",
                     department => department.Id))
-            .WithName("CreateDepartment");
+            .WithName("CreateDepartment").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
 
         group.MapPut("/{id:guid}", async (
             Guid hospitalId,
@@ -43,7 +44,7 @@ public static class DepartmentEndpoints
             IDepartmentService service,
             CancellationToken ct) =>
                 FacilityHttp.From(await service.UpdateDepartment(hospitalId, id, new(request.Name, request.Code), ct)))
-            .WithName("UpdateDepartment");
+            .WithName("UpdateDepartment").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
 
         group.MapDelete("/{id:guid}", async (
             Guid hospitalId,
@@ -51,7 +52,7 @@ public static class DepartmentEndpoints
             IDepartmentService service,
             CancellationToken ct) =>
                 FacilityHttp.Deleted(await service.DeleteDepartment(hospitalId, id, ct)))
-            .WithName("DeleteDepartment");
+            .WithName("DeleteDepartment").RequireAuthorization(AuthorizationPolicies.FacilityDelete);
 
         return endpoints;
     }

@@ -1,3 +1,4 @@
+using CompileCare.Api.Security;
 using CompileCare.Application.Facilities;
 
 namespace CompileCare.Api;
@@ -6,7 +7,7 @@ public static class HospitalEndpoints
 {
     public static IEndpointRouteBuilder MapHospitalEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1/hospitals").WithTags("Hospitals");
+        var group = endpoints.MapGroup("/api/v1/hospitals").WithTags("Hospitals").WithMetadata(TenantScopedEndpointMetadata.Instance).RequireAuthorization();
 
         group.MapGet("/", async (
             IHospitalService service,
@@ -14,14 +15,14 @@ public static class HospitalEndpoints
             int pageSize = 50,
             CancellationToken ct = default) =>
                 Results.Ok(await service.ListHospitals(new(page, pageSize), ct)))
-            .WithName("ListHospitals");
+            .WithName("ListHospitals").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapGet("/{id:guid}", async (
             Guid id,
             IHospitalService service,
             CancellationToken ct) =>
                 FacilityHttp.From(await service.GetHospital(id, ct)))
-            .WithName("GetHospital");
+            .WithName("GetHospital").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapPost("/", async (
             HospitalRequest request,
@@ -31,7 +32,7 @@ public static class HospitalEndpoints
                     await service.CreateHospital(new(request.Name, request.Code), ct),
                     "/api/v1/hospitals",
                     hospital => hospital.Id))
-            .WithName("CreateHospital");
+            .WithName("CreateHospital").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
 
         group.MapPut("/{id:guid}", async (
             Guid id,
@@ -39,14 +40,14 @@ public static class HospitalEndpoints
             IHospitalService service,
             CancellationToken ct) =>
                 FacilityHttp.From(await service.UpdateHospital(id, new(request.Name, request.Code), ct)))
-            .WithName("UpdateHospital");
+            .WithName("UpdateHospital").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
 
         group.MapDelete("/{id:guid}", async (
             Guid id,
             IHospitalService service,
             CancellationToken ct) =>
                 FacilityHttp.Deleted(await service.DeleteHospital(id, ct)))
-            .WithName("DeleteHospital");
+            .WithName("DeleteHospital").RequireAuthorization(AuthorizationPolicies.FacilityDelete);
 
         return endpoints;
     }

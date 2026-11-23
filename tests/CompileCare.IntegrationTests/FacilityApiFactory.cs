@@ -1,10 +1,14 @@
+using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 
 namespace CompileCare.IntegrationTests;
 
@@ -17,14 +21,72 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:Authority"] = TestJwtTokenFactory.Issuer,
+                ["Authentication:Audience"] = TestJwtTokenFactory.Audience,
+                ["Authentication:RequireHttpsMetadata"] = "true"
+            }));
         builder.ConfigureTestServices(services =>
         {
-            // Replace any provider-less DbContext registration created when the
-            // application host has no regular CompileCare connection string.
             services.RemoveAll<DbContextOptions<CompileCareDbContext>>();
             services.AddDbContext<CompileCareDbContext>(
                 options => options.UseNpgsql(_connectionString));
+
+            // Keep the real JwtBearer handler and issuer-stamping event. Only replace
+            // discovery metadata/signing keys for deterministic integration tests.
+            services.PostConfigure<JwtBearerOptions>(
+                JwtBearerDefaults.AuthenticationScheme,
+                options =>
+                {
+                    var discoveryConfiguration = new Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectConfiguration
+                    {
+                        Issuer = TestJwtTokenFactory.Issuer
+                    };
+                    discoveryConfiguration.SigningKeys.Add(TestJwtTokenFactory.ValidationKey);
+                    options.ConfigurationManager =
+                        new Microsoft.IdentityModel.Protocols.StaticConfigurationManager<Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectConfiguration>(
+                            discoveryConfiguration);
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        RequireSignedTokens = true,
+                        RequireExpirationTime = true,
+                        ValidateIssuer = true,
+                        ValidIssuer = TestJwtTokenFactory.Issuer,
+                        ValidateAudience = true,
+                        ValidAudience = TestJwtTokenFactory.Audience,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = TestJwtTokenFactory.ValidationKey,
+                        NameClaimType = "sub",
+                        RoleClaimType = "role",
+                        ClockSkew = TimeSpan.FromSeconds(5)
+                    };
+                });
         });
+    }
+
+    public async Task SeedTenantMembershipAsync(
+        Guid tenantId,
+        string role,
+        bool isActive = true)
+    {
+        using var scope = Services.CreateScope();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        tenantContext.SetTenant(tenantId);
+
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        db.TenantMemberships.Add(new TenantMembership
+        {
+            TenantId = tenantId,
+            Issuer = TestJwtTokenFactory.Issuer,
+            Subject = TestJwtTokenFactory.Subject,
+            Role = role,
+            IsActive = isActive
+        });
+
+        await db.SaveChangesAsync();
     }
 
     public void ResetDatabase()

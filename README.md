@@ -49,6 +49,29 @@ dotnet ef migrations script --idempotent --project src/CompileCare.Infrastructur
 
 The design-time factory supports `ConnectionStrings__CompileCare`; its local fallback is tooling-only. Never use it in production. Production deployments must review and apply a generated migration script through the release process after a verified backup. **The API does not run migrations automatically at startup.** Keep migration files and the model snapshot in source control; never edit a migration already applied to a shared environment. Integration tests recreate their dedicated `_test` database and apply migrations rather than using `EnsureCreated`.
 
+## Authentication and tenant authorization
+
+Configure an OIDC identity provider using its HTTPS issuer/discovery endpoint and the API's registered audience. Do not commit credentials or signing keys.
+
+Set the following environment variables in each deployed environment:
+
+```text
+Authentication__Authority=https://identity.example.com/
+Authentication__Audience=compilecare-api
+Authentication__RequireHttpsMetadata=true
+```
+
+The API validates JWT signature, issuer, audience, lifetime, expiry and subject. The validated issuer and subject (`sub`) are matched against an active CompileCare tenant membership. Facility endpoints require exactly one `X-Tenant-ID` GUID; this header only selects the requested tenant and never grants access by itself.
+
+Tenant roles are stored in the CompileCare database. Current facility permissions are:
+- `HospitalAdmin`: read, create/update and delete facility records.
+- `FacilityManager`: read and create/update facility records.
+- `FacilityViewer`: read facility records only.
+
+Token-supplied role or permission claims do not grant CompileCare access. Membership provisioning and lifecycle management must be performed by a trusted administrative process; a self-service tenant onboarding or membership administration API is not yet included.
+
+The integration suite uses synthetic, signed HS256 JWTs and a local static OIDC signing configuration. Its test key is not used by any deployed environment.
+
 ## Observability configuration
 
 The API consumes stable shared packages from the CompileCare GitHub Packages NuGet feed. CI uses `GITHUB_TOKEN` with `packages: read`; grant the API repository read access in each package's Settings → Manage Actions access.
@@ -89,7 +112,7 @@ Each collection supports bounded `page` and `pageSize` pagination (default 50, m
 
 ## Tenant isolation
 
-The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Before tenant-owned data is exposed, tenant identity must be bound to an authenticated principal and authorized against the requested resource. Persistence requires a validated tenant context for tenant-owned writes and applies tenant query filters. Tenant scope must also be enforced in audit, background jobs and message consumers. The platform context endpoint is diagnostic only.
+The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Facility and platform-context API routes now require a validated OIDC/JWT principal and an active CompileCare membership matching the token issuer, subject and selected tenant. Persistence requires the validated tenant context for tenant-owned writes and applies tenant query filters. Background jobs and message consumers must establish an equivalent trusted tenant context before accessing tenant-owned data. The platform context endpoint is diagnostic only.
 
 ## Pull request workflow
 
