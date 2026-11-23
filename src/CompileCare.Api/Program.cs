@@ -21,6 +21,7 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<TenantContextMiddleware>();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
+app.MapPrometheusScrapingEndpoint();
 app.MapGet("/", () => Results.Ok(new { service = "CompileCare.Api", status = "ready" }));
 app.MapHealthEndpoints();
 app.MapPlatformEndpoints();
