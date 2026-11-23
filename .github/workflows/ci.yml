@@ -40,4 +40,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: dotnet restore CompileCare.Api.slnx
       - run: dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+      - name: Restore .NET tools
+        run: dotnet tool restore
+      - name: Detect pending EF Core model changes
+        run: dotnet ef migrations has-pending-model-changes --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
       - run: dotnet test CompileCare.Api.slnx --configuration Release --no-build

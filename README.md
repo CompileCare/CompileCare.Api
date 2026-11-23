@@ -41,11 +41,13 @@ Host=localhost;Database=compilecare;Username=compilecare;Password=replace-me
 Infrastructure registers EF Core/Npgsql and database readiness only when the connection string is configured. Migrations are created with the EF Core CLI from the Infrastructure project.
 
 ```bash
-dotnet ef migrations add InitialPersistence --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
+dotnet ef migrations add <MigrationName> --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api --output-dir Persistence/Migrations
 dotnet ef database update --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
+
+dotnet ef migrations script --idempotent --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api --output artifacts/compilecare-migrations.sql
 ```
 
-The design-time factory supports `ConnectionStrings__CompileCare`; its local fallback is tooling-only. Never use it in production.
+The design-time factory supports `ConnectionStrings__CompileCare`; its local fallback is tooling-only. Never use it in production. Production deployments must review and apply a generated migration script through the release process after a verified backup. **The API does not run migrations automatically at startup.** Keep migration files and the model snapshot in source control; never edit a migration already applied to a shared environment. Integration tests recreate their dedicated `_test` database and apply migrations rather than using `EnsureCreated`.
 
 ## Observability configuration
 
