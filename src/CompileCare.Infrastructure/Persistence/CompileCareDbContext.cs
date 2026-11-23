@@ -1,5 +1,4 @@
 using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Facilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace CompileCare.Infrastructure.Persistence;
@@ -9,7 +8,11 @@ public sealed class CompileCareDbContext(
     ITenantContext tenantContext) : DbContext(options)
 {
     public Guid? CurrentTenantId => tenantContext.TenantId;
-    public DbSet<Facility> Facilities => Set<Facility>();
+    public DbSet<Hospital> Hospitals => Set<Hospital>();
+    public DbSet<Department> Departments => Set<Department>();
+    public DbSet<Ward> Wards => Set<Ward>();
+    public DbSet<Room> Rooms => Set<Room>();
+    public DbSet<Bed> Beds => Set<Bed>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
