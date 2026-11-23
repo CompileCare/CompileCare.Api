@@ -54,6 +54,19 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
                         logger.LogError(context.Exception, "Test JWT bearer validation failed.");
                         return Task.CompletedTask;
                     };
+                    var configuredEvents = options.Events;
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnTokenValidated = configuredEvents.OnTokenValidated,
+                        OnChallenge = configuredEvents.OnChallenge,
+                        OnForbidden = configuredEvents.OnForbidden,
+                        OnAuthenticationFailed = async context =>
+                        {
+                            context.Response.Headers["X-Test-Jwt-Failure"] =
+                                $"{context.Exception.GetType().Name}: {context.Exception.Message}";
+                            await configuredEvents.OnAuthenticationFailed(context);
+                        }
+                    };
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         RequireSignedTokens = true,

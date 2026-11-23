@@ -55,6 +55,19 @@ public sealed class SecurityAuthorizationTests
     }
 
     [Fact]
+    public async Task ValidJwtWithoutTenantMembership_ReachesMembershipAuthorization()
+    {
+        using var client = CreateAuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.GetAsync("/api/v1/hospitals");
+        var diagnostic = response.Headers.TryGetValues("X-Test-Jwt-Failure", out var failures)
+            ? string.Join("; ", failures)
+            : "JWT validation succeeded; membership authorization returned a response.";
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode, diagnostic);
+    }
+
+    [Fact]
     public async Task TenantScopedEndpoint_RequiresTenantSelection()
     {
         using var client = CreateAuthenticatedClient(tenantId: null);
