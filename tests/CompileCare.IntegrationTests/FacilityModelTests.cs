@@ -55,7 +55,7 @@ public sealed class FacilityModelTests
         var parent = db.Model.FindEntityType(typeof(TParent))!;
         var foreignKey = child.GetForeignKeys().Single(fk => fk.PrincipalEntityType == parent);
         Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior);
-        Assert.Equal([nameof(TenantOwnedEntity.TenantId), parentIdProperty], foreignKey.Properties.Select(p => p.Name));
-        Assert.Equal([nameof(TenantOwnedEntity.TenantId), nameof(TenantOwnedEntity.Id)], foreignKey.PrincipalKey.Properties.Select(p => p.Name));
+        Assert.Equal(new[] { nameof(TenantOwnedEntity.TenantId), parentIdProperty }, foreignKey.Properties.Select(p => p.Name));
+        Assert.Equal(new[] { nameof(TenantOwnedEntity.TenantId), nameof(TenantOwnedEntity.Id) }, foreignKey.PrincipalKey.Properties.Select(p => p.Name));
     }
 }
