@@ -118,12 +118,16 @@ public sealed class SecurityAuthorizationTests
     }
 
     [Fact]
-    public async Task ClientSuppliedRoleCannotEscalateTenantMembership()
+    public async Task ExternalTokenPermissionAndRoleClaimsCannotEscalateTenantMembership()
     {
         var tenantId = Guid.NewGuid();
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.FacilityViewer);
         using var client = CreateAuthenticatedClient(tenantId);
-        client.DefaultRequestHeaders.Add("X-Test-Roles", TenantRoles.HospitalAdmin);
+
+        // Simulate claims emitted by the configured identity provider. Only the
+        // CompileCare membership row is authoritative for tenant role/permissions.
+        client.DefaultRequestHeaders.Add("X-Test-External-Permissions", TenantPermissions.FacilityWrite);
+        client.DefaultRequestHeaders.Add("X-Test-External-Roles", TenantRoles.HospitalAdmin);
 
         var createResponse = await client.PostAsJsonAsync(
             "/api/v1/hospitals",

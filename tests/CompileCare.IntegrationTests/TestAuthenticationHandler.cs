@@ -27,14 +27,19 @@ public sealed class TestAuthenticationHandler(
 
         var issuer = Request.Headers["X-Test-Issuer"].FirstOrDefault() ?? Issuer;
         var subject = Request.Headers["X-Test-Subject"].FirstOrDefault() ?? Subject;
-        var identity = new ClaimsIdentity(
-        [
-            new Claim("iss", issuer),
-            new Claim("sub", subject)
-        ],
-        TestScheme,
-        "sub",
-        "role");
+        var claims = new List<Claim>
+        {
+            new("iss", issuer),
+            new("sub", subject)
+        };
+
+        claims.AddRange(Request.Headers["X-Test-External-Permissions"]
+            .Select(permission => new Claim("compilecare:permission", permission)));
+
+        claims.AddRange(Request.Headers["X-Test-External-Roles"]
+            .Select(role => new Claim("role", role)));
+
+        var identity = new ClaimsIdentity(claims, TestScheme, "sub", "role");
 
         return Task.FromResult(AuthenticateResult.Success(
             new AuthenticationTicket(new ClaimsPrincipal(identity), TestScheme)));

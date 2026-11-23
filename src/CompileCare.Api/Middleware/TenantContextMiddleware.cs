@@ -77,8 +77,30 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             return;
         }
 
+        // Remove reserved authorization claims from the external identity before adding
+        // membership-derived claims. A valid issuer may still carry profile/group claims;
+        // those must never grant CompileCare tenant permissions.
+        var reservedClaimTypes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            AuthorizationPolicies.TenantIdClaim,
+            AuthorizationPolicies.TenantRoleClaim,
+            AuthorizationPolicies.PermissionClaim,
+            "role",
+            "roles",
+            ClaimTypes.Role
+        };
+
+        foreach (var identity in context.User.Identities)
+        {
+            foreach (var claim in identity.Claims
+                         .Where(claim => reservedClaimTypes.Contains(claim.Type))
+                         .ToArray())
+            {
+                identity.RemoveClaim(claim);
+            }
+        }
+
         // Only server-loaded membership data creates CompileCare permission claims.
-        // Roles and permissions supplied by the external token or request are ignored.
         var membershipClaims = new List<Claim>
         {
             new(AuthorizationPolicies.TenantIdClaim, tenantId.ToString("D")),
