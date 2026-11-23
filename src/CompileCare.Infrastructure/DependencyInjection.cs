@@ -1,4 +1,6 @@
 using CompileCare.Infrastructure.Persistence;
+using CompileCare.Infrastructure.Facilities;
+using CompileCare.Application.Facilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +31,13 @@ public static class DependencyInjection
             services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
         }
 
+        services.AddScoped<FacilityService>();
+        services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
+        services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());
+        services.AddScoped<IWardService>(sp => sp.GetRequiredService<FacilityService>());
+        services.AddScoped<IRoomService>(sp => sp.GetRequiredService<FacilityService>());
+        services.AddScoped<IBedService>(sp => sp.GetRequiredService<FacilityService>());
+        services.AddScoped<IFacilityService>(sp => sp.GetRequiredService<FacilityService>());
         return services;
     }
 }
