@@ -60,9 +60,12 @@ public sealed class SecurityAuthorizationTests
         using var client = CreateAuthenticatedClient(Guid.NewGuid());
 
         var response = await client.GetAsync("/api/v1/hospitals");
-        var diagnostic = response.Headers.TryGetValues("X-Test-Jwt-Failure", out var failures)
+        var jwtFailure = response.Headers.TryGetValues("X-Test-Jwt-Failure", out var failures)
             ? string.Join("; ", failures)
-            : "JWT validation succeeded; membership authorization returned a response.";
+            : "OnAuthenticationFailed was not invoked.";
+        var challenge = string.Join("; ", response.Headers.WwwAuthenticate.Select(value => value.ToString()));
+        var body = await response.Content.ReadAsStringAsync();
+        var diagnostic = $"JWT failure: {jwtFailure}; challenge: {challenge}; response: {body}";
 
         Assert.True(response.StatusCode == HttpStatusCode.Forbidden, diagnostic);
     }
