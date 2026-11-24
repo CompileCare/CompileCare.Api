@@ -18,6 +18,8 @@ public sealed class CompileCareDbContext(
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<TenantMembershipScope> TenantMembershipScopes => Set<TenantMembershipScope>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<HospitalPatientRegistration> HospitalPatientRegistrations => Set<HospitalPatientRegistration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +49,10 @@ public sealed class CompileCareDbContext(
         modelBuilder.Entity<TenantMembershipScope>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<AuditEvent>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Patient>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<HospitalPatientRegistration>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
 
         TenantModelConfiguration.ApplyTenantFilters(modelBuilder, this);

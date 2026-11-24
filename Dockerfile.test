@@ -1,0 +1,11 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+WORKDIR /workspace
+
+COPY . .
+
+# Restore at container start so private GitHub Packages credentials can be supplied
+# at runtime without baking credentials into an image layer.
+COPY scripts/docker-test-entrypoint.sh /usr/local/bin/docker-test-entrypoint
+RUN chmod +x /usr/local/bin/docker-test-entrypoint
+
+ENTRYPOINT ["/usr/local/bin/docker-test-entrypoint"]

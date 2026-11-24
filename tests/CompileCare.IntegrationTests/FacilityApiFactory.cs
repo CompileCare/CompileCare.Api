@@ -70,7 +70,8 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
     public async Task SeedTenantMembershipAsync(
         Guid tenantId,
         string role,
-        bool isActive = true)
+        bool isActive = true,
+        IReadOnlyList<OrganizationScope>? scopes = null)
     {
         using var scope = Services.CreateScope();
         var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
@@ -97,12 +98,17 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
             Role = role,
             IsActive = isActive
         };
-        membership.Scopes.Add(new TenantMembershipScope
+        foreach (var organizationScope in scopes ?? [new OrganizationScope(OrganizationScopeTypes.Tenant)])
         {
-            TenantId = tenantId,
-            MembershipId = membership.Id,
-            ScopeType = OrganizationScopeTypes.Tenant
-        });
+            membership.Scopes.Add(new TenantMembershipScope
+            {
+                TenantId = tenantId,
+                MembershipId = membership.Id,
+                ScopeType = organizationScope.ScopeType,
+                HospitalId = organizationScope.HospitalId,
+                DepartmentId = organizationScope.DepartmentId
+            });
+        }
         db.TenantMemberships.Add(membership);
 
         await db.SaveChangesAsync();

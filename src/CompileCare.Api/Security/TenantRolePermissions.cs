@@ -1,4 +1,5 @@
 using CompileCare.Application.Tenancy;
+using CompileCare.Application.Patients;
 
 namespace CompileCare.Api.Security;
 
@@ -22,6 +23,11 @@ internal static class TenantRolePermissions
             TenantRoles.FacilityViewer =>
             [
                 TenantPermissions.FacilityRead
+            ],
+            TenantRoles.PatientRegistrar =>
+            [
+                PatientPermissions.Read,
+                PatientPermissions.Register
             ],
             _ => Array.Empty<string>()
         };
