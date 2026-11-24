@@ -92,6 +92,16 @@ partial class AddStaffProfilesAndAssignments : Migration
             unique: true);
 
         migrationBuilder.CreateIndex(
+            name: "IX_staff_assignments_TenantId_HospitalId",
+            table: "staff_assignments",
+            columns: new[] { "TenantId", "HospitalId" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_staff_assignments_TenantId_HospitalId_DepartmentId",
+            table: "staff_assignments",
+            columns: new[] { "TenantId", "HospitalId", "DepartmentId" });
+
+        migrationBuilder.CreateIndex(
             name: "IX_staff_assignments_TenantId_StaffProfileId_HospitalId",
             table: "staff_assignments",
             columns: new[] { "TenantId", "StaffProfileId", "HospitalId" },
