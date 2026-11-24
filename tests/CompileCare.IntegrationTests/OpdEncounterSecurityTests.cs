@@ -58,6 +58,9 @@ public sealed class OpdEncounterSecurityTests
         var clinicianPatient = await clinician.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/patients/{patientId:D}");
         Assert.Equal(HttpStatusCode.OK, clinicianPatient.StatusCode);
+        var forbiddenPatientSearch = await clinician.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients?query=Ravi&page=1&pageSize=25");
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenPatientSearch.StatusCode);
 
         var clinicianDepartments = await clinician.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/departments?page=1&pageSize=100");
