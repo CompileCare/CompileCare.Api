@@ -1,2 +1,1 @@
-One-shot trigger for AddPatientMasterRegistration on feature/patient-master-registration-foundation.
-Retry after migration timestamp ordering fix.
+Initial patient registration migration generated and committed as 20261124143001_AddPatientMasterRegistration. The one-shot trigger is retired; future migrations use workflow_dispatch.
