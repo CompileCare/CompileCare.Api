@@ -134,7 +134,8 @@ public sealed class AppointmentSchedulingApiTests
         var rescheduleResponse = await registrar.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/appointments/{original!.Id:D}/reschedule",
             new AppointmentBookInput(session.Id, patientId, slots[1].StartsAtUtc, "Rescheduled"));
-        Assert.Equal(HttpStatusCode.OK, rescheduleResponse.StatusCode);
+        Assert.True(rescheduleResponse.StatusCode == HttpStatusCode.OK,
+            $"Reschedule failed: {(int)rescheduleResponse.StatusCode} {await rescheduleResponse.Content.ReadAsStringAsync()}");
         var replacement = await rescheduleResponse.Content.ReadFromJsonAsync<AppointmentDto>();
         Assert.NotNull(replacement);
         Assert.Equal(original.Id, replacement!.RescheduledFromAppointmentId);
