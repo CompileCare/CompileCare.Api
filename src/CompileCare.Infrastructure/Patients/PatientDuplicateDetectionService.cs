@@ -19,15 +19,15 @@ public sealed class PatientDuplicateDetectionService(
         if (hospitalId == Guid.Empty || !HasHospitalWideScope(hospitalId))
             return PatientResult<PatientDuplicateCheckDto>.Failure("Hospital not found.", 404);
 
-        var givenName = Normalize(request.GivenName);
-        var middleName = Normalize(request.MiddleName);
-        var familyName = Normalize(request.FamilyName);
+        var normalizedGivenName = PatientNameNormalizer.Normalize(request.GivenName);
+        var normalizedMiddleName = PatientNameNormalizer.Normalize(request.MiddleName);
+        var normalizedFamilyName = PatientNameNormalizer.Normalize(request.FamilyName);
 
-        if (string.IsNullOrWhiteSpace(givenName) || givenName.Length > 100)
+        if (normalizedGivenName is null || request.GivenName!.Length > 100)
             return PatientResult<PatientDuplicateCheckDto>.Failure(
                 "Given name is required and must be at most 100 characters.", 400);
 
-        if (middleName?.Length > 100 || familyName?.Length > 100)
+        if (request.MiddleName?.Length > 100 || request.FamilyName?.Length > 100)
             return PatientResult<PatientDuplicateCheckDto>.Failure(
                 "Patient name parts must be at most 100 characters.", 400);
 
@@ -39,8 +39,8 @@ public sealed class PatientDuplicateDetectionService(
         if (!hospitalExists)
             return PatientResult<PatientDuplicateCheckDto>.Failure("Hospital not found.", 404);
 
-        // DOB is required for this conservative first matching pass. A missing
-        // DOB must never cause a name-only search that could expose unrelated records.
+        // Exact DOB remains mandatory. Without it, the service deliberately does
+        // not execute a name-only search.
         if (request.DateOfBirth is null)
             return PatientResult<PatientDuplicateCheckDto>.Success(new(
                 false,
@@ -48,16 +48,19 @@ public sealed class PatientDuplicateDetectionService(
                 Array.Empty<PatientDuplicateCandidateDto>(),
                 false));
 
-        // This v1 check is deliberately hospital-local and advisory. Exact,
-        // case-insensitive given-name + DOB matches are candidates only; no
-        // patient association, identifier assignment or merge is performed.
-        var pattern = EscapeLike(givenName);
-        var matches = await db.HospitalPatientRegistrations
+        // A candidate must match either the normalized given name, or both
+        // normalized middle and family names. A shared family name alone is
+        // deliberately insufficient. Results remain hospital-local and advisory.
+        var query = db.HospitalPatientRegistrations
             .AsNoTracking()
             .Where(x =>
                 x.HospitalId == hospitalId &&
                 x.Patient.DateOfBirth == request.DateOfBirth &&
-                EF.Functions.ILike(x.Patient.GivenName, pattern))
+                (x.Patient.NormalizedGivenName == normalizedGivenName ||
+                 (normalizedMiddleName != null &&
+                  normalizedFamilyName != null &&
+                  x.Patient.NormalizedMiddleName == normalizedMiddleName &&
+                  x.Patient.NormalizedFamilyName == normalizedFamilyName)))
             .OrderBy(x => x.Patient.FamilyName)
             .ThenBy(x => x.Patient.GivenName)
             .ThenBy(x => x.Patient.Id)
@@ -67,18 +70,25 @@ public sealed class PatientDuplicateDetectionService(
                 x.Patient.GivenName,
                 x.Patient.MiddleName,
                 x.Patient.FamilyName,
+                x.Patient.NormalizedGivenName,
+                x.Patient.NormalizedMiddleName,
+                x.Patient.NormalizedFamilyName,
                 x.Patient.DateOfBirth!.Value,
-                x.RegisteredAtUtc))
-            .ToListAsync(cancellationToken);
+                x.RegisteredAtUtc));
 
+        var matches = await query.ToListAsync(cancellationToken);
         var hasMoreCandidates = matches.Count > MaximumCandidates;
         var candidates = matches
             .Take(MaximumCandidates)
-            .Select(candidate => ToDto(candidate, middleName, familyName))
+            .Select(candidate => ToDto(
+                candidate,
+                normalizedGivenName,
+                normalizedMiddleName,
+                normalizedFamilyName))
             .ToArray();
 
         var message = candidates.Length == 0
-            ? "No candidates matched the configured conservative checks."
+            ? "No candidates matched the configured checks. This does not prove that no duplicate exists."
             : "Possible matches found. Verify identity using the hospital's approved procedure; candidates are not confirmed identities.";
 
         return PatientResult<PatientDuplicateCheckDto>.Success(new(
@@ -93,22 +103,25 @@ public sealed class PatientDuplicateDetectionService(
 
     private static PatientDuplicateCandidateDto ToDto(
         CandidateProjection candidate,
-        string? requestedMiddleName,
-        string? requestedFamilyName)
+        string normalizedGivenName,
+        string? normalizedMiddleName,
+        string? normalizedFamilyName)
     {
-        var signals = new List<string>
-        {
-            "Exact given name (case-insensitive)",
-            "Exact date of birth"
-        };
+        var givenNameMatches = candidate.NormalizedGivenName == normalizedGivenName;
+        var middleNameMatches = normalizedMiddleName is not null &&
+                                candidate.NormalizedMiddleName == normalizedMiddleName;
+        var familyNameMatches = normalizedFamilyName is not null &&
+                                candidate.NormalizedFamilyName == normalizedFamilyName;
+        var signals = new List<string> { "Exact date of birth" };
 
-        if (requestedMiddleName is not null &&
-            string.Equals(requestedMiddleName, Normalize(candidate.MiddleName), StringComparison.OrdinalIgnoreCase))
-            signals.Add("Exact middle name");
-
-        if (requestedFamilyName is not null &&
-            string.Equals(requestedFamilyName, Normalize(candidate.FamilyName), StringComparison.OrdinalIgnoreCase))
-            signals.Add("Exact family name");
+        if (givenNameMatches)
+            signals.Add("Normalized given name match");
+        if (middleNameMatches)
+            signals.Add("Normalized middle name match");
+        if (familyNameMatches)
+            signals.Add("Normalized family name match");
+        if (!givenNameMatches && middleNameMatches && familyNameMatches)
+            signals.Add("Middle and family names matched; given name differed");
 
         return new(
             candidate.PatientId,
@@ -120,17 +133,14 @@ public sealed class PatientDuplicateDetectionService(
             signals);
     }
 
-    private static string? Normalize(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static string EscapeLike(string value) =>
-        value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
-
     private sealed record CandidateProjection(
         Guid PatientId,
         string GivenName,
         string? MiddleName,
         string? FamilyName,
+        string NormalizedGivenName,
+        string? NormalizedMiddleName,
+        string? NormalizedFamilyName,
         DateOnly DateOfBirth,
         DateTimeOffset RegisteredAtUtc);
 }
