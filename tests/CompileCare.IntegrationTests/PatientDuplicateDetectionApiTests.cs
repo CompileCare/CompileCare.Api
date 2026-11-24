@@ -46,10 +46,10 @@ public sealed class PatientDuplicateDetectionApiTests
         Assert.False(result.HasMoreCandidates);
         var candidate = Assert.Single(result.Candidates);
         Assert.Equal(localPatient.Id, candidate.PatientId);
-        Assert.Contains("Exact given name (case-insensitive)", candidate.MatchSignals);
+        Assert.Contains("Normalized given name match", candidate.MatchSignals);
         Assert.Contains("Exact date of birth", candidate.MatchSignals);
-        Assert.Contains("Exact middle name", candidate.MatchSignals);
-        Assert.Contains("Exact family name", candidate.MatchSignals);
+        Assert.Contains("Normalized middle name match", candidate.MatchSignals);
+        Assert.Contains("Normalized family name match", candidate.MatchSignals);
 
         // Candidate detection is advisory only. Registration remains a separate
         // explicit action and does not silently associate the new person.
@@ -157,6 +157,83 @@ public sealed class PatientDuplicateDetectionApiTests
             new PatientDuplicateCheckRequest("Asha", null, null, new DateOnly(1990, 4, 12)));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DuplicateCheck_MatchesUnicodeCompatibilityAndCollapsedWhitespace()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar);
+        var hospitalId = await SeedHospitalAsync(tenantId, "Normalized Name Hospital");
+        using var client = CreateClient(tenantId);
+
+        var patient = await RegisterPatientAsync(
+            client, hospitalId, "Ａsha   Patil", null, null, new DateOnly(1990, 4, 12));
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("asha patil", null, null, new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<PatientDuplicateCheckDto>();
+        Assert.NotNull(result);
+        var candidate = Assert.Single(result!.Candidates);
+        Assert.Equal(patient.Id, candidate.PatientId);
+        Assert.Contains("Normalized given name match", candidate.MatchSignals);
+    }
+
+    [Fact]
+    public async Task DuplicateCheck_UsesMiddleAndFamilyAsAlternateSignalOnlyWhenBothMatch()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar);
+        var hospitalId = await SeedHospitalAsync(tenantId, "Multi Signal Hospital");
+        using var client = CreateClient(tenantId);
+
+        var patient = await RegisterPatientAsync(
+            client, hospitalId, "Asha", "R", "Patil", new DateOnly(1990, 4, 12));
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Anita", " R ", "Patil", new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<PatientDuplicateCheckDto>();
+        Assert.NotNull(result);
+        var candidate = Assert.Single(result!.Candidates);
+        Assert.Equal(patient.Id, candidate.PatientId);
+        Assert.Contains("Normalized middle name match", candidate.MatchSignals);
+        Assert.Contains("Normalized family name match", candidate.MatchSignals);
+        Assert.Contains("Middle and family names matched; given name differed", candidate.MatchSignals);
+        Assert.DoesNotContain("Normalized given name match", candidate.MatchSignals);
+    }
+
+    [Fact]
+    public async Task DuplicateCheck_DoesNotUseFamilyNameAloneOrRelaxExactDateOfBirth()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar);
+        var hospitalId = await SeedHospitalAsync(tenantId, "Strict Match Hospital");
+        using var client = CreateClient(tenantId);
+
+        _ = await RegisterPatientAsync(
+            client, hospitalId, "Asha", "R", "Patil", new DateOnly(1990, 4, 12));
+
+        var familyOnly = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Anita", null, "Patil", new DateOnly(1990, 4, 12)));
+        var differentDob = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Asha", "R", "Patil", new DateOnly(1990, 4, 13)));
+
+        Assert.Equal(HttpStatusCode.OK, familyOnly.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, differentDob.StatusCode);
+        var familyOnlyResult = await familyOnly.Content.ReadFromJsonAsync<PatientDuplicateCheckDto>();
+        var differentDobResult = await differentDob.Content.ReadFromJsonAsync<PatientDuplicateCheckDto>();
+        Assert.NotNull(familyOnlyResult);
+        Assert.NotNull(differentDobResult);
+        Assert.Empty(familyOnlyResult!.Candidates);
+        Assert.Empty(differentDobResult!.Candidates);
     }
 
     private async Task<PatientDto> RegisterPatientAsync(

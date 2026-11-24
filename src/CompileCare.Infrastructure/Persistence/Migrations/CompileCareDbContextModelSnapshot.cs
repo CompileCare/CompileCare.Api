@@ -327,6 +327,19 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("NormalizedGivenName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NormalizedMiddleName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NormalizedFamilyName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -341,7 +354,14 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "FamilyName", "GivenName");
 
-                    b.ToTable("patients", (string)null);
+                    b.HasIndex("TenantId", "DateOfBirth", "NormalizedGivenName");
+
+                    b.HasIndex("TenantId", "DateOfBirth", "NormalizedMiddleName", "NormalizedFamilyName");
+
+                    b.ToTable("patients", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_patients_normalized_given_name", "\"NormalizedGivenName\" <> ''");
+                        });
                 });
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.PatientIdentifier", b =>

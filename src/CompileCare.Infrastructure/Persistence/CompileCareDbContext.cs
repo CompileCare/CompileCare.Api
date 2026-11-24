@@ -1,3 +1,4 @@
+using CompileCare.Application.Patients;
 using CompileCare.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
@@ -78,6 +79,15 @@ public sealed class CompileCareDbContext(
 
     private void ApplyAuditAndTenantRules()
     {
+        foreach (var entry in ChangeTracker.Entries<Patient>()
+                     .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+        {
+            entry.Entity.NormalizedGivenName =
+                PatientNameNormalizer.Normalize(entry.Entity.GivenName) ?? string.Empty;
+            entry.Entity.NormalizedMiddleName = PatientNameNormalizer.Normalize(entry.Entity.MiddleName);
+            entry.Entity.NormalizedFamilyName = PatientNameNormalizer.Normalize(entry.Entity.FamilyName);
+        }
+
         var now = DateTimeOffset.UtcNow;
         foreach (var entry in ChangeTracker.Entries<AuditEvent>())
         {
