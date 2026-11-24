@@ -59,7 +59,8 @@ public sealed record AppointmentDto(
     DateTimeOffset SlotEndsAtUtc,
     string Status,
     string? Reason,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    Guid? RescheduledFromAppointmentId);
 
 public sealed record AvailabilitySessionPage(
     IReadOnlyList<AvailabilitySessionDto> Items,
