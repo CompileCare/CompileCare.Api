@@ -71,6 +71,8 @@ public interface IOpdEncounterService
         Guid hospitalId, Guid queueEntryId, OpdEncounterActor actor, CancellationToken cancellationToken);
     Task<OpdEncounterResult<OpdEncounterDto>> GetAsync(
         Guid hospitalId, Guid encounterId, CancellationToken cancellationToken);
+    Task<OpdEncounterResult<OpdEncounterDto>> GetByQueueEntryAsync(
+        Guid hospitalId, Guid queueEntryId, CancellationToken cancellationToken);
     Task<OpdEncounterResult<OpdEncounterDto>> UpdateNoteAsync(
         Guid hospitalId, Guid encounterId, OpdEncounterNoteInput input, OpdEncounterActor actor, CancellationToken cancellationToken);
     Task<OpdEncounterResult<OpdEncounterDto>> SignAsync(
