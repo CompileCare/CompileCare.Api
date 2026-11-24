@@ -10,6 +10,9 @@ namespace CompileCare.Infrastructure.Persistence.Migrations;
 [Migration("20261124190000_AddOpdBillingFoundation")]
 public partial class AddOpdBillingFoundation : Migration
 {
+    protected override void BuildTargetModel(ModelBuilder modelBuilder) =>
+        CompileCareDbContextModelSnapshot.BuildModelForMigration(modelBuilder);
+
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.AddUniqueConstraint(
