@@ -20,6 +20,8 @@ public sealed class AppointmentQueueService(
             return AppointmentResult<AppointmentDto>.Failure("Appointment not found.", 404);
         if (current.Status != AppointmentStatuses.Booked)
             return AppointmentResult<AppointmentDto>.Failure("Only booked appointments can be rescheduled.", 409);
+        if (input.PatientId != current.PatientId)
+            return AppointmentResult<AppointmentDto>.Failure("Rescheduling must retain the original patient registration.", 400);
         if (await db.QueueEntries.AnyAsync(x => x.AppointmentId == appointmentId, cancellationToken))
             return AppointmentResult<AppointmentDto>.Failure("A checked-in appointment cannot be rescheduled.", 409);
 
