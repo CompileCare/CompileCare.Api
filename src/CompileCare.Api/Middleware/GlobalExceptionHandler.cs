@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 
 namespace CompileCare.Api.Middleware;
 
@@ -19,11 +20,26 @@ public sealed class GlobalExceptionHandler(
             ["traceId"] = context.TraceIdentifier
         };
 
-        // Test environments return the exception type/message to make integration
-        // failures diagnosable. Production and other deployed environments keep a
-        // generic RFC 9457 response and never expose internal exception details.
+        // Test environments expose safe diagnostic metadata only. Production and
+        // deployed environments retain the generic RFC 9457 response.
         if (environment.IsEnvironment("Testing"))
+        {
             extensions["diagnostic"] = $"{exception.GetType().Name}: {exception.Message}";
+            if (exception is DbUpdateConcurrencyException concurrencyException)
+            {
+                extensions["concurrencyEntries"] = concurrencyException.Entries
+                    .Select(entry => new
+                    {
+                        Entity = entry.Metadata.ClrType.Name,
+                        State = entry.State.ToString(),
+                        Key = string.Join(
+                            ",",
+                            entry.Metadata.FindPrimaryKey()?.Properties.Select(property => property.Name)
+                            ?? Array.Empty<string>())
+                    })
+                    .ToArray();
+            }
+        }
 
         await Results.Problem(
             title: "An unexpected error occurred.",
