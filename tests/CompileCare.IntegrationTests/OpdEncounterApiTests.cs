@@ -49,8 +49,12 @@ public sealed class OpdEncounterApiTests
         var queueEntry = await walkIn.Content.ReadFromJsonAsync<QueueEntryDto>();
         Assert.NotNull(queueEntry);
 
+        var call = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{queueEntry!.Id:D}/call",
+            new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, call.StatusCode);
         var start = await registrar.PostAsJsonAsync(
-            $"/api/v1/hospitals/{hospitalId:D}/queue/{queueEntry!.Id:D}/start",
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{queueEntry.Id:D}/start",
             new QueueActionInput(null));
         Assert.Equal(HttpStatusCode.OK, start.StatusCode);
 
