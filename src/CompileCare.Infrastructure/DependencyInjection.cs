@@ -1,10 +1,12 @@
 using CompileCare.Application.Appointments;
+using CompileCare.Application.Billing;
 using CompileCare.Application.Clinical;
 using CompileCare.Application.Facilities;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Appointments;
+using CompileCare.Infrastructure.Billing;
 using CompileCare.Infrastructure.Clinical;
 using CompileCare.Infrastructure.Facilities;
 using CompileCare.Infrastructure.Memberships;
@@ -44,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentSchedulingService, AppointmentSchedulingService>();
         services.AddScoped<IAppointmentQueueService, AppointmentQueueService>();
         services.AddScoped<IOpdEncounterService, OpdEncounterService>();
+        services.AddScoped<IBillingService, BillingService>();
         services.AddScoped<FacilityService>();
         services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
         services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());
