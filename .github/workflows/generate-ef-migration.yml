@@ -89,6 +89,33 @@ jobs:
             --context CompileCareDbContext \
             --output-dir Persistence/Migrations
 
+
+      - name: Ensure migration ID follows existing migration history
+        shell: bash
+        env:
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientMasterRegistration' }}
+        run: |
+          set -euo pipefail
+          migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
+          generated_file="$(find "$migration_dir" -maxdepth 1 -type f -name "*_${MIGRATION_NAME}.cs" ! -name "*.Designer.cs" -print -quit)"
+          if [[ -z "$generated_file" ]]; then
+            echo "::error::Generated migration source file was not found."
+            exit 1
+          fi
+
+          generated_id="$(basename "$generated_file" .cs | cut -d_ -f1)"
+          latest_id="$(find "$migration_dir" -maxdepth 1 -type f -name "*.cs" ! -name "*.Designer.cs" -printf '%f\n' | sed -nE 's/^([0-9]{14})_.+\.cs$/\1/p' | sort | tail -n 1)"
+          if [[ -n "$latest_id" && "$generated_id" < "$latest_id" || "$generated_id" == "$latest_id" ]]; then
+            latest_epoch="$(python -c "from datetime import datetime; print(int(datetime.strptime('$latest_id', '%Y%m%d%H%M%S').timestamp()))")"
+            next_id="$(python -c "from datetime import datetime, timezone; import sys; print(datetime.fromtimestamp(int(sys.argv[1]) + 1, timezone.utc).strftime('%Y%m%d%H%M%S'))" "$latest_epoch")"
+            old_base="$(basename "$generated_file" .cs)"
+            new_base="${next_id}_${MIGRATION_NAME}"
+            designer_file="$migration_dir/${old_base}.Designer.cs"
+            mv "$generated_file" "$migration_dir/${new_base}.cs"
+            mv "$designer_file" "$migration_dir/${new_base}.Designer.cs"
+            sed -i "s/$old_base/$new_base/g" "$migration_dir/${new_base}.Designer.cs"
+          fi
+
       - name: Build solution
         run: dotnet build CompileCare.Api.slnx --configuration Release --no-restore
 
