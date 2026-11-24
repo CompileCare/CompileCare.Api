@@ -154,7 +154,8 @@ public sealed class AppointmentSchedulingService(
     }
 
     public async Task<AppointmentResult<AppointmentDto>> BookAsync(
-        Guid hospitalId, AppointmentBookInput input, CancellationToken cancellationToken)
+        Guid hospitalId, AppointmentBookInput input, CancellationToken cancellationToken,
+        Guid? rescheduledFromAppointmentId = null)
     {
         if (input.AvailabilitySessionId == Guid.Empty || input.PatientId == Guid.Empty)
             return AppointmentResult<AppointmentDto>.Failure("A valid availability session and patient are required.", 400);
@@ -198,7 +199,8 @@ public sealed class AppointmentSchedulingService(
             SlotStartsAtUtc = slotStart,
             SlotEndsAtUtc = slotEnd,
             Status = AppointmentStatuses.Booked,
-            Reason = string.IsNullOrWhiteSpace(input.Reason) ? null : input.Reason.Trim()
+            Reason = string.IsNullOrWhiteSpace(input.Reason) ? null : input.Reason.Trim(),
+            RescheduledFromAppointmentId = rescheduledFromAppointmentId
         };
         db.Appointments.Add(appointment);
         try
