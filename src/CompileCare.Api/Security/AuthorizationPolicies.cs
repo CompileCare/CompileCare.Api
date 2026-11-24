@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CompileCare.Application.Appointments;
+using CompileCare.Application.Billing;
 using CompileCare.Application.Clinical;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
@@ -34,6 +35,11 @@ public static class AuthorizationPolicies
     public const string EncounterManage = "EncounterManage";
     public const string EncounterSign = "EncounterSign";
     public const string EncounterAmend = "EncounterAmend";
+    public const string BillingCatalogueManage = "BillingCatalogueManage";
+    public const string BillingInvoiceRead = "BillingInvoiceRead";
+    public const string BillingInvoiceManage = "BillingInvoiceManage";
+    public const string BillingPaymentManage = "BillingPaymentManage";
+    public const string BillingReportRead = "BillingReportRead";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
@@ -109,6 +115,16 @@ public static class AuthorizationPolicies
         options.AddPolicy(EncounterSign, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, OpdEncounterPermissions.Sign)));
+        options.AddPolicy(BillingCatalogueManage, policy =>
+            policy.RequireAuthenticatedUser().RequireAssertion(context => HasMembershipPermission(context.User, BillingPermissions.CatalogueManage)));
+        options.AddPolicy(BillingInvoiceRead, policy =>
+            policy.RequireAuthenticatedUser().RequireAssertion(context => HasMembershipPermission(context.User, BillingPermissions.InvoiceRead)));
+        options.AddPolicy(BillingInvoiceManage, policy =>
+            policy.RequireAuthenticatedUser().RequireAssertion(context => HasMembershipPermission(context.User, BillingPermissions.InvoiceManage)));
+        options.AddPolicy(BillingPaymentManage, policy =>
+            policy.RequireAuthenticatedUser().RequireAssertion(context => HasMembershipPermission(context.User, BillingPermissions.PaymentManage)));
+        options.AddPolicy(BillingReportRead, policy =>
+            policy.RequireAuthenticatedUser().RequireAssertion(context => HasMembershipPermission(context.User, BillingPermissions.ReportRead)));
         options.AddPolicy(EncounterAmend, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, OpdEncounterPermissions.Amend)));
