@@ -201,9 +201,9 @@ public sealed class AppointmentSchedulingService(
             await db.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (
-            exception.InnerException is PostgresException { SqlState: "23505" })
+            exception.InnerException is PostgresException { SqlState: "23505" or "23P01" })
         {
-            return AppointmentResult<AppointmentDto>.Failure("The selected slot has already been booked.", 409);
+            return AppointmentResult<AppointmentDto>.Failure("The selected slot is no longer available or overlaps an active appointment.", 409);
         }
 
         return AppointmentResult<AppointmentDto>.Success(ToDto(appointment));
