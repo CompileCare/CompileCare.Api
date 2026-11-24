@@ -145,12 +145,15 @@ public partial class AddOpdBillingFoundation : Migration
         migrationBuilder.CreateIndex("IX_billing_invoices_TenantId_HospitalId_PatientId_IssuedAtUtc", "billing_invoices", new[] { "TenantId", "HospitalId", "PatientId", "IssuedAtUtc" });
         migrationBuilder.CreateIndex("IX_billing_invoices_TenantId_HospitalId_DepartmentId", "billing_invoices", new[] { "TenantId", "HospitalId", "DepartmentId" });
         migrationBuilder.CreateIndex("IX_billing_invoices_TenantId_HospitalId_InvoiceNumber", "billing_invoices", new[] { "TenantId", "HospitalId", "InvoiceNumber" }, unique: true);
-        migrationBuilder.CreateIndex("IX_billing_invoices_TenantId_QueueEntryId", "billing_invoices", new[] { "TenantId", "QueueEntryId" }, unique: true);
+        migrationBuilder.CreateIndex("IX_billing_invoices_TenantId_HospitalId_QueueEntryId", "billing_invoices", new[] { "TenantId", "HospitalId", "QueueEntryId" }, unique: true);
         migrationBuilder.CreateIndex("IX_billing_invoice_lines_TenantId_HospitalId", "billing_invoice_lines", new[] { "TenantId", "HospitalId" });
         migrationBuilder.CreateIndex("IX_billing_invoice_lines_TenantId_InvoiceId", "billing_invoice_lines", new[] { "TenantId", "InvoiceId" });
+        migrationBuilder.CreateIndex("IX_billing_invoice_lines_TenantId_HospitalId_InvoiceId", "billing_invoice_lines", new[] { "TenantId", "HospitalId", "InvoiceId" });
+        migrationBuilder.CreateIndex("IX_billing_invoice_lines_TenantId_HospitalId_ServiceItemId", "billing_invoice_lines", new[] { "TenantId", "HospitalId", "ServiceItemId" });
         migrationBuilder.CreateIndex("IX_billing_payments_TenantId_HospitalId_PaidAtUtc", "billing_payments", new[] { "TenantId", "HospitalId", "PaidAtUtc" });
         migrationBuilder.CreateIndex("IX_billing_payments_TenantId_HospitalId_ReceiptNumber", "billing_payments", new[] { "TenantId", "HospitalId", "ReceiptNumber" }, unique: true);
         migrationBuilder.CreateIndex("IX_billing_payments_TenantId_InvoiceId_PaidAtUtc", "billing_payments", new[] { "TenantId", "InvoiceId", "PaidAtUtc" });
+        migrationBuilder.CreateIndex("IX_billing_payments_TenantId_HospitalId_InvoiceId", "billing_payments", new[] { "TenantId", "HospitalId", "InvoiceId" });
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
