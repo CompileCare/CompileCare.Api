@@ -246,13 +246,16 @@ public sealed class TenantMembershipAdministrationService(
             // make EF treat the membership FK as severed instead of as a row delete.
             await db.SaveChangesAsync(cancellationToken);
 
-            membership.Scopes.Clear();
-            AddScopes(membership, resolution.Scopes);
+            // Do not clear the required Membership.Scopes navigation after deleting
+            // the old rows. EF can interpret that as a severed required relationship
+            // and schedule a stale UPDATE for the already-deleted child row.
+            AddScopeRows(membership, resolution.Scopes);
         }
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return TenantMembershipResult<TenantMembershipDto>.Success(ToDto(membership));
+        return TenantMembershipResult<TenantMembershipDto>.Success(
+            ToDto(membership, resolution.Scopes));
     }
 
     public async Task<TenantMembershipResult<TenantMembershipDto>> SetActiveAsync(
@@ -516,6 +519,23 @@ public sealed class TenantMembershipAdministrationService(
         }
     }
 
+    private void AddScopeRows(
+        TenantMembership membership,
+        IReadOnlyList<OrganizationScope> scopes)
+    {
+        foreach (var scope in scopes)
+        {
+            db.TenantMembershipScopes.Add(new TenantMembershipScope
+            {
+                TenantId = membership.TenantId,
+                MembershipId = membership.Id,
+                ScopeType = scope.ScopeType,
+                HospitalId = scope.HospitalId,
+                DepartmentId = scope.DepartmentId
+            });
+        }
+    }
+
     private static IReadOnlyList<OrganizationScope> ToScopes(TenantMembership membership) =>
         membership.Scopes.Select(scope =>
             new OrganizationScope(
@@ -524,6 +544,11 @@ public sealed class TenantMembershipAdministrationService(
                 scope.DepartmentId)).ToArray();
 
     private static TenantMembershipDto ToDto(TenantMembership membership) =>
+        ToDto(membership, ToScopes(membership));
+
+    private static TenantMembershipDto ToDto(
+        TenantMembership membership,
+        IReadOnlyList<OrganizationScope> scopes) =>
         new(
             membership.Id,
             membership.Issuer,
@@ -532,7 +557,7 @@ public sealed class TenantMembershipAdministrationService(
             membership.IsActive,
             membership.CreatedAtUtc,
             membership.UpdatedAtUtc,
-            ToScopes(membership));
+            scopes);
 
     private static TenantMembershipResult<T> Failure<T>(string error, int statusCode) =>
         TenantMembershipResult<T>.Failure(error, statusCode);
