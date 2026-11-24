@@ -25,11 +25,8 @@ public sealed class HospitalPatientRegistrationConfiguration : IEntityTypeConfig
     public void Configure(EntityTypeBuilder<HospitalPatientRegistration> builder)
     {
         builder.ToTable("hospital_patient_registrations");
-        builder.Property(x => x.MedicalRecordNumber).HasMaxLength(64);
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PatientId }).IsUnique();
-        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.MedicalRecordNumber })
-            .IsUnique().HasFilter("\"MedicalRecordNumber\" IS NOT NULL");
         builder.HasOne(x => x.Hospital).WithMany()
             .HasForeignKey(x => new { x.TenantId, x.HospitalId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id })
