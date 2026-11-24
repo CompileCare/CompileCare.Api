@@ -86,13 +86,55 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                 ON CONFLICT ("Id") DO NOTHING;
                 """);
 
-            migrationBuilder.AddForeignKey("FK_hospitals_tenants_TenantId", "hospitals", "TenantId", "tenants", "Id", onDelete: ReferentialAction.Restrict);
-            migrationBuilder.AddForeignKey("FK_departments_tenants_TenantId", "departments", "TenantId", "tenants", "Id", onDelete: ReferentialAction.Restrict);
-            migrationBuilder.AddForeignKey("FK_wards_tenants_TenantId", "wards", "TenantId", "tenants", "Id", onDelete: ReferentialAction.Restrict);
-            migrationBuilder.AddForeignKey("FK_rooms_tenants_TenantId", "rooms", "TenantId", "tenants", "Id", onDelete: ReferentialAction.Restrict);
-            migrationBuilder.AddForeignKey("FK_beds_tenants_TenantId", "beds", "TenantId", "tenants", "Id", onDelete: ReferentialAction.Restrict);
-            migrationBuilder.AddForeignKey("FK_tenant_memberships_tenants_TenantId", "tenant_memberships", "TenantId", "tenants", "Id", onDelete: ReferentialAction.Restrict);
-            migrationBuilder.AddForeignKey("FK_audit_events_tenants_TenantId", "audit_events", "TenantId", "tenants", "Id", onDelete: ReferentialAction.Restrict);
+            migrationBuilder.AddForeignKey(
+                name: "FK_hospitals_tenants_TenantId",
+                table: "hospitals",
+                column: "TenantId",
+                principalTable: "tenants",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+            migrationBuilder.AddForeignKey(
+                name: "FK_departments_tenants_TenantId",
+                table: "departments",
+                column: "TenantId",
+                principalTable: "tenants",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+            migrationBuilder.AddForeignKey(
+                name: "FK_wards_tenants_TenantId",
+                table: "wards",
+                column: "TenantId",
+                principalTable: "tenants",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+            migrationBuilder.AddForeignKey(
+                name: "FK_rooms_tenants_TenantId",
+                table: "rooms",
+                column: "TenantId",
+                principalTable: "tenants",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+            migrationBuilder.AddForeignKey(
+                name: "FK_beds_tenants_TenantId",
+                table: "beds",
+                column: "TenantId",
+                principalTable: "tenants",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+            migrationBuilder.AddForeignKey(
+                name: "FK_tenant_memberships_tenants_TenantId",
+                table: "tenant_memberships",
+                column: "TenantId",
+                principalTable: "tenants",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+            migrationBuilder.AddForeignKey(
+                name: "FK_audit_events_tenants_TenantId",
+                table: "audit_events",
+                column: "TenantId",
+                principalTable: "tenants",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
