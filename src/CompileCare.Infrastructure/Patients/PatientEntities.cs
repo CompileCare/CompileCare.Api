@@ -5,6 +5,9 @@ public sealed class Patient : TenantOwnedEntity
     public string GivenName { get; set; } = string.Empty;
     public string? MiddleName { get; set; }
     public string? FamilyName { get; set; }
+    public string NormalizedGivenName { get; set; } = string.Empty;
+    public string? NormalizedMiddleName { get; set; }
+    public string? NormalizedFamilyName { get; set; }
     public DateOnly? DateOfBirth { get; set; }
     public ICollection<HospitalPatientRegistration> HospitalRegistrations { get; set; } = [];
 }
