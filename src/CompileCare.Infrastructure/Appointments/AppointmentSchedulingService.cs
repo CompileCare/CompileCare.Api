@@ -254,5 +254,5 @@ public sealed class AppointmentSchedulingService(
     private static AppointmentDto ToDto(Appointment x) =>
         new(x.Id, x.HospitalId, x.DepartmentId, x.PatientId, x.ProviderStaffId,
             x.AvailabilitySessionId, x.SlotStartsAtUtc, x.SlotEndsAtUtc,
-            x.Status, x.Reason, x.CreatedAtUtc);
+            x.Status, x.Reason, x.CreatedAtUtc, x.RescheduledFromAppointmentId);
 }
