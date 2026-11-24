@@ -193,6 +193,10 @@ public sealed class OpdEncounterSecurityTests
         var encounter = await create.Content.ReadFromJsonAsync<OpdEncounterDto>();
         Assert.NotNull(encounter);
 
+        var crossHospitalPatientRead = await clinicianA.GetAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/patients/{patientId:D}");
+        Assert.Equal(HttpStatusCode.NotFound, crossHospitalPatientRead.StatusCode);
+
         var crossHospitalRead = await clinicianA.GetAsync(
             $"/api/v1/hospitals/{hospitalB:D}/opd/encounters/{encounter!.Id:D}");
         Assert.Equal(HttpStatusCode.NotFound, crossHospitalRead.StatusCode);
