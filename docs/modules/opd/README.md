@@ -8,7 +8,7 @@ The OPD module records a clinical interaction after front-desk hand-off. It is s
 - Queue entries record arrival and operational work.
 - OPD encounters record the clinical interaction.
 
-An encounter is created from an `InProgress` queue entry. It retains the tenant, hospital, department, patient registration and queue-entry relationship. One queue entry can have at most one encounter. Appointment-linked and walk-in queue entries use the same encounter workflow.
+An encounter is created from an `InProgress` queue entry. It retains the tenant, hospital, department, patient registration and queue-entry relationship. One queue entry can have at most one encounter. Appointment-linked and walk-in queue entries use the same encounter workflow. The queue-entry lookup returns the existing encounter to support safe resume after a refresh; it does not expose patient details through the queue listing.
 
 ## API
 
@@ -17,6 +17,7 @@ All routes are tenant-scoped and hospital-scoped under `/api/v1/hospitals/{hospi
 | Method | Route | Permission |
 |---|---|---|
 | POST | `/queue/{queueEntryId}/encounter` | `encounter.manage` |
+| GET | `/queue/{queueEntryId}/encounter` | `encounter.read` |
 | GET | `/encounters/{encounterId}` | `encounter.read` |
 | PUT | `/encounters/{encounterId}/note` | `encounter.manage` |
 | POST | `/encounters/{encounterId}/sign` | `encounter.sign` |
@@ -24,7 +25,7 @@ All routes are tenant-scoped and hospital-scoped under `/api/v1/hospitals/{hospi
 | POST | `/encounters/{encounterId}/close` | `encounter.manage` |
 | POST | `/encounters/{encounterId}/cancel` | `encounter.manage` |
 
-The initial role mapping is the explicitly provisioned `ClinicalUser` membership role. It receives the four encounter permissions and still requires a matching hospital/department scope. This role is an administrative authorization assertion; it does not prove a professional qualification, licence or clinical privilege. HospitalAdmin, PatientRegistrar and queue permissions do not grant access to clinical notes.
+The initial role mapping is the explicitly provisioned `ClinicalUser` membership role. It receives the four encounter permissions plus read-only `queue.read` so clinicians can see operational queue tokens and locate in-progress visits. It does not receive `queue.manage`; clinical users cannot call, cancel, mark no-show or otherwise transition queue entries. All access still requires a matching hospital/department scope. This role is an administrative authorization assertion; it does not prove a professional qualification, licence or clinical privilege. Queue permissions do not grant access to clinical notes.
 
 ## Encounter lifecycle
 
