@@ -42,6 +42,22 @@ jobs:
       - run: dotnet build CompileCare.Api.slnx --configuration Release --no-restore
       - name: Restore .NET tools
         run: dotnet tool restore
+      - name: Diagnose EF Core model delta
+        shell: bash
+        run: |
+          set +e
+          dotnet ef migrations add __Diagnostic --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api --output-dir Persistence/Migrations/__Diagnostic
+          diagnostic_status=$?
+          set -e
+          echo "EF diagnostic migration exit code: $diagnostic_status"
+          if [ -d src/CompileCare.Infrastructure/Persistence/Migrations/__Diagnostic ]; then
+            for file in src/CompileCare.Infrastructure/Persistence/Migrations/__Diagnostic/*.cs; do
+              echo "===== $file ====="
+              cat "$file"
+            done
+          fi
+          git checkout -- src/CompileCare.Infrastructure/Persistence/Migrations/CompileCareDbContextModelSnapshot.cs
+          rm -rf src/CompileCare.Infrastructure/Persistence/Migrations/__Diagnostic
       - name: Detect pending EF Core model changes
         run: dotnet ef migrations has-pending-model-changes --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
       - run: dotnet test CompileCare.Api.slnx --configuration Release --no-build
