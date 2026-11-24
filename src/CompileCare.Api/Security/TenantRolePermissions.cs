@@ -21,7 +21,9 @@ internal static class TenantRolePermissions
                 StaffPermissions.Read,
                 StaffPermissions.Manage,
                 AppointmentPermissions.AvailabilityRead,
-                AppointmentPermissions.AvailabilityManage
+                AppointmentPermissions.AvailabilityManage,
+                QueuePermissions.Read,
+                QueuePermissions.Manage
             ],
             TenantRoles.FacilityManager =>
             [
