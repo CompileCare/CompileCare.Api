@@ -53,6 +53,8 @@ public sealed class AddFrontDeskQueue : Migration
             new[] { "TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "TokenNumber" }, unique: true);
         migrationBuilder.CreateIndex("IX_queue_entries_daily_status_token", "queue_entries",
             new[] { "TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "Status", "TokenNumber" });
+        migrationBuilder.CreateIndex("IX_queue_entries_TenantId_HospitalId_PatientId", "queue_entries",
+            new[] { "TenantId", "HospitalId", "PatientId" });
         migrationBuilder.CreateIndex("IX_queue_entries_TenantId_AppointmentId", "queue_entries",
             new[] { "TenantId", "AppointmentId" }, unique: true, filter: "\"AppointmentId\" IS NOT NULL");
     }
