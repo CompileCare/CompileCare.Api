@@ -176,7 +176,7 @@ The first staff-management increment provides tenant-owned workforce profiles an
 
 Only HospitalAdmin receives the new staff read/manage permissions in this first increment. Every request still requires validated OIDC identity, active tenant membership, tenant context and organization-scope validation. Profiles and assignments are tenant-owned with composite tenant-aware facility/profile foreign keys. Provider designation is descriptive metadata only—not credential or clinical-privilege verification. Login provisioning, membership linking, payroll, attendance, credentialing and sensitive employment identifiers are deferred.
 
-See [staff module API documentation](docs/modules/staff/README.md) and the product [staff/provider workflow](https://github.com/CompileCare/Compilecare.Doc/blob/main/product/workflows/staff-and-provider-management.md).
+See [staff module API documentation](docs/modules/staff/README.md) and [documentation PR #21](https://github.com/CompileCare/Compilecare.Doc/pull/21) for the product workflow and design boundaries.
 
 ## Tenant isolation
 
