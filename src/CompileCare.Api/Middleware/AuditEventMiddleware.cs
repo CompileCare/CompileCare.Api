@@ -27,7 +27,12 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         ILogger<AuditEventMiddleware> logger)
     {
         var endpoint = context.GetEndpoint();
-        if (endpoint?.Metadata.GetMetadata<TenantScopedEndpointMetadata>() is null)
+        var isTenantScoped =
+            endpoint?.Metadata.GetMetadata<TenantScopedEndpointMetadata>() is not null;
+        var isPlatformOperatorRoute =
+            endpoint?.Metadata.GetMetadata<PlatformOperatorEndpointMetadata>() is not null;
+
+        if (!isTenantScoped && !isPlatformOperatorRoute)
         {
             await next(context);
             return;

@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using CompileCare.Application.Tenancy;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -111,6 +113,7 @@ public static class SecurityServiceCollectionExtensions
             });
 
         services.AddAuthorization(AuthorizationPolicies.Configure);
+        services.AddScoped<IAuthorizationHandler, PlatformOperatorAuthorizationHandler>();
         return services;
     }
 }
