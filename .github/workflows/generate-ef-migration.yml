@@ -1,6 +1,8 @@
 name: Generate EF Core Migration
 
 on:
+  push:
+    branches: [feat/opd-billing-foundation]
   workflow_dispatch:
     inputs:
       migration_name:
@@ -18,7 +20,7 @@ concurrency:
 
 jobs:
   generate-and-commit:
-    if: github.ref == 'refs/heads/feature/patient-identifier-mrn-management'
+    if: github.ref == 'refs/heads/feat/opd-billing-foundation'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -47,7 +49,7 @@ jobs:
           MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
-          test "$GITHUB_REF" = "refs/heads/feature/patient-identifier-mrn-management"
+          test "$GITHUB_REF" = "refs/heads/feat/opd-billing-foundation"
           if [[ ! "$MIGRATION_NAME" =~ ^[A-Z][A-Za-z0-9]*$ ]]; then
             echo "::error::Migration name must be PascalCase alphanumeric and start with an uppercase letter."
             exit 1
