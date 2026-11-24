@@ -27,6 +27,8 @@ public sealed class StaffAssignmentConfiguration : IEntityTypeConfiguration<Staf
                 "CK_staff_assignments_effective_range",
                 "\"EffectiveTo\" IS NULL OR \"EffectiveTo\" >= \"EffectiveFrom\""));
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId });
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId });
         builder.HasIndex(x => new { x.TenantId, x.StaffProfileId, x.HospitalId })
             .IsUnique()
             .HasFilter("\"DepartmentId\" IS NULL AND \"IsActive\" = TRUE AND \"EffectiveTo\" IS NULL");
