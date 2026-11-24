@@ -104,6 +104,54 @@ public sealed class AuditEventTests
             db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE audit_events"));
     }
 
+
+    [Fact]
+    public async Task AnonymousTenantScopedRequest_IsAuditedAsDeniedWithoutInventingActorOrTenant()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/v1/hospitals");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvent = await db.AuditEvents.SingleAsync();
+
+        Assert.Null(auditEvent.TenantId);
+        Assert.Null(auditEvent.RequestedTenantId);
+        Assert.Null(auditEvent.ActorIssuer);
+        Assert.Null(auditEvent.ActorSubject);
+        Assert.Equal("ListHospitals", auditEvent.Action);
+        Assert.Equal("Denied", auditEvent.Outcome);
+        Assert.Equal((int)HttpStatusCode.Unauthorized, auditEvent.StatusCode);
+    }
+
+    [Fact]
+    public async Task InvalidTenantContext_IsAuditedAsRejectedWithValidatedActorOnly()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+        client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, "not-a-tenant-guid");
+
+        var response = await client.GetAsync("/api/v1/hospitals");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvent = await db.AuditEvents.SingleAsync();
+
+        Assert.Null(auditEvent.TenantId);
+        Assert.Null(auditEvent.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
+        Assert.Equal(TestJwtTokenFactory.Subject, auditEvent.ActorSubject);
+        Assert.Equal("ListHospitals", auditEvent.Action);
+        Assert.Equal("Rejected", auditEvent.Outcome);
+        Assert.Equal((int)HttpStatusCode.BadRequest, auditEvent.StatusCode);
+    }
+
     private HttpClient CreateAuthenticatedClient(Guid tenantId)
     {
         var client = _factory.CreateClient();
