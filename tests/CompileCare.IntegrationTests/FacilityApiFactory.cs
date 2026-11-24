@@ -71,7 +71,8 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         Guid tenantId,
         string role,
         bool isActive = true,
-        IReadOnlyList<OrganizationScope>? scopes = null)
+        IReadOnlyList<OrganizationScope>? scopes = null,
+        string? subject = null)
     {
         using var scope = Services.CreateScope();
         var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
@@ -94,7 +95,7 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         {
             TenantId = tenantId,
             Issuer = TestJwtTokenFactory.Issuer,
-            Subject = TestJwtTokenFactory.Subject,
+            Subject = subject ?? TestJwtTokenFactory.Subject,
             Role = role,
             IsActive = isActive
         };
