@@ -29,6 +29,7 @@ public sealed class CompileCareDbContext(
     public DbSet<StaffAssignment> StaffAssignments => Set<StaffAssignment>();
     public DbSet<ProviderAvailabilitySession> ProviderAvailabilitySessions => Set<ProviderAvailabilitySession>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<QueueEntry> QueueEntries => Set<QueueEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
