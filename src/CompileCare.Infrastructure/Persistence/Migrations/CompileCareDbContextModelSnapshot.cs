@@ -1190,7 +1190,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
                     b.HasKey("Id");
                     b.HasAlternateKey("TenantId", "Id");
-                    b.HasIndex("TenantId", "QueueEntryId").IsUnique();
+                    b.HasIndex("TenantId", "HospitalId", "QueueEntryId").IsUnique();
                     b.HasIndex("TenantId", "HospitalId", "DepartmentId");
                     b.HasIndex("TenantId", "HospitalId", "PatientId", "StartedAtUtc");
                     b.ToTable("opd_encounters", (string)null, t =>
@@ -1389,6 +1389,8 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.HasAlternateKey("TenantId", "Id");
                     b.HasIndex("TenantId", "InvoiceId");
                     b.HasIndex("TenantId", "HospitalId");
+                    b.HasIndex("TenantId", "HospitalId", "InvoiceId");
+                    b.HasIndex("TenantId", "HospitalId", "ServiceItemId");
                     b.ToTable("billing_invoice_lines", (string)null, t =>
                         {
                             t.HasCheckConstraint("CK_billing_invoice_lines_quantity", "\"Quantity\" BETWEEN 1 AND 1000");
@@ -1415,6 +1417,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "HospitalId", "PaidAtUtc");
                     b.HasIndex("TenantId", "HospitalId", "ReceiptNumber").IsUnique();
                     b.HasIndex("TenantId", "InvoiceId", "PaidAtUtc");
+                    b.HasIndex("TenantId", "HospitalId", "InvoiceId");
                     b.ToTable("billing_payments", (string)null, t =>
                         {
                             t.HasCheckConstraint("CK_billing_payments_amount", "\"Amount\" > 0");
