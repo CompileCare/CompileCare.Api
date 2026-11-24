@@ -60,7 +60,7 @@ internal static class TenantRolePermissions
             ],
             TenantRoles.ClinicalUser =>
             [
-                PatientPermissions.Read,
+                PatientPermissions.IdentityRead,
                 TenantPermissions.FacilityRead,
                 QueuePermissions.Read,
                 OpdEncounterPermissions.Read,
