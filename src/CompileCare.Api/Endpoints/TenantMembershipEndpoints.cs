@@ -31,9 +31,11 @@ public static class TenantMembershipEndpoints
                 if (!result.IsSuccess || result.Value is null)
                     return TenantMembershipHttp.From(result);
 
-                return Results.Created(
-                    $"/api/v1/tenant/memberships/{result.Value.Id:D}",
-                    result.Value);
+                return result.StatusCode == 201
+                    ? Results.Created(
+                        $"/api/v1/tenant/memberships/{result.Value.Id:D}",
+                        result.Value)
+                    : Results.Ok(result.Value);
             })
             .WithName("CreateInitialTenantAdministrator");
 

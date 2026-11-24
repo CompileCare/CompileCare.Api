@@ -124,7 +124,10 @@ public sealed class TenantMembershipAdministrationService(
                 409);
         }
 
-        return TenantMembershipResult<TenantMembershipDto>.Success(ToDto(membership));
+        return new TenantMembershipResult<TenantMembershipDto>(
+            ToDto(membership),
+            Error: null,
+            StatusCode: 201);
     }
 
     public async Task<TenantMembershipResult<TenantMembershipDto>> CreateAsync(

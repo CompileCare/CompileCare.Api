@@ -136,7 +136,10 @@ public sealed class TenantMembershipApiTests
                     new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentA }
                 }
             });
-        Assert.Equal(HttpStatusCode.OK, sameScopeUpdate.StatusCode);
+        var sameScopeBody = await sameScopeUpdate.Content.ReadAsStringAsync();
+        Assert.True(
+            sameScopeUpdate.StatusCode == HttpStatusCode.OK,
+            $"Scope update returned {(int)sameScopeUpdate.StatusCode}: {sameScopeBody}");
 
         var reassignResponse = await adminClient.PostAsJsonAsync(
             "/api/v1/tenant/memberships",
