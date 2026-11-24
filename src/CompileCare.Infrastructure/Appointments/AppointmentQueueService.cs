@@ -35,16 +35,17 @@ public sealed class AppointmentQueueService(
             return replacement;
         }
 
+        var replacementValue = replacement.Value!;
         var replacementEntity = await db.Appointments.SingleAsync(
-            x => x.Id == replacement.Value!.Id && x.HospitalId == hospitalId, cancellationToken);
+            x => x.Id == replacementValue.Id && x.HospitalId == hospitalId, cancellationToken);
         replacementEntity.RescheduledFromAppointmentId = current.Id;
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return AppointmentResult<AppointmentDto>.Success(new(
-            replacement.Value.Id, replacement.Value.HospitalId, replacement.Value.DepartmentId,
-            replacement.Value.PatientId, replacement.Value.ProviderStaffId, replacement.Value.AvailabilitySessionId,
-            replacement.Value.SlotStartsAtUtc, replacement.Value.SlotEndsAtUtc, replacement.Value.Status,
-            replacement.Value.Reason, replacement.Value.CreatedAtUtc, current.Id));
+            replacementValue.Id, replacementValue.HospitalId, replacementValue.DepartmentId,
+            replacementValue.PatientId, replacementValue.ProviderStaffId, replacementValue.AvailabilitySessionId,
+            replacementValue.SlotStartsAtUtc, replacementValue.SlotEndsAtUtc, replacementValue.Status,
+            replacementValue.Reason, replacementValue.CreatedAtUtc, current.Id));
     }
 
     public async Task<AppointmentResult<QueueEntryDto>> CheckInAsync(
