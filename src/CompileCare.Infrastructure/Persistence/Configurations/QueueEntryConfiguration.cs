@@ -21,6 +21,7 @@ public sealed class QueueEntryConfiguration : IEntityTypeConfiguration<QueueEntr
             .HasDatabaseName("IX_queue_entries_daily_token").IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId, x.QueueDateLocal, x.Status, x.TokenNumber })
             .HasDatabaseName("IX_queue_entries_daily_status_token");
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PatientId });
         builder.HasIndex(x => new { x.TenantId, x.AppointmentId }).IsUnique().HasFilter("\"AppointmentId\" IS NOT NULL");
         builder.HasOne<Hospital>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.HospitalId })
