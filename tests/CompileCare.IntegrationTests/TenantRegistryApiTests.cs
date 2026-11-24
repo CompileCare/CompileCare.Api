@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security.Claims;
+using CompileCare.Api.Security;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using CompileCare.Api.Middleware;
@@ -27,7 +29,14 @@ public sealed class TenantRegistryApiTests
         var anonymousResponse = await anonymous.GetAsync("/api/v1/platform/tenants");
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
 
-        using var authenticatedNonOperator = CreateAuthenticatedClient();
+        // A role and permission claim from the external identity provider must not
+        // grant platform access without a matching persisted platform-operator record.
+        using var authenticatedNonOperator = CreateAuthenticatedClient(
+            additionalClaims:
+            [
+                new Claim("role", "PlatformOperator"),
+                new Claim(AuthorizationPolicies.PermissionClaim, "platform:tenant:manage")
+            ]);
         var deniedResponse = await authenticatedNonOperator.GetAsync("/api/v1/platform/tenants");
         Assert.Equal(HttpStatusCode.Forbidden, deniedResponse.StatusCode);
     }
@@ -139,11 +148,15 @@ public sealed class TenantRegistryApiTests
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
     }
 
-    private HttpClient CreateAuthenticatedClient(Guid? tenantId = null)
+    private HttpClient CreateAuthenticatedClient(
+        Guid? tenantId = null,
+        params Claim[] additionalClaims)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+            new AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken(additionalClaims: additionalClaims));
 
         if (tenantId.HasValue)
         {
