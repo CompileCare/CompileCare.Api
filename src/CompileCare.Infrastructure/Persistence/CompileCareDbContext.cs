@@ -1,3 +1,4 @@
+using CompileCare.Application.Appointments;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
@@ -26,6 +27,8 @@ public sealed class CompileCareDbContext(
     public DbSet<HospitalPatientIdentifierPolicy> HospitalPatientIdentifierPolicies => Set<HospitalPatientIdentifierPolicy>();
     public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
     public DbSet<StaffAssignment> StaffAssignments => Set<StaffAssignment>();
+    public DbSet<ProviderAvailabilitySession> ProviderAvailabilitySessions => Set<ProviderAvailabilitySession>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,6 +70,10 @@ public sealed class CompileCareDbContext(
         modelBuilder.Entity<StaffProfile>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<StaffAssignment>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ProviderAvailabilitySession>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Appointment>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
 
         TenantModelConfiguration.ApplyTenantFilters(modelBuilder, this);
