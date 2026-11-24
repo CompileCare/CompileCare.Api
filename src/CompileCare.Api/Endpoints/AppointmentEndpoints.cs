@@ -99,6 +99,60 @@ public static class AppointmentEndpoints
         .WithName("CancelAppointment")
         .RequireAuthorization(AuthorizationPolicies.AppointmentManage);
 
+        group.MapPost("/appointments/{appointmentId:guid}/reschedule", async (
+            Guid hospitalId, Guid appointmentId, AppointmentBookInput request,
+            IAppointmentQueueService service, CancellationToken ct) =>
+        {
+            var result = await service.RescheduleAsync(hospitalId, appointmentId, request, ct);
+            return result.IsSuccess ? Results.Ok(result.Value) :
+                Results.Problem(title: "Appointment rescheduling failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("RescheduleAppointment")
+        .RequireAuthorization(AuthorizationPolicies.AppointmentManage);
+
+        group.MapPost("/appointments/{appointmentId:guid}/check-in", async (
+            Guid hospitalId, Guid appointmentId, IAppointmentQueueService service, CancellationToken ct) =>
+        {
+            var result = await service.CheckInAsync(hospitalId, appointmentId, ct);
+            return result.IsSuccess ? Results.Ok(result.Value) :
+                Results.Problem(title: "Appointment check-in failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("CheckInAppointment")
+        .RequireAuthorization(AuthorizationPolicies.QueueManage);
+
+        group.MapPost("/queue/walk-ins", async (
+            Guid hospitalId, WalkInCreateInput request, IAppointmentQueueService service, CancellationToken ct) =>
+        {
+            var result = await service.CreateWalkInAsync(hospitalId, request, ct);
+            return result.IsSuccess
+                ? Results.Created($"/api/v1/hospitals/{hospitalId:D}/queue/{result.Value!.Id:D}", result.Value)
+                : Results.Problem(title: "Walk-in registration failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("RegisterQueueWalkIn")
+        .RequireAuthorization(AuthorizationPolicies.QueueManage);
+
+        group.MapGet("/queue", async (
+            Guid hospitalId, Guid departmentId, DateOnly date, IAppointmentQueueService service,
+            CancellationToken ct, int page = 1, int pageSize = 25) =>
+        {
+            var result = await service.ListQueueAsync(hospitalId, departmentId, date, page, pageSize, ct);
+            return result.IsSuccess ? Results.Ok(result.Value) :
+                Results.Problem(title: "Queue not found", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("ListDepartmentQueue")
+        .RequireAuthorization(AuthorizationPolicies.QueueRead);
+
+        group.MapPost("/queue/{queueEntryId:guid}/{action}", async (
+            Guid hospitalId, Guid queueEntryId, string action, QueueActionInput request,
+            IAppointmentQueueService service, CancellationToken ct) =>
+        {
+            var result = await service.TransitionAsync(hospitalId, queueEntryId, action, request, ct);
+            return result.IsSuccess ? Results.Ok(result.Value) :
+                Results.Problem(title: "Queue transition failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("TransitionQueueEntry")
+        .RequireAuthorization(AuthorizationPolicies.QueueManage);
+
         return endpoints;
     }
 }
