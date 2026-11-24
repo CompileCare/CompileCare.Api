@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CompileCare.Application.Patients;
+using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 
@@ -19,6 +20,8 @@ public static class AuthorizationPolicies
     public const string PatientIdentifierAssign = "PatientIdentifierAssign";
     public const string PatientIdentifierPolicyRead = "PatientIdentifierPolicyRead";
     public const string PatientIdentifierPolicyManage = "PatientIdentifierPolicyManage";
+    public const string StaffRead = "StaffRead";
+    public const string StaffManage = "StaffManage";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
@@ -61,6 +64,12 @@ public static class AuthorizationPolicies
         options.AddPolicy(PatientIdentifierPolicyManage, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, PatientIdentifierPermissions.PolicyManage)));
+        options.AddPolicy(StaffRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, StaffPermissions.Read)));
+        options.AddPolicy(StaffManage, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, StaffPermissions.Manage)));
         options.AddPolicy(PlatformOperator, policy =>
             policy.RequireAuthenticatedUser()
                 .AddRequirements(new PlatformOperatorRequirement()));
