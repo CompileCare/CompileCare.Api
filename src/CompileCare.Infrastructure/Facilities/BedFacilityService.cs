@@ -67,7 +67,7 @@ public sealed partial class FacilityService
             IsActive = input.IsActive
         };
 
-        ScopedBeds().Add(bed);
+        db.Beds.Add(bed);
 
         try
         {
@@ -141,7 +141,7 @@ public sealed partial class FacilityService
         if (bed is null)
             return NotFound<bool>();
 
-        ScopedBeds().Remove(bed);
+        db.Beds.Remove(bed);
 
         try
         {

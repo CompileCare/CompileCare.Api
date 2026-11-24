@@ -76,7 +76,7 @@ public sealed partial class FacilityService
             Code = code
         };
 
-        ScopedHospitals().Add(hospital);
+        db.Hospitals.Add(hospital);
 
         try
         {
@@ -162,7 +162,7 @@ public sealed partial class FacilityService
         if (hospital is null)
             return NotFound<bool>();
 
-        ScopedHospitals().Remove(hospital);
+        db.Hospitals.Remove(hospital);
 
         try
         {

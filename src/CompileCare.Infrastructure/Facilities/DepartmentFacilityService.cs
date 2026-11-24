@@ -86,7 +86,7 @@ public sealed partial class FacilityService
             Code = code
         };
 
-        ScopedDepartments().Add(department);
+        db.Departments.Add(department);
 
         try
         {
@@ -173,7 +173,7 @@ public sealed partial class FacilityService
         if (department is null)
             return NotFound<bool>();
 
-        ScopedDepartments().Remove(department);
+        db.Departments.Remove(department);
 
         try
         {

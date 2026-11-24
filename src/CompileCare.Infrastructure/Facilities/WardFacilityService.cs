@@ -68,7 +68,7 @@ public sealed partial class FacilityService
             Name = name
         };
 
-        ScopedWards().Add(ward);
+        db.Wards.Add(ward);
 
         try
         {
@@ -141,7 +141,7 @@ public sealed partial class FacilityService
         if (ward is null)
             return NotFound<bool>();
 
-        ScopedWards().Remove(ward);
+        db.Wards.Remove(ward);
 
         try
         {

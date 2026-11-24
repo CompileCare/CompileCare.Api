@@ -66,7 +66,7 @@ public sealed partial class FacilityService
             Name = name
         };
 
-        ScopedRooms().Add(room);
+        db.Rooms.Add(room);
 
         try
         {
@@ -139,7 +139,7 @@ public sealed partial class FacilityService
         if (room is null)
             return NotFound<bool>();
 
-        ScopedRooms().Remove(room);
+        db.Rooms.Remove(room);
 
         try
         {
