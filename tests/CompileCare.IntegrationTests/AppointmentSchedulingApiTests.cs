@@ -118,6 +118,43 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Equal(HttpStatusCode.BadRequest, invalidDuration.StatusCode);
     }
 
+    [Fact]
+    public async Task WalkInsReceiveSequentialTokensAndQueueTransitionsAreEnforced()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, _, patientId) = await SeedSchedulingDataAsync(tenantId);
+        const string registrarSubject = "queue-reception-user";
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: registrarSubject);
+        using var registrar = CreateClient(tenantId, registrarSubject);
+
+        var request = new WalkInCreateInput(departmentId, patientId, "Asia/Kolkata");
+        var responses = await Task.WhenAll(
+            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins", request),
+            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins", request));
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.Created, response.StatusCode));
+        var entries = await Task.WhenAll(responses.Select(
+            response => response.Content.ReadFromJsonAsync<QueueEntryDto>()));
+        Assert.All(entries, entry => Assert.NotNull(entry));
+        Assert.Equal(new[] { 1, 2 }, entries.Select(entry => entry!.TokenNumber).Order().ToArray());
+
+        var first = entries.Single(entry => entry!.TokenNumber == 1)!;
+        var call = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{first.Id:D}/call", new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, call.StatusCode);
+        var start = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{first.Id:D}/start", new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, start.StatusCode);
+        var complete = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{first.Id:D}/complete", new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        var invalidRecall = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{first.Id:D}/recall", new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.Conflict, invalidRecall.StatusCode);
+    }
+
     private async Task<(Guid HospitalId, Guid DepartmentId, Guid ProviderId, Guid PatientId)> SeedSchedulingDataAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
