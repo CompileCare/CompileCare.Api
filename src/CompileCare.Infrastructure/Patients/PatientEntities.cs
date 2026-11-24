@@ -16,5 +16,4 @@ public sealed class HospitalPatientRegistration : TenantOwnedEntity
     public Guid HospitalId { get; set; }
     public Hospital Hospital { get; set; } = null!;
     public DateTimeOffset RegisteredAtUtc { get; set; }
-    public string? MedicalRecordNumber { get; set; }
 }
