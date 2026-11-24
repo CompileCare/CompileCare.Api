@@ -39,6 +39,7 @@ app.MapWardEndpoints();
 app.MapRoomEndpoints();
 app.MapBedEndpoints();
 app.MapPatientEndpoints();
+app.MapStaffEndpoints();
 app.MapPatientIdentifierEndpoints();
 app.Run();
 

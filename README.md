@@ -162,6 +162,22 @@ The facility module exposes CRUD for the hierarchy **Hospital → Department →
 
 Each collection supports bounded `page` and `pageSize` pagination (default 50, maximum 100). See [the facility module documentation](docs/modules/facilities/README.md) for route behavior, resource constraints, and response metadata.
 
+## Staff and provider management
+
+The first staff-management increment provides tenant-owned workforce profiles and effective-dated hospital/department assignments:
+
+- `POST /api/v1/staff`
+- `GET /api/v1/staff?page=1&pageSize=50&query=...`
+- `GET /api/v1/staff/{staffId}`
+- `PUT /api/v1/staff/{staffId}`
+- `POST /api/v1/staff/{staffId}/assignments`
+- `POST /api/v1/staff/{staffId}/assignments/{assignmentId}/end`
+- `POST /api/v1/staff/{staffId}/deactivate` and `/reactivate`
+
+Only HospitalAdmin receives the new staff read/manage permissions in this first increment. Every request still requires validated OIDC identity, active tenant membership, tenant context and organization-scope validation. Profiles and assignments are tenant-owned with composite tenant-aware facility/profile foreign keys. Provider designation is descriptive metadata only—not credential or clinical-privilege verification. Login provisioning, membership linking, payroll, attendance, credentialing and sensitive employment identifiers are deferred.
+
+See [staff module API documentation](docs/modules/staff/README.md) and [documentation PR #21](https://github.com/CompileCare/Compilecare.Doc/pull/21) for the product workflow and design boundaries.
+
 ## Tenant isolation
 
 The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Facility and platform-context API routes now require a validated OIDC/JWT principal and an active CompileCare membership matching the token issuer, subject and selected tenant. Persistence requires the validated tenant context for tenant-owned writes and applies tenant query filters. Background jobs and message consumers must establish an equivalent trusted tenant context before accessing tenant-owned data. The platform context endpoint is diagnostic only.
