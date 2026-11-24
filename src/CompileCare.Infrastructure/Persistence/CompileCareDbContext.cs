@@ -20,6 +20,8 @@ public sealed class CompileCareDbContext(
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<HospitalPatientRegistration> HospitalPatientRegistrations => Set<HospitalPatientRegistration>();
+    public DbSet<PatientIdentifier> PatientIdentifiers => Set<PatientIdentifier>();
+    public DbSet<HospitalPatientIdentifierPolicy> HospitalPatientIdentifierPolicies => Set<HospitalPatientIdentifierPolicy>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,6 +55,10 @@ public sealed class CompileCareDbContext(
         modelBuilder.Entity<Patient>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<HospitalPatientRegistration>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PatientIdentifier>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<HospitalPatientIdentifierPolicy>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
 
         TenantModelConfiguration.ApplyTenantFilters(modelBuilder, this);
@@ -113,6 +119,12 @@ public sealed class CompileCareDbContext(
             }
             else if (entry.State == EntityState.Deleted)
                 throw new InvalidOperationException("Platform records cannot be physically deleted.");
+        }
+
+        foreach (var entry in ChangeTracker.Entries<PatientIdentifier>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+                throw new InvalidOperationException("Patient identifiers are append-only and cannot be edited or deleted.");
         }
 
         foreach (var entry in ChangeTracker.Entries<TenantOwnedEntity>())

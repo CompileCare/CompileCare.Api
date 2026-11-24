@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       migration_name:
-        description: "PascalCase EF migration name, e.g. AddPatientRegistration"
+        description: "PascalCase EF migration name, e.g. AddPatientIdentifiers"
         required: true
         type: string
 
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   generate-and-commit:
-    if: github.ref == 'refs/heads/feature/patient-master-registration-foundation'
+    if: github.ref == 'refs/heads/feature/patient-identifier-mrn-management'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -44,10 +44,10 @@ jobs:
       - name: Validate target branch and migration name
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientMasterRegistration' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
-          test "$GITHUB_REF" = "refs/heads/feature/patient-master-registration-foundation"
+          test "$GITHUB_REF" = "refs/heads/feature/patient-identifier-mrn-management"
           if [[ ! "$MIGRATION_NAME" =~ ^[A-Z][A-Za-z0-9]*$ ]]; then
             echo "::error::Migration name must be PascalCase alphanumeric and start with an uppercase letter."
             exit 1
@@ -76,7 +76,7 @@ jobs:
       - name: Generate migration from the committed EF model
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientMasterRegistration' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           dotnet ef migrations add "$MIGRATION_NAME" \
             --project src/CompileCare.Infrastructure \
@@ -84,15 +84,14 @@ jobs:
             --context CompileCareDbContext \
             --output-dir Persistence/Migrations
 
-
       - name: Ensure migration ID follows existing migration history
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientMasterRegistration' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
           migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
-          generated_file="$(find "$migration_dir" -maxdepth 1 -type f -name "*_${MIGRATION_NAME}.cs" ! -name "*.Designer.cs" -print -quit)"
+          generated_file="$(find "$migration_dir" -maxdepth 1 -type f -name "*_$MIGRATION_NAME.cs" ! -name "*.Designer.cs" -print -quit)"
           if [[ -z "$generated_file" ]]; then
             echo "::error::Generated migration source file was not found."
             exit 1
@@ -105,10 +104,10 @@ jobs:
             next_id="$(python -c "from datetime import datetime, timezone; import sys; print(datetime.fromtimestamp(int(sys.argv[1]) + 1, timezone.utc).strftime('%Y%m%d%H%M%S'))" "$latest_epoch")"
             old_base="$(basename "$generated_file" .cs)"
             new_base="${next_id}_${MIGRATION_NAME}"
-            designer_file="$migration_dir/${old_base}.Designer.cs"
-            mv "$generated_file" "$migration_dir/${new_base}.cs"
-            mv "$designer_file" "$migration_dir/${new_base}.Designer.cs"
-            sed -i "s/$old_base/$new_base/g" "$migration_dir/${new_base}.Designer.cs"
+            designer_file="$migration_dir/$old_base.Designer.cs"
+            mv "$generated_file" "$migration_dir/$new_base.cs"
+            mv "$designer_file" "$migration_dir/$new_base.Designer.cs"
+            sed -i "s/$old_base/$new_base/g" "$migration_dir/$new_base.Designer.cs"
           fi
 
       - name: Build solution
@@ -123,16 +122,16 @@ jobs:
       - name: Commit and push generated migration
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientMasterRegistration' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
-          MIGRATION_DIR="src/CompileCare.Infrastructure/Persistence/Migrations"
-          if [[ -z "$(git status --porcelain -- "$MIGRATION_DIR")" ]]; then
+          migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
+          if [[ -z "$(git status --porcelain -- "$migration_dir")" ]]; then
             echo "::error::EF tooling produced no migration changes; refusing to create an empty commit."
             exit 1
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$MIGRATION_DIR"
-          git commit -m "chore(database): add ${MIGRATION_NAME} migration"
+          git add "$migration_dir"
+          git commit -m "chore(database): add $MIGRATION_NAME migration"
           git push origin "HEAD:$GITHUB_REF_NAME"

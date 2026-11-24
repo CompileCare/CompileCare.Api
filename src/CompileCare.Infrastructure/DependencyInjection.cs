@@ -1,11 +1,11 @@
-using CompileCare.Infrastructure.Persistence;
+using CompileCare.Application.Facilities;
+using CompileCare.Application.Patients;
+using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Facilities;
-using CompileCare.Infrastructure.Tenants;
 using CompileCare.Infrastructure.Memberships;
 using CompileCare.Infrastructure.Patients;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Facilities;
-using CompileCare.Application.Tenancy;
+using CompileCare.Infrastructure.Persistence;
+using CompileCare.Infrastructure.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantRegistryService, TenantRegistryService>();
         services.AddScoped<ITenantMembershipAdministrationService, TenantMembershipAdministrationService>();
         services.AddScoped<IPatientService, PatientService>();
+        services.AddScoped<IPatientIdentifierService, PatientIdentifierService>();
         services.AddScoped<FacilityService>();
         services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
         services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());
