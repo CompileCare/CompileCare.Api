@@ -24,7 +24,7 @@ public sealed class BillingService(
         {
             HospitalId = hospitalId, Code = code, Name = input.Name.Trim(),
             Category = input.Category.Trim(), UnitPrice = decimal.Round(input.UnitPrice, 2),
-            IsActive = true
+            IsActive = input.IsActive
         };
         db.BillingServiceItems.Add(item);
         await db.SaveChangesAsync(ct);
@@ -49,6 +49,7 @@ public sealed class BillingService(
         item.Name = input.Name.Trim();
         item.Category = input.Category.Trim();
         item.UnitPrice = decimal.Round(input.UnitPrice, 2);
+        item.IsActive = input.IsActive;
         await db.SaveChangesAsync(ct);
         return BillingResult<BillingServiceItemDto>.Success(ToDto(item));
     }
@@ -201,7 +202,7 @@ public sealed class BillingService(
     public async Task<BillingResult<DailyCollectionReportDto>> GetDailyCollectionAsync(
         Guid hospitalId, DateOnly businessDate, string timeZoneId, CancellationToken ct)
     {
-        if (!organizationScope.CanAccessHospital(hospitalId))
+        if (!organizationScope.CanManageHospital(hospitalId))
             return BillingResult<DailyCollectionReportDto>.Failure("Hospital not found.", 404);
         if (string.IsNullOrWhiteSpace(timeZoneId) || timeZoneId.Length > 100)
             return BillingResult<DailyCollectionReportDto>.Failure("A valid time zone is required.", 400);
