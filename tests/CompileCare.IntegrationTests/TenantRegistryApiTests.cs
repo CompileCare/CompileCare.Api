@@ -148,6 +148,40 @@ public sealed class TenantRegistryApiTests
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
     }
 
+
+    [Fact]
+    public async Task InitialAdministratorProvisioning_IsAuditedAsPrivilegedMembershipChange()
+    {
+        await _factory.SeedPlatformOperatorAsync();
+        using var client = CreateAuthenticatedClient();
+
+        var createTenant = await client.PostAsJsonAsync(
+            "/api/v1/platform/tenants",
+            new { name = "Membership Audit Tenant", slug = "membership-audit-tenant" });
+        Assert.Equal(HttpStatusCode.Created, createTenant.StatusCode);
+        var tenant = await createTenant.Content.ReadFromJsonAsync<TenantResponse>();
+        Assert.NotNull(tenant);
+
+        var provision = await client.PostAsJsonAsync(
+            $"/api/v1/platform/tenants/{tenant!.Id:D}/initial-administrator",
+            new { issuer = TestJwtTokenFactory.Issuer, subject = "initial-admin-subject" });
+
+        Assert.Equal(HttpStatusCode.Created, provision.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var audit = await db.AuditEvents
+            .SingleAsync(value => value.Action == "CreateInitialTenantAdministrator");
+
+        Assert.Null(audit.TenantId);
+        Assert.Null(audit.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+        Assert.Equal(TestJwtTokenFactory.Subject, audit.ActorSubject);
+        Assert.Equal("Platform tenant memberships", audit.ResourceType);
+        Assert.Equal("Succeeded", audit.Outcome);
+        Assert.Equal((int)HttpStatusCode.Created, audit.StatusCode);
+    }
+
     private HttpClient CreateAuthenticatedClient(
         Guid? tenantId = null,
         params Claim[] additionalClaims)
