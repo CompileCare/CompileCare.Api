@@ -94,14 +94,23 @@ public sealed class AddOpdEncounters : Migration
             table: "opd_encounters",
             columns: new[] { "TenantId", "HospitalId", "PatientId", "StartedAtUtc" });
         migrationBuilder.CreateIndex(
+            name: "IX_opd_encounters_TenantId_HospitalId_DepartmentId",
+            table: "opd_encounters",
+            columns: new[] { "TenantId", "HospitalId", "DepartmentId" });
+        migrationBuilder.CreateIndex(
             name: "IX_opd_encounter_amendments_TenantId_EncounterId_CreatedAtUtc",
             table: "opd_encounter_amendments",
             columns: new[] { "TenantId", "EncounterId", "CreatedAtUtc" });
+        migrationBuilder.CreateIndex(
+            name: "IX_opd_encounter_amendments_TenantId_HospitalId_DepartmentId",
+            table: "opd_encounter_amendments",
+            columns: new[] { "TenantId", "HospitalId", "DepartmentId" });
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.DropTable(name: "opd_encounter_amendments");
+        migrationBuilder.DropTable(name: "opd_encounters");
         migrationBuilder.DropTable(name: "opd_encounters");
     }
 
