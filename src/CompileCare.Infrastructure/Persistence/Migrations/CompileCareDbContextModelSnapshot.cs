@@ -13,6 +13,9 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
     [DbContext(typeof(CompileCareDbContext))]
     partial class CompileCareDbContextModelSnapshot : ModelSnapshot
     {
+        internal static void BuildModelForMigration(ModelBuilder modelBuilder) =>
+            new CompileCareDbContextModelSnapshot().BuildModel(modelBuilder);
+
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
