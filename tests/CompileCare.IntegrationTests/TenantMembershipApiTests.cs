@@ -167,7 +167,10 @@ public sealed class TenantMembershipApiTests
                     new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentB }
                 }
             });
-        Assert.Equal(HttpStatusCode.OK, reassignment.StatusCode);
+        var reassignmentBody = await reassignment.Content.ReadAsStringAsync();
+        Assert.True(
+            reassignment.StatusCode == HttpStatusCode.OK,
+            $"Department reassignment returned {(int)reassignment.StatusCode}: {reassignmentBody}");
 
         using (var verifyScope = _factory.Services.CreateScope())
         {
