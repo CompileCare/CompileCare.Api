@@ -143,9 +143,12 @@ public sealed class StaffManagementService(
     {
         var profile = await ManageableProfiles().FirstOrDefaultAsync(x => x.Id == staffId, cancellationToken);
         if (profile is null) return StaffResult<StaffAssignmentDto>.Failure("Staff profile not found.", 404);
-        if (!profile.IsActive || input.EffectiveFrom == default ||
-            !await CanManageAssignmentAsync(input.HospitalId, input.DepartmentId, cancellationToken))
-            return StaffResult<StaffAssignmentDto>.Failure("Hospital, department or effective start date is invalid.", 404);
+        if (input.EffectiveFrom == default)
+            return StaffResult<StaffAssignmentDto>.Failure("Assignment effective start date is required.", 400);
+        if (!profile.IsActive)
+            return StaffResult<StaffAssignmentDto>.Failure("An inactive staff profile cannot receive a new assignment.", 409);
+        if (!await CanManageAssignmentAsync(input.HospitalId, input.DepartmentId, cancellationToken))
+            return StaffResult<StaffAssignmentDto>.Failure("Hospital or department not found.", 404);
 
         var duplicate = await db.StaffAssignments.AnyAsync(x =>
             x.StaffProfileId == staffId && x.HospitalId == input.HospitalId &&
