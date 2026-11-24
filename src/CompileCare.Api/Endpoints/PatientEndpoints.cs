@@ -26,6 +26,20 @@ public static class PatientEndpoints
         .WithName("RegisterPatient")
         .RequireAuthorization(AuthorizationPolicies.PatientRegister);
 
+        group.MapPost("/duplicate-candidates", async (
+            Guid hospitalId,
+            PatientDuplicateCheckRequest request,
+            IPatientDuplicateDetectionService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.FindCandidatesAsync(hospitalId, request, ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.Problem(title: "Patient duplicate check failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("FindPatientDuplicateCandidates")
+        .RequireAuthorization(AuthorizationPolicies.PatientDuplicateReview);
+
         group.MapGet("/", async (
             Guid hospitalId,
             IPatientService service,
