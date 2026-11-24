@@ -45,6 +45,9 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.AvailabilitySessionId, x.SlotStartsAtUtc })
             .IsUnique().HasFilter("\"Status\" = 'Booked'");
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId });
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PatientId });
+        builder.HasIndex(x => new { x.TenantId, x.ProviderStaffId });
         builder.HasIndex(x => new { x.TenantId, x.PatientId, x.SlotStartsAtUtc })
             .HasFilter("\"Status\" = 'Booked'");
         builder.HasOne<ProviderAvailabilitySession>().WithMany()
