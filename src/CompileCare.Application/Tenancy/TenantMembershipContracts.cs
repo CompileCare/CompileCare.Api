@@ -29,9 +29,18 @@ public static class OrganizationScopeTypes
 public sealed record OrganizationScope(string ScopeType, Guid? HospitalId = null, Guid? DepartmentId = null);
 public sealed record TenantMembershipAuthorization(Guid MembershipId, string Role, IReadOnlyList<OrganizationScope> Scopes);
 
+public sealed record UserTenantContextDto(
+    Guid TenantId,
+    string TenantName,
+    string TenantSlug,
+    string Role,
+    IReadOnlyList<OrganizationScope> Scopes);
+
 public interface ITenantMembershipReader
 {
     Task<TenantMembershipAuthorization?> FindActiveMembershipAsync(Guid tenantId, string issuer, string subject, CancellationToken cancellationToken);
+    Task<TenantMembershipPage<UserTenantContextDto>> ListActiveTenantContextsAsync(
+        string issuer, string subject, TenantMembershipPageRequest page, CancellationToken cancellationToken);
 }
 
 public interface IOrganizationScopeContext

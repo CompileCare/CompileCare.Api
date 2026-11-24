@@ -9,7 +9,7 @@ using Serilog.Context;
 namespace CompileCare.Api.Middleware;
 
 /// <summary>
-/// Writes metadata-only audit events for tenant-scoped and platform-operator API requests.
+/// Writes metadata-only audit events for tenant-scoped, user-scoped and platform-operator API requests.
 /// Successful business changes and their audit event commit in one database transaction.
 /// No request/response bodies, query strings, or patient payloads are persisted.
 /// </summary>
@@ -37,8 +37,10 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
             endpoint.Metadata.GetMetadata<TenantScopedEndpointMetadata>() is not null;
         var isPlatformOperatorRoute =
             endpoint.Metadata.GetMetadata<PlatformOperatorEndpointMetadata>() is not null;
+        var isUserScoped =
+            endpoint.Metadata.GetMetadata<UserScopedEndpointMetadata>() is not null;
 
-        if (!isTenantScoped && !isPlatformOperatorRoute)
+        if (!isTenantScoped && !isPlatformOperatorRoute && !isUserScoped)
         {
             await next(context);
             return;

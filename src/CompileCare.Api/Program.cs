@@ -33,6 +33,7 @@ app.MapHealthEndpoints();
 app.MapPlatformEndpoints();
 app.MapPlatformTenantEndpoints();
 app.MapTenantMembershipEndpoints();
+app.MapUserContextEndpoints();
 app.MapHospitalEndpoints();
 app.MapDepartmentEndpoints();
 app.MapWardEndpoints();
