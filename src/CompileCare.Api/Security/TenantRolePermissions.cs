@@ -1,4 +1,5 @@
 using CompileCare.Application.Appointments;
+using CompileCare.Application.Clinical;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
@@ -46,6 +47,13 @@ internal static class TenantRolePermissions
                 AppointmentPermissions.AppointmentManage,
                 QueuePermissions.Read,
                 QueuePermissions.Manage
+            ],
+            TenantRoles.ClinicalUser =>
+            [
+                OpdEncounterPermissions.Read,
+                OpdEncounterPermissions.Manage,
+                OpdEncounterPermissions.Sign,
+                OpdEncounterPermissions.Amend
             ],
             _ => Array.Empty<string>()
         };
