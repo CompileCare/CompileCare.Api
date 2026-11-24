@@ -155,6 +155,59 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Equal(HttpStatusCode.Conflict, invalidRecall.StatusCode);
     }
 
+    [Fact]
+    public async Task AppointmentCheckInCreatesOneQueueEntryAndIsIdempotent()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        const string registrarSubject = "appointment-checkin-user";
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: registrarSubject);
+        using var registrar = CreateClient(tenantId, registrarSubject);
+
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        var localStart = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).DateTime.AddMinutes(10);
+        var start = new TimeOnly(localStart.Hour, localStart.Minute, localStart.Second);
+        var date = DateOnly.FromDateTime(localStart);
+        var sessionResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(departmentId, providerId, date, start, start.AddMinutes(5), 5, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Forbidden, sessionResponse.StatusCode);
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(departmentId, providerId, date, start, start.AddMinutes(5), 5, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var booking = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session!.Id, patientId, session.StartsAtUtc, null));
+        Assert.Equal(HttpStatusCode.Created, booking.StatusCode);
+        var appointment = await booking.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(appointment);
+
+        var first = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment!.Id:D}/check-in", null);
+        var second = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/check-in", null);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var firstEntry = await first.Content.ReadFromJsonAsync<QueueEntryDto>();
+        var secondEntry = await second.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(firstEntry);
+        Assert.NotNull(secondEntry);
+        Assert.Equal(firstEntry!.Id, secondEntry!.Id);
+        Assert.Equal(firstEntry.TokenNumber, secondEntry.TokenNumber);
+    }
+
     private async Task<(Guid HospitalId, Guid DepartmentId, Guid ProviderId, Guid PatientId)> SeedSchedulingDataAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
