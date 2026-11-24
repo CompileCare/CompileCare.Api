@@ -69,6 +69,19 @@ public sealed class OpdEncounterService(
         return OpdEncounterResult<OpdEncounterDto>.Success(ToDto(encounter, amendments));
     }
 
+    public async Task<OpdEncounterResult<OpdEncounterDto>> GetByQueueEntryAsync(
+        Guid hospitalId, Guid queueEntryId, CancellationToken cancellationToken)
+    {
+        var encounterId = await db.OpdEncounters.AsNoTracking()
+            .Where(x => x.HospitalId == hospitalId && x.QueueEntryId == queueEntryId)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return encounterId.HasValue
+            ? await GetAsync(hospitalId, encounterId.Value, cancellationToken)
+            : OpdEncounterResult<OpdEncounterDto>.Failure("Encounter not found.", 404);
+    }
+
     public async Task<OpdEncounterResult<OpdEncounterDto>> UpdateNoteAsync(
         Guid hospitalId, Guid encounterId, OpdEncounterNoteInput input,
         OpdEncounterActor actor, CancellationToken cancellationToken)
