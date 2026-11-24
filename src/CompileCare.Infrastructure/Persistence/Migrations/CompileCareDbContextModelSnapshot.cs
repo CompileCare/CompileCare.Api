@@ -1160,6 +1160,69 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
                 });
 
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.OpdEncounter", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("Assessment").HasMaxLength(2000).HasColumnType("character varying(2000)");
+                    b.Property<string>("CancellationReason").HasMaxLength(250).HasColumnType("character varying(250)");
+                    b.Property<string>("ChiefComplaint").HasMaxLength(500).HasColumnType("character varying(500)");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("CreatedByIssuer").IsRequired().HasMaxLength(255).HasColumnType("character varying(255)");
+                    b.Property<string>("CreatedBySubject").IsRequired().HasMaxLength(255).HasColumnType("character varying(255)");
+                    b.Property<Guid>("DepartmentId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset?>("ClosedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("Examination").HasMaxLength(4000).HasColumnType("character varying(4000)");
+                    b.Property<string>("History").HasMaxLength(4000).HasColumnType("character varying(4000)");
+                    b.Property<Guid>("HospitalId").HasColumnType("uuid");
+                    b.Property<Guid>("PatientId").HasColumnType("uuid");
+                    b.Property<string>("Plan").HasMaxLength(4000).HasColumnType("character varying(4000)");
+                    b.Property<Guid>("QueueEntryId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset?>("SignedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("SignedByIssuer").HasMaxLength(255).HasColumnType("character varying(255)");
+                    b.Property<string>("SignedBySubject").HasMaxLength(255).HasColumnType("character varying(255)");
+                    b.Property<DateTimeOffset>("StartedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("TenantId", "Id");
+                    b.HasIndex("TenantId", "QueueEntryId").IsUnique();
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+                    b.HasIndex("TenantId", "HospitalId", "PatientId", "StartedAtUtc");
+                    b.ToTable("opd_encounters", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_opd_encounters_status", "\"Status\" IN ('InProgress', 'Signed', 'Closed', 'Cancelled')");
+                            t.HasCheckConstraint("CK_opd_encounters_signed_attribution", "\"Status\" NOT IN ('Signed', 'Closed') OR (\"SignedAtUtc\" IS NOT NULL AND \"SignedByIssuer\" IS NOT NULL AND \"SignedBySubject\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_opd_encounters_cancel_reason", "\"Status\" <> 'Cancelled' OR (\"CancellationReason\" IS NOT NULL AND length(trim(\"CancellationReason\")) BETWEEN 1 AND 250)");
+                        });
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.OpdEncounterAmendment", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("AuthorIssuer").IsRequired().HasMaxLength(255).HasColumnType("character varying(255)");
+                    b.Property<string>("AuthorSubject").IsRequired().HasMaxLength(255).HasColumnType("character varying(255)");
+                    b.Property<string>("Content").IsRequired().HasMaxLength(4000).HasColumnType("character varying(4000)");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("DepartmentId").HasColumnType("uuid");
+                    b.Property<Guid>("EncounterId").HasColumnType("uuid");
+                    b.Property<Guid>("HospitalId").HasColumnType("uuid");
+                    b.Property<string>("Reason").IsRequired().HasMaxLength(250).HasColumnType("character varying(250)");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("TenantId", "Id");
+                    b.HasIndex("TenantId", "EncounterId", "CreatedAtUtc");
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+                    b.ToTable("opd_encounter_amendments", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_opd_encounter_amendments_reason", "length(trim(\"Reason\")) BETWEEN 1 AND 250");
+                            t.HasCheckConstraint("CK_opd_encounter_amendments_content", "length(trim(\"Content\")) BETWEEN 1 AND 4000");
+                        });
+                });
+
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.QueueEntry", b =>
                 {
                     b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
@@ -1192,6 +1255,39 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_queue_entries_status", "\"Status\" IN ('Waiting', 'Called', 'InProgress', 'Completed', 'Cancelled', 'NoShow')");
                             t.HasCheckConstraint("CK_queue_entries_token_positive", "\"TokenNumber\" > 0");
                         });
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.OpdEncounter", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.QueueEntry", null).WithMany()
+                        .HasForeignKey("TenantId", "QueueEntryId").HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId").HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId").HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.HospitalPatientRegistration", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "PatientId").HasPrincipalKey("TenantId", "HospitalId", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
+                        .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.OpdEncounterAmendment", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.OpdEncounter", null).WithMany()
+                        .HasForeignKey("TenantId", "EncounterId").HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId").HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId").HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
+                        .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
                 });
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.QueueEntry", b =>

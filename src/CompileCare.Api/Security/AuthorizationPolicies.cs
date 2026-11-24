@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CompileCare.Application.Appointments;
+using CompileCare.Application.Clinical;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
@@ -29,6 +30,10 @@ public static class AuthorizationPolicies
     public const string AppointmentManage = "AppointmentManage";
     public const string QueueRead = "QueueRead";
     public const string QueueManage = "QueueManage";
+    public const string EncounterRead = "EncounterRead";
+    public const string EncounterManage = "EncounterManage";
+    public const string EncounterSign = "EncounterSign";
+    public const string EncounterAmend = "EncounterAmend";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
@@ -95,6 +100,18 @@ public static class AuthorizationPolicies
         options.AddPolicy(QueueManage, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, QueuePermissions.Manage)));
+        options.AddPolicy(EncounterRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, OpdEncounterPermissions.Read)));
+        options.AddPolicy(EncounterManage, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, OpdEncounterPermissions.Manage)));
+        options.AddPolicy(EncounterSign, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, OpdEncounterPermissions.Sign)));
+        options.AddPolicy(EncounterAmend, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, OpdEncounterPermissions.Amend)));
         options.AddPolicy(PlatformOperator, policy =>
             policy.RequireAuthenticatedUser()
                 .AddRequirements(new PlatformOperatorRequirement()));
