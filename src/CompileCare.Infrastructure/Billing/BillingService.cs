@@ -77,6 +77,9 @@ public sealed class BillingService(
             return BillingResult<InvoiceDto>.Failure("Queue visit not found.", 404);
         if (queue.Status is not ("InProgress" or "Completed"))
             return BillingResult<InvoiceDto>.Failure("An invoice can only be issued for an in-progress or completed OPD visit.", 409);
+        var visitLockKey = $"billing-invoice:{db.CurrentTenantId}:{queue.Id}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({visitLockKey}, 0))", ct);
         if (await db.BillingInvoices.AnyAsync(x => x.QueueEntryId == queue.Id, ct))
             return BillingResult<InvoiceDto>.Failure("An invoice has already been issued for this visit.", 409);
 
@@ -124,7 +127,6 @@ public sealed class BillingService(
         Guid hospitalId, Guid invoiceId, CancellationToken ct)
     {
         var invoice = await db.BillingInvoices.AsNoTracking()
-            .Include(x => db.BillingInvoiceLines.Where(line => line.InvoiceId == x.Id))
             .FirstOrDefaultAsync(x => x.Id == invoiceId && x.HospitalId == hospitalId, ct);
         if (invoice is null || !organizationScope.CanManageDepartment(hospitalId, invoice.DepartmentId))
             return BillingResult<InvoiceDto>.Failure("Invoice not found.", 404);
@@ -209,8 +211,8 @@ public sealed class BillingService(
         catch (InvalidTimeZoneException) { return BillingResult<DailyCollectionReportDto>.Failure("The time zone is invalid.", 400); }
         var startLocal = businessDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         var endLocal = businessDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-        var startUtc = TimeZoneInfo.ConvertTimeToUtc(startLocal, zone);
-        var endUtc = TimeZoneInfo.ConvertTimeToUtc(endLocal, zone);
+        var startUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(startLocal, zone), TimeSpan.Zero);
+        var endUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(endLocal, zone), TimeSpan.Zero);
         var payments = await db.BillingPayments.AsNoTracking()
             .Where(x => x.HospitalId == hospitalId && x.PaidAtUtc >= startUtc && x.PaidAtUtc < endUtc)
             .GroupBy(x => x.Method)
@@ -221,7 +223,6 @@ public sealed class BillingService(
             businessDate, timeZoneId, payments.Sum(x => x.Total), byMethod, payments.Sum(x => x.Count)));
     }
 
-    private bool CanManageHospital(Guid hospitalId) => organizationScope.CanManageHospital(hospitalId);
     private static string? ValidateServiceItem(BillingServiceItemInput input)
     {
         if (string.IsNullOrWhiteSpace(input.Code) || input.Code.Trim().Length > 40)
