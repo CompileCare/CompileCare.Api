@@ -89,6 +89,12 @@ public static class AuthorizationPolicies
         options.AddPolicy(AppointmentManage, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, AppointmentPermissions.AppointmentManage)));
+        options.AddPolicy(QueueRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, QueuePermissions.Read)));
+        options.AddPolicy(QueueManage, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, QueuePermissions.Manage)));
         options.AddPolicy(PlatformOperator, policy =>
             policy.RequireAuthenticatedUser()
                 .AddRequirements(new PlatformOperatorRequirement()));
