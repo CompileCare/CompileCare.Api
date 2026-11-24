@@ -51,6 +51,13 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Equal(date, session!.LocalDate);
         Assert.Equal(TimeSpan.FromHours(3.5), session.StartsAtUtc.TimeOfDay);
 
+        var overlappingSession = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentId, providerId, date,
+                new TimeOnly(9, 30), new TimeOnly(10, 30), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Conflict, overlappingSession.StatusCode);
+
         var sessions = await registrar.GetFromJsonAsync<AppointmentPage>(
             $"/api/v1/hospitals/{hospitalId:D}/availability-sessions?date={date:yyyy-MM-dd}&page=1&pageSize=10");
         Assert.NotNull(sessions);
@@ -62,18 +69,22 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Equal(2, slots!.Count);
         Assert.All(slots, slot => Assert.True(slot.IsAvailable));
 
+        var unregistered = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, Guid.NewGuid(), slots[0].StartsAtUtc, null));
+        Assert.Equal(HttpStatusCode.Conflict, unregistered.StatusCode);
+
         var request = new AppointmentBookInput(session.Id, patientId, slots[0].StartsAtUtc, "Follow-up");
-        var booked = await registrar.PostAsJsonAsync(
-            $"/api/v1/hospitals/{hospitalId:D}/appointments", request);
-        Assert.Equal(HttpStatusCode.Created, booked.StatusCode);
+        var attempts = await Task.WhenAll(
+            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/appointments", request),
+            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/appointments", request));
+        Assert.Single(attempts, response => response.StatusCode == HttpStatusCode.Created);
+        Assert.Single(attempts, response => response.StatusCode == HttpStatusCode.Conflict);
+        var booked = attempts.Single(response => response.StatusCode == HttpStatusCode.Created);
         var appointment = await booked.Content.ReadFromJsonAsync<AppointmentDto>();
         Assert.NotNull(appointment);
         Assert.Equal(AppointmentStatuses.Booked, appointment!.Status);
         Assert.Equal(patientId, appointment.PatientId);
-
-        var duplicate = await registrar.PostAsJsonAsync(
-            $"/api/v1/hospitals/{hospitalId:D}/appointments", request);
-        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
 
         var cancel = await registrar.PostAsync(
             $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/cancel", null);
@@ -85,7 +96,7 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Fact]
-    public async Task AvailabilityRejectsInvalidOrAmbiguousLocalTimeAndProviderWithoutAssignment()
+    public async Task AvailabilityRejectsInvalidTimeZoneAndSlotDuration()
     {
         var tenantId = Guid.NewGuid();
         var (hospitalId, departmentId, providerId, _) = await SeedSchedulingDataAsync(tenantId);
