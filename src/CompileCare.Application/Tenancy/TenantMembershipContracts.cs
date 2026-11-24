@@ -5,7 +5,8 @@ public static class TenantRoles
     public const string HospitalAdmin = "HospitalAdmin";
     public const string FacilityManager = "FacilityManager";
     public const string FacilityViewer = "FacilityViewer";
-    public static bool IsKnown(string? role) => role is HospitalAdmin or FacilityManager or FacilityViewer;
+    public const string PatientRegistrar = "PatientRegistrar";
+    public static bool IsKnown(string? role) => role is HospitalAdmin or FacilityManager or FacilityViewer or PatientRegistrar;
 }
 
 public static class TenantPermissions
