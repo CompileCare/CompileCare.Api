@@ -433,8 +433,6 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Bed", b =>
                 {
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Room", "Room")            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Bed", b =>
-                {
                     b.HasOne("CompileCare.Infrastructure.Persistence.Room", "Room")
                         .WithMany("Beds")
                         .HasForeignKey("TenantId", "RoomId")
