@@ -952,6 +952,10 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
                     b.HasAlternateKey("TenantId", "Id");
 
+                    b.HasIndex("TenantId", "HospitalId");
+
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+
                     b.HasIndex("TenantId", "StaffProfileId", "HospitalId")
                         .IsUnique()
                         .HasFilter("\"DepartmentId\" IS NULL AND \"IsActive\" = TRUE AND \"EffectiveTo\" IS NULL");
