@@ -138,6 +138,23 @@ jobs:
           echo "Generated migration: $generated_file"
           cat "$generated_file"
 
+      - name: Keep the regenerated snapshot and discard redundant schema operations
+        shell: bash
+        env:
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
+        run: |
+          set -euo pipefail
+          migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
+          generated_file="$(find "$migration_dir" -maxdepth 1 -type f -name "*_$MIGRATION_NAME.cs" ! -name "*.Designer.cs" -print -quit)"
+          if [[ -z "$generated_file" ]]; then
+            echo "::error::Generated migration source file was not found."
+            exit 1
+          fi
+          # Existing migrations already create the desired indexes. The generated
+          # operations only correct a hand-authored snapshot, so retain the fresh
+          # snapshot and do not add a schema migration that would drop absent indexes.
+          rm "$generated_file" "${generated_file%.cs}.Designer.cs"
+
       - name: Build solution
         run: dotnet build CompileCare.Api.slnx --configuration Release --no-restore
 
