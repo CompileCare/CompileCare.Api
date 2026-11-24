@@ -1,9 +1,6 @@
 name: Generate EF Core Migration
 
 on:
-  push:
-    branches:
-      - feature/patient-identifier-mrn-management
   workflow_dispatch:
     inputs:
       migration_name:
