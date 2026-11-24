@@ -38,6 +38,7 @@ app.MapDepartmentEndpoints();
 app.MapWardEndpoints();
 app.MapRoomEndpoints();
 app.MapBedEndpoints();
+app.MapPatientEndpoints();
 app.Run();
 
 public partial class Program;
