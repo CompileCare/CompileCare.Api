@@ -31,7 +31,7 @@ jobs:
         run: dotnet ef migrations has-pending-model-changes --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api --context CompileCareDbContext
       - name: Scaffold diagnostic migration without committing
         run: dotnet ef migrations add DiagnoseModelDrift --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api --context CompileCareDbContext --output-dir Persistence/Migrations
-      - name: Print exact generated model diff
+      - name: Print exact generated model diff and migration operations
         run: |
-          git diff -- src/CompileCare.Infrastructure/Persistence/Migrations/CompileCareDbContextModelSnapshot.cs
-          find src/CompileCare.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*DiagnoseModelDrift*' -print -exec cat {} ;
+          git diff -- src/CompileCare.Infrastructure/Persistence/Migrations/CompileCareDbContextModelSnapshot.cs || true
+          find src/CompileCare.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*DiagnoseModelDrift.cs' -print -exec cat {} \;
