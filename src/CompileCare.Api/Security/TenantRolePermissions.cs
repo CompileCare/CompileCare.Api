@@ -43,7 +43,9 @@ internal static class TenantRolePermissions
                 PatientIdentifierPermissions.Assign,
                 AppointmentPermissions.AvailabilityRead,
                 AppointmentPermissions.AppointmentRead,
-                AppointmentPermissions.AppointmentManage
+                AppointmentPermissions.AppointmentManage,
+                QueuePermissions.Read,
+                QueuePermissions.Manage
             ],
             _ => Array.Empty<string>()
         };
