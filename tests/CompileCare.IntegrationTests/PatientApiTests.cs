@@ -108,6 +108,22 @@ public sealed class PatientApiTests
             tenantId,
             TenantRoles.PatientRegistrar,
             scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentId)]);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var reader = scope.ServiceProvider.GetRequiredService<ITenantMembershipReader>();
+            var membership = await reader.FindActiveMembershipAsync(
+                tenantId, TestJwtTokenFactory.Issuer, TestJwtTokenFactory.Subject, CancellationToken.None);
+            Assert.NotNull(membership);
+            Assert.Equal(OrganizationScopeTypes.Department, Assert.Single(membership!.Scopes).ScopeType);
+        }
+
+        var scopeContext = new OrganizationScopeContext();
+        scopeContext.SetMembership(Guid.NewGuid(), TenantRoles.PatientRegistrar,
+            [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentId)]);
+        Assert.False(scopeContext.IsTenantWide);
+        Assert.Empty(scopeContext.HospitalIds);
+
         using var client = CreateClient(tenantId);
 
         var response = await client.GetAsync($"/api/v1/hospitals/{hospitalId:D}/patients");
