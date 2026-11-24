@@ -81,7 +81,7 @@ public interface IAppointmentSchedulingService
 {
     Task<AppointmentResult<AvailabilitySessionDto>> CreateAvailabilityAsync(
         Guid hospitalId, AvailabilitySessionCreateInput input, CancellationToken cancellationToken);
-    Task<AppointmentResult<AppointmentPage>> ListAvailabilityAsync(
+    Task<AppointmentResult<AvailabilitySessionPage>> ListAvailabilityAsync(
         Guid hospitalId, DateOnly localDate, Guid? departmentId, int page, int pageSize, CancellationToken cancellationToken);
     Task<AppointmentResult<IReadOnlyList<AppointmentSlotDto>>> GetSlotsAsync(
         Guid hospitalId, Guid sessionId, CancellationToken cancellationToken);
