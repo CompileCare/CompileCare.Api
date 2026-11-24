@@ -1245,6 +1245,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
                     b.HasKey("Id");
                     b.HasAlternateKey("TenantId", "Id");
+                    b.HasAlternateKey("TenantId", "HospitalId", "Id");
                     b.HasIndex("TenantId", "HospitalId", "PatientId");
                     b.HasIndex("TenantId", "AppointmentId").IsUnique().HasFilter("\"AppointmentId\" IS NOT NULL");
                     b.HasIndex("TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "Status", "TokenNumber").HasDatabaseName("IX_queue_entries_daily_status_token");
@@ -1303,6 +1304,168 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict).IsRequired();
                     b.HasOne("CompileCare.Infrastructure.Persistence.HospitalPatientRegistration", null).WithMany()
                         .HasForeignKey("TenantId", "HospitalId", "PatientId").HasPrincipalKey("TenantId", "HospitalId", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
+                        .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.BillingServiceItem", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("Category").IsRequired().HasMaxLength(80).HasColumnType("character varying(80)");
+                    b.Property<string>("Code").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("HospitalId").HasColumnType("uuid");
+                    b.Property<bool>("IsActive").HasColumnType("boolean");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<decimal>("UnitPrice").HasPrecision(18, 2).HasColumnType("numeric(18,2)");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("TenantId", "Id");
+                    b.HasAlternateKey("TenantId", "HospitalId", "Id");
+                    b.HasIndex("TenantId", "HospitalId", "IsActive", "Category");
+                    b.HasIndex("TenantId", "HospitalId", "Code").IsUnique();
+                    b.ToTable("billing_service_items", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_billing_service_items_price", "\"UnitPrice\" >= 0");
+                            t.HasCheckConstraint("CK_billing_service_items_code", "length(trim(\"Code\")) BETWEEN 1 AND 40");
+                            t.HasCheckConstraint("CK_billing_service_items_name", "length(trim(\"Name\")) BETWEEN 1 AND 160");
+                        });
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.BillingInvoice", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("DepartmentId").HasColumnType("uuid");
+                    b.Property<Guid>("HospitalId").HasColumnType("uuid");
+                    b.Property<string>("InvoiceNumber").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<DateTimeOffset>("IssuedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<int>("PaymentSequence").HasColumnType("integer");
+                    b.Property<Guid>("PatientId").HasColumnType("uuid");
+                    b.Property<Guid>("QueueEntryId").HasColumnType("uuid");
+                    b.Property<decimal>("Subtotal").HasPrecision(18, 2).HasColumnType("numeric(18,2)");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("TenantId", "Id");
+                    b.HasAlternateKey("TenantId", "HospitalId", "Id");
+                    b.HasIndex("TenantId", "HospitalId", "PatientId", "IssuedAtUtc");
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+                    b.HasIndex("TenantId", "HospitalId", "InvoiceNumber").IsUnique();
+                    b.HasIndex("TenantId", "QueueEntryId").IsUnique();
+                    b.ToTable("billing_invoices", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_billing_invoices_subtotal", "\"Subtotal\" >= 0");
+                            t.HasCheckConstraint("CK_billing_invoices_status", "\"Status\" IN ('Issued')");
+                            t.HasCheckConstraint("CK_billing_invoices_payment_sequence", "\"PaymentSequence\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.BillingInvoiceLine", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("Description").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<Guid>("HospitalId").HasColumnType("uuid");
+                    b.Property<Guid>("InvoiceId").HasColumnType("uuid");
+                    b.Property<decimal>("LineTotal").HasPrecision(18, 2).HasColumnType("numeric(18,2)");
+                    b.Property<int>("Quantity").HasColumnType("integer");
+                    b.Property<string>("ServiceCode").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<Guid>("ServiceItemId").HasColumnType("uuid");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<decimal>("UnitPrice").HasPrecision(18, 2).HasColumnType("numeric(18,2)");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("TenantId", "Id");
+                    b.HasIndex("TenantId", "InvoiceId");
+                    b.HasIndex("TenantId", "HospitalId");
+                    b.ToTable("billing_invoice_lines", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_billing_invoice_lines_quantity", "\"Quantity\" BETWEEN 1 AND 1000");
+                            t.HasCheckConstraint("CK_billing_invoice_lines_price", "\"UnitPrice\" >= 0 AND \"LineTotal\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.BillingPayment", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<decimal>("Amount").HasPrecision(18, 2).HasColumnType("numeric(18,2)");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("HospitalId").HasColumnType("uuid");
+                    b.Property<Guid>("InvoiceId").HasColumnType("uuid");
+                    b.Property<string>("Method").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<DateTimeOffset>("PaidAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("ReceiptNumber").IsRequired().HasMaxLength(48).HasColumnType("character varying(48)");
+                    b.Property<string>("Reference").HasMaxLength(80).HasColumnType("character varying(80)");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("TenantId", "Id");
+                    b.HasIndex("TenantId", "HospitalId", "PaidAtUtc");
+                    b.HasIndex("TenantId", "HospitalId", "ReceiptNumber").IsUnique();
+                    b.HasIndex("TenantId", "InvoiceId", "PaidAtUtc");
+                    b.ToTable("billing_payments", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_billing_payments_amount", "\"Amount\" > 0");
+                            t.HasCheckConstraint("CK_billing_payments_method", "\"Method\" IN ('Cash', 'UPI', 'Card', 'BankTransfer')");
+                        });
+                });
+
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.BillingServiceItem", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId").HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
+                        .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.BillingInvoice", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId").HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.HospitalPatientRegistration", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "PatientId").HasPrincipalKey("TenantId", "HospitalId", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId").HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.QueueEntry", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "QueueEntryId").HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
+                        .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.BillingInvoiceLine", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.BillingInvoice", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "InvoiceId").HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.BillingServiceItem", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "ServiceItemId").HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
+                        .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.BillingPayment", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.BillingInvoice", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "InvoiceId").HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId").HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict).IsRequired();
                     b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
                         .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
