@@ -49,9 +49,9 @@ public sealed class AddFrontDeskQueue : Migration
                 table.ForeignKey("FK_queue_entries_appointments_TenantId_AppointmentId", x => new { x.TenantId, x.AppointmentId }, "appointments", new[] { "TenantId", "Id" }, onDelete: ReferentialAction.Restrict);
                 table.ForeignKey("FK_queue_entries_tenants_TenantId", x => x.TenantId, "tenants", "Id", onDelete: ReferentialAction.Restrict);
             });
-        migrationBuilder.CreateIndex("IX_queue_entries_TenantId_HospitalId_DepartmentId_QueueDateLocal_TokenNumber", "queue_entries",
+        migrationBuilder.CreateIndex("IX_queue_entries_daily_token", "queue_entries",
             new[] { "TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "TokenNumber" }, unique: true);
-        migrationBuilder.CreateIndex("IX_queue_entries_TenantId_HospitalId_DepartmentId_QueueDateLocal_Status_TokenNumber", "queue_entries",
+        migrationBuilder.CreateIndex("IX_queue_entries_daily_status_token", "queue_entries",
             new[] { "TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "Status", "TokenNumber" });
         migrationBuilder.CreateIndex("IX_queue_entries_TenantId_AppointmentId", "queue_entries",
             new[] { "TenantId", "AppointmentId" }, unique: true, filter: "\"AppointmentId\" IS NOT NULL");
