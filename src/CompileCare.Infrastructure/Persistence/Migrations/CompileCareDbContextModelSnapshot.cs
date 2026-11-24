@@ -1177,8 +1177,8 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
                     b.HasAlternateKey("TenantId", "Id");
                     b.HasIndex("TenantId", "AppointmentId").IsUnique().HasFilter("\"AppointmentId\" IS NOT NULL");
-                    b.HasIndex("TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "Status", "TokenNumber");
-                    b.HasIndex("TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "TokenNumber").IsUnique();
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "Status", "TokenNumber").HasDatabaseName("IX_queue_entries_daily_status_token");
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "TokenNumber").IsUnique().HasDatabaseName("IX_queue_entries_daily_token");
                     b.ToTable("queue_entries", (string)null, t =>
                         {
                             t.HasCheckConstraint("CK_queue_entries_closure_reason", "\"ClosureReason\" IS NULL OR length(trim(\"ClosureReason\")) BETWEEN 1 AND 250");
