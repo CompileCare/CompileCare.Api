@@ -53,8 +53,8 @@ public sealed class BillingInvoiceConfiguration : IEntityTypeConfiguration<Billi
             .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.DepartmentId })
             .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<QueueEntry>().WithMany()
-            .HasForeignKey(x => new { x.TenantId, x.QueueEntryId })
-            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.QueueEntryId })
+            .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<HospitalPatientRegistration>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.PatientId })
             .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.PatientId }).OnDelete(DeleteBehavior.Restrict);
