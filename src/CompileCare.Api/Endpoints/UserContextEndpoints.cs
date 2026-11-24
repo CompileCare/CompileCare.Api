@@ -1,0 +1,47 @@
+using CompileCare.Api.Security;
+using CompileCare.Application.Tenancy;
+
+namespace CompileCare.Api;
+
+public static class UserContextEndpoints
+{
+    public static IEndpointRouteBuilder MapUserContextEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints
+            .MapGroup("/api/v1/me")
+            .WithTags("User context")
+            .WithMetadata(UserScopedEndpointMetadata.Instance)
+            .RequireAuthorization();
+
+        group.MapGet("/tenant-contexts", async (
+                HttpContext context,
+                ITenantMembershipReader membershipReader,
+                int page = 1,
+                int pageSize = TenantMembershipPageRequest.DefaultPageSize,
+                CancellationToken cancellationToken = default) =>
+            {
+                var issuer = context.User
+                    .FindFirst(AuthorizationPolicies.ValidatedIssuerClaim)?.Value;
+                var subject = context.User.FindFirst("sub")?.Value;
+
+                if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject))
+                {
+                    return Results.Problem(
+                        title: "Identity is not provisioned",
+                        detail: "The authenticated identity does not contain the validated issuer and subject required to resolve tenant memberships.",
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                var result = await membershipReader.ListActiveTenantContextsAsync(
+                    issuer,
+                    subject,
+                    new TenantMembershipPageRequest(page, pageSize),
+                    cancellationToken);
+
+                return Results.Ok(result);
+            })
+            .WithName("ListCurrentUserTenantContexts");
+
+        return endpoints;
+    }
+}
