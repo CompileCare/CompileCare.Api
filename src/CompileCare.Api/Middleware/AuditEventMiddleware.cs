@@ -98,6 +98,13 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         }
         catch (Exception exception)
         {
+            // The exception text is emitted to the configured protected application
+            // log, never to the API response or audit event payload.
+            logger.LogError(
+                exception,
+                "Audited endpoint {Endpoint} failed before its response completed.",
+                endpoint.DisplayName);
+
             try
             {
                 await transaction.RollbackAsync(CancellationToken.None);

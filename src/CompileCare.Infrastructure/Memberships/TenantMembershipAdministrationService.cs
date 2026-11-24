@@ -232,9 +232,23 @@ public sealed class TenantMembershipAdministrationService(
         }
 
         membership.Role = input.Role!;
-        db.TenantMembershipScopes.RemoveRange(membership.Scopes);
-        membership.Scopes.Clear();
-        AddScopes(membership, resolution.Scopes);
+        var currentScopes = ToScopes(membership);
+        var scopesChanged = !currentScopes.ToHashSet().SetEquals(resolution.Scopes);
+
+        if (scopesChanged)
+        {
+            var previousScopes = membership.Scopes.ToArray();
+            db.TenantMembershipScopes.RemoveRange(previousScopes);
+            membership.Scopes.Clear();
+
+            // The request audit middleware owns the enclosing transaction. Persist
+            // the deletes before inserting replacements to avoid a transient clash
+            // with the filtered unique indexes on the scope rows.
+            await db.SaveChangesAsync(cancellationToken);
+
+            AddScopes(membership, resolution.Scopes);
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
         return TenantMembershipResult<TenantMembershipDto>.Success(ToDto(membership));
