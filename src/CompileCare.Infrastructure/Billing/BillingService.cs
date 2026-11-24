@@ -141,7 +141,7 @@ public sealed class BillingService(
     public async Task<BillingResult<PaymentDto>> RecordPaymentAsync(
         Guid hospitalId, Guid invoiceId, PaymentCreateInput input, CancellationToken ct)
     {
-        if (input.Amount <= 0 || decimal.Round(input.Amount, 2) != input.Amount)
+        if (input.Amount <= 0 || input.Amount > 9_999_999_999_999_999.99m || decimal.Round(input.Amount, 2) != input.Amount)
             return BillingResult<PaymentDto>.Failure("Payment amount must be positive and have at most two decimal places.", 400);
         if (!PaymentMethods.IsSupported(input.Method))
             return BillingResult<PaymentDto>.Failure("Payment method must be Cash, UPI, Card or BankTransfer.", 400);
@@ -232,7 +232,7 @@ public sealed class BillingService(
             return "Service name is required and must be at most 160 characters.";
         if (string.IsNullOrWhiteSpace(input.Category) || input.Category.Trim().Length > 80)
             return "Service category is required and must be at most 80 characters.";
-        if (input.UnitPrice < 0 || decimal.Round(input.UnitPrice, 2) != input.UnitPrice)
+        if (input.UnitPrice < 0 || input.UnitPrice > 99_999_999_999.99m || decimal.Round(input.UnitPrice, 2) != input.UnitPrice)
             return "Service price must be non-negative and have at most two decimal places.";
         return null;
     }
