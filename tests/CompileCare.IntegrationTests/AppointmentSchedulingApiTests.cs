@@ -58,7 +58,7 @@ public sealed class AppointmentSchedulingApiTests
                 new TimeOnly(9, 30), new TimeOnly(10, 30), 30, "Asia/Kolkata"));
         Assert.Equal(HttpStatusCode.Conflict, overlappingSession.StatusCode);
 
-        var sessions = await registrar.GetFromJsonAsync<AppointmentPage>(
+        var sessions = await registrar.GetFromJsonAsync<AvailabilitySessionPage>(
             $"/api/v1/hospitals/{hospitalId:D}/availability-sessions?date={date:yyyy-MM-dd}&page=1&pageSize=10");
         Assert.NotNull(sessions);
         Assert.Single(sessions!.Items);
