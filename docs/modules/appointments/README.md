@@ -9,8 +9,8 @@ All routes are tenant-scoped and hospital-scoped under `/api/v1/hospitals/{hospi
 | Method | Route | Permission |
 |---|---|---|
 | POST | `/availability-sessions` | `availability.manage` |
-| GET | `/availability-sessions?date=YYYY-MM-DD&departmentId=...` | `appointment.read` |
-| GET | `/availability-sessions/{sessionId}/slots` | `appointment.read` |
+| GET | `/availability-sessions?date=YYYY-MM-DD&departmentId=...` | `availability.read` |
+| GET | `/availability-sessions/{sessionId}/slots` | `availability.read` |
 | POST | `/appointments` | `appointment.manage` |
 | GET | `/appointments/{appointmentId}` | `appointment.read` |
 | POST | `/appointments/{appointmentId}/cancel` | `appointment.manage` |
@@ -30,7 +30,7 @@ Collection results are paginated with a maximum page size of 100. Slot results a
 
 ## Authorization
 
-The initial role mapping is explicit: HospitalAdmin receives `availability.manage`; PatientRegistrar receives `appointment.read` and `appointment.manage`. Other roles do not inherit these permissions. These are provisional pilot mappings and must be reviewed with each hospital before production deployment. Organization scope is checked independently of permission claims.
+The initial role mapping is explicit: HospitalAdmin receives `availability.read` and `availability.manage`; PatientRegistrar receives `availability.read`, `appointment.read` and `appointment.manage`. Other roles do not inherit these permissions. These are provisional pilot mappings and must be reviewed with each hospital before production deployment. Organization scope is checked independently of permission claims.
 
 ## Persistence and privacy
 
