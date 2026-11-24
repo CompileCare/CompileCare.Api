@@ -27,6 +27,8 @@ public static class AuthorizationPolicies
     public const string AvailabilityManage = "AvailabilityManage";
     public const string AppointmentRead = "AppointmentRead";
     public const string AppointmentManage = "AppointmentManage";
+    public const string QueueRead = "QueueRead";
+    public const string QueueManage = "QueueManage";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
