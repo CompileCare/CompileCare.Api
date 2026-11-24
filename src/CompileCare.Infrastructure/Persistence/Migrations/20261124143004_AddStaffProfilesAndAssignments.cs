@@ -1,14 +1,9 @@
-using CompileCare.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace CompileCare.Infrastructure.Persistence.Migrations;
 
-[DbContext(typeof(CompileCareDbContext))]
-[Migration("20261124143004_AddStaffProfilesAndAssignments")]
 partial class AddStaffProfilesAndAssignments : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -97,10 +92,18 @@ partial class AddStaffProfilesAndAssignments : Migration
             unique: true);
 
         migrationBuilder.CreateIndex(
-            name: "IX_staff_assignments_TenantId_StaffProfileId_HospitalId_DepartmentId_EffectiveFrom",
+            name: "IX_staff_assignments_TenantId_StaffProfileId_HospitalId",
             table: "staff_assignments",
-            columns: new[] { "TenantId", "StaffProfileId", "HospitalId", "DepartmentId", "EffectiveFrom" },
-            unique: true);
+            columns: new[] { "TenantId", "StaffProfileId", "HospitalId" },
+            unique: true,
+            filter: "\"DepartmentId\" IS NULL AND \"IsActive\" = TRUE AND \"EffectiveTo\" IS NULL");
+
+        migrationBuilder.CreateIndex(
+            name: "IX_staff_assignments_TenantId_StaffProfileId_HospitalId_DepartmentId",
+            table: "staff_assignments",
+            columns: new[] { "TenantId", "StaffProfileId", "HospitalId", "DepartmentId" },
+            unique: true,
+            filter: "\"DepartmentId\" IS NOT NULL AND \"IsActive\" = TRUE AND \"EffectiveTo\" IS NULL");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
