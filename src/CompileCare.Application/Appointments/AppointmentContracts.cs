@@ -2,6 +2,7 @@ namespace CompileCare.Application.Appointments;
 
 public static class AppointmentPermissions
 {
+    public const string AvailabilityRead = "availability.read";
     public const string AvailabilityManage = "availability.manage";
     public const string AppointmentRead = "appointment.read";
     public const string AppointmentManage = "appointment.manage";
@@ -60,7 +61,7 @@ public sealed record AppointmentDto(
     string? Reason,
     DateTimeOffset CreatedAtUtc);
 
-public sealed record AppointmentPage(
+public sealed record AvailabilitySessionPage(
     IReadOnlyList<AvailabilitySessionDto> Items,
     int Page,
     int PageSize,
