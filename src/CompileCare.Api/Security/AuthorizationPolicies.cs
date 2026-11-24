@@ -1,6 +1,6 @@
 using System.Security.Claims;
-using CompileCare.Application.Tenancy;
 using CompileCare.Application.Patients;
+using CompileCare.Application.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 
 namespace CompileCare.Api.Security;
@@ -14,6 +14,10 @@ public static class AuthorizationPolicies
     public const string PlatformOperator = "PlatformOperator";
     public const string PatientRead = "PatientRead";
     public const string PatientRegister = "PatientRegister";
+    public const string PatientIdentifierRead = "PatientIdentifierRead";
+    public const string PatientIdentifierAssign = "PatientIdentifierAssign";
+    public const string PatientIdentifierPolicyRead = "PatientIdentifierPolicyRead";
+    public const string PatientIdentifierPolicyManage = "PatientIdentifierPolicyManage";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
@@ -41,6 +45,18 @@ public static class AuthorizationPolicies
         options.AddPolicy(PatientRegister, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, PatientPermissions.Register)));
+        options.AddPolicy(PatientIdentifierRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, PatientIdentifierPermissions.Read)));
+        options.AddPolicy(PatientIdentifierAssign, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, PatientIdentifierPermissions.Assign)));
+        options.AddPolicy(PatientIdentifierPolicyRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, PatientIdentifierPermissions.PolicyRead)));
+        options.AddPolicy(PatientIdentifierPolicyManage, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, PatientIdentifierPermissions.PolicyManage)));
         options.AddPolicy(PlatformOperator, policy =>
             policy.RequireAuthenticatedUser()
                 .AddRequirements(new PlatformOperatorRequirement()));
