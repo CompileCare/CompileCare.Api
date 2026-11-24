@@ -46,7 +46,7 @@ jobs:
       - name: Validate target branch and migration name
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/feat/opd-billing-foundation"
@@ -78,7 +78,7 @@ jobs:
       - name: Generate migration from the committed EF model
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
         run: |
           dotnet ef migrations add "$MIGRATION_NAME" \
             --project src/CompileCare.Infrastructure \
@@ -89,7 +89,7 @@ jobs:
       - name: Ensure migration ID follows existing migration history
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
         run: |
           set -euo pipefail
           migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
@@ -124,7 +124,7 @@ jobs:
       - name: Commit and push generated migration
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
         run: |
           set -euo pipefail
           migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
