@@ -14,27 +14,45 @@ public sealed class TenantMembershipAdministrationService(
     public async Task<TenantMembershipPage<TenantMembershipDto>> ListAsync(
         TenantMembershipPageRequest page, CancellationToken cancellationToken)
     {
-        IQueryable<TenantMembership> query =
-            db.TenantMemberships.AsNoTracking().Include(value => value.Scopes);
+        IQueryable<TenantMembership> query = db.TenantMemberships.AsNoTracking();
 
         if (!organizationScopeContext.IsTenantWide)
         {
             var hospitalIds = organizationScopeContext.HospitalIds.ToArray();
             var departmentIds = organizationScopeContext.DepartmentIds.ToArray();
-            query = query.Where(value => value.Scopes.Any(scope =>
-                (scope.HospitalId.HasValue && hospitalIds.Contains(scope.HospitalId.Value)) ||
-                (scope.DepartmentId.HasValue && departmentIds.Contains(scope.DepartmentId.Value))));
+
+            // A scoped administrator may manage a target membership only when every
+            // scope assigned to that target is contained in the caller's scope.
+            // Keep this predicate in SQL so pagination never materializes the full
+            // tenant membership table in application memory.
+            query = query.Where(value =>
+                value.Scopes.Any() &&
+                !value.Scopes.Any(scope =>
+                    scope.ScopeType == OrganizationScopeTypes.Tenant ||
+                    (scope.ScopeType == OrganizationScopeTypes.Hospital &&
+                     (!scope.HospitalId.HasValue ||
+                      !hospitalIds.Contains(scope.HospitalId.Value))) ||
+                    (scope.ScopeType == OrganizationScopeTypes.Department &&
+                     (!scope.HospitalId.HasValue ||
+                      !scope.DepartmentId.HasValue ||
+                      (!hospitalIds.Contains(scope.HospitalId.Value) &&
+                       !departmentIds.Contains(scope.DepartmentId.Value))))));
         }
 
-        var members = await query.OrderBy(value => value.Subject).ThenBy(value => value.Id)
+        var totalCount = await query.CountAsync(cancellationToken);
+        var members = await query
+            .Include(value => value.Scopes)
+            .OrderBy(value => value.Subject)
+            .ThenBy(value => value.Id)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
             .ToListAsync(cancellationToken);
-        var visible = members.Where(value => CanManageMembershipScopes(ToScopes(value))).ToArray();
 
         return new TenantMembershipPage<TenantMembershipDto>(
-            visible.Skip(page.Skip).Take(page.SafePageSize).Select(ToDto).ToArray(),
+            members.Select(ToDto).ToArray(),
             page.SafePage,
             page.SafePageSize,
-            visible.Length);
+            totalCount);
     }
 
     public async Task<TenantMembershipResult<TenantMembershipDto>> CreateInitialAdministratorAsync(
