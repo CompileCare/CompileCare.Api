@@ -53,11 +53,15 @@ public sealed class StaffManagementService(
     public async Task<StaffResult<StaffProfileDto>> GetAsync(Guid staffId, CancellationToken cancellationToken)
     {
         var profile = await ReadableProfiles()
-            .Include(x => db.StaffAssignments.Where(a => a.StaffProfileId == x.Id))
+            .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == staffId, cancellationToken);
-        return profile is null
-            ? StaffResult<StaffProfileDto>.Failure("Staff profile not found.", 404)
-            : StaffResult<StaffProfileDto>.Success(ToDto(profile, profileAssignments: null));
+        if (profile is null)
+            return StaffResult<StaffProfileDto>.Failure("Staff profile not found.", 404);
+        var assignments = await ReadableAssignments()
+            .Where(x => x.StaffProfileId == staffId)
+            .OrderBy(x => x.EffectiveFrom)
+            .ToListAsync(cancellationToken);
+        return StaffResult<StaffProfileDto>.Success(ToDto(profile, assignments));
     }
 
     public async Task<StaffResult<StaffPage>> ListAsync(StaffSearchRequest request, CancellationToken cancellationToken)
