@@ -1,5 +1,6 @@
 using CompileCare.Application.Facilities;
 using CompileCare.Application.Patients;
+using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Facilities;
 using CompileCare.Infrastructure.Memberships;
