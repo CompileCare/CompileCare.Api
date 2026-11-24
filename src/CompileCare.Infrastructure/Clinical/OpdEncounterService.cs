@@ -182,12 +182,15 @@ public sealed class OpdEncounterService(
         return await GetAsync(hospitalId, encounterId, cancellationToken);
     }
 
-    private Task<OpdEncounter?> FindManageableAsync(
-        Guid hospitalId, Guid encounterId, CancellationToken cancellationToken) =>
-        db.OpdEncounters.FirstOrDefaultAsync(
-            x => x.Id == encounterId && x.HospitalId == hospitalId &&
-                 organizationScope.CanManageDepartment(hospitalId, x.DepartmentId),
-            cancellationToken);
+    private async Task<OpdEncounter?> FindManageableAsync(
+        Guid hospitalId, Guid encounterId, CancellationToken cancellationToken)
+    {
+        var encounter = await db.OpdEncounters.FirstOrDefaultAsync(
+            x => x.Id == encounterId && x.HospitalId == hospitalId, cancellationToken);
+        return encounter is not null && organizationScope.CanManageDepartment(hospitalId, encounter.DepartmentId)
+            ? encounter
+            : null;
+    }
 
     private static bool IsValidActor(OpdEncounterActor actor) =>
         !string.IsNullOrWhiteSpace(actor.Issuer) && actor.Issuer.Length <= 255 &&
