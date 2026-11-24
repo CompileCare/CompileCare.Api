@@ -96,6 +96,59 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Fact]
+    public async Task ReschedulingPersistsTenantScopedAppointmentLineage()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "reschedule-reception-user");
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        using var registrar = CreateClient(tenantId, "reschedule-reception-user");
+        var date = new DateOnly(2026, 12, 11);
+        var sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentId, providerId, date, new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await registrar.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        Assert.Equal(2, slots!.Count);
+
+        var bookingResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, patientId, slots[0].StartsAtUtc, "Initial booking"));
+        Assert.Equal(HttpStatusCode.Created, bookingResponse.StatusCode);
+        var original = await bookingResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(original);
+
+        var rescheduleResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{original!.Id:D}/reschedule",
+            new AppointmentBookInput(session.Id, patientId, slots[1].StartsAtUtc, "Rescheduled"));
+        Assert.Equal(HttpStatusCode.OK, rescheduleResponse.StatusCode);
+        var replacement = await rescheduleResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(replacement);
+        Assert.Equal(original.Id, replacement!.RescheduledFromAppointmentId);
+        Assert.Equal(AppointmentStatuses.Booked, replacement.Status);
+
+        var originalResponse = await registrar.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{original.Id:D}");
+        Assert.Equal(HttpStatusCode.OK, originalResponse.StatusCode);
+        var cancelled = await originalResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(cancelled);
+        Assert.Equal(AppointmentStatuses.Cancelled, cancelled!.Status);
+    }
+
+    [Fact]
     public async Task AvailabilityRejectsInvalidTimeZoneAndSlotDuration()
     {
         var tenantId = Guid.NewGuid();
