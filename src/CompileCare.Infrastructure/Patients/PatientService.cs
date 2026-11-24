@@ -61,7 +61,7 @@ public sealed class PatientService(
         CancellationToken cancellationToken)
     {
         if (hospitalId == Guid.Empty || patientId == Guid.Empty ||
-            !organizationScope.CanAccessHospital(hospitalId))
+            !HasHospitalWidePatientScope(hospitalId))
             return PatientResult<PatientDto>.Failure("Patient not found.", 404);
 
         var result = await db.HospitalPatientRegistrations
@@ -86,7 +86,7 @@ public sealed class PatientService(
         PatientSearchRequest request,
         CancellationToken cancellationToken)
     {
-        if (hospitalId == Guid.Empty || !organizationScope.CanAccessHospital(hospitalId))
+        if (hospitalId == Guid.Empty || !HasHospitalWidePatientScope(hospitalId))
             return PatientResult<PatientPage>.Failure("Hospital not found.", 404);
 
         var query = db.HospitalPatientRegistrations
