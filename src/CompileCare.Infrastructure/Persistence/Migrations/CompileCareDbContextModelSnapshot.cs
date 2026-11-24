@@ -1188,6 +1188,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
                     b.HasAlternateKey("TenantId", "Id");
                     b.HasIndex("TenantId", "QueueEntryId").IsUnique();
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
                     b.HasIndex("TenantId", "HospitalId", "PatientId", "StartedAtUtc");
                     b.ToTable("opd_encounters", (string)null, t =>
                         {
@@ -1214,6 +1215,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
                     b.HasAlternateKey("TenantId", "Id");
                     b.HasIndex("TenantId", "EncounterId", "CreatedAtUtc");
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
                     b.ToTable("opd_encounter_amendments", (string)null, t =>
                         {
                             t.HasCheckConstraint("CK_opd_encounter_amendments_reason", "length(trim(\"Reason\")) BETWEEN 1 AND 250");
