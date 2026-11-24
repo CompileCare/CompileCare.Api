@@ -41,6 +41,9 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
                     b.HasKey("Id");
                     b.HasAlternateKey("TenantId", "Id");
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+                    b.HasIndex("TenantId", "HospitalId", "PatientId");
+                    b.HasIndex("TenantId", "ProviderStaffId");
                     b.HasIndex("TenantId", "AvailabilitySessionId", "SlotStartsAtUtc").IsUnique().HasFilter("\"Status\" = 'Booked'");
                     b.HasIndex("TenantId", "PatientId", "SlotStartsAtUtc").HasFilter("\"Status\" = 'Booked'");
                     b.ToTable("appointments", (string)null, t =>
