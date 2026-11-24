@@ -115,6 +115,44 @@ public sealed class PatientApiTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+
+    [Fact]
+    public async Task HospitalScopedPatientRegistrar_CannotReadAnotherHospitalsRegistrations()
+    {
+        var tenantId = Guid.NewGuid();
+        var (authorizedHospitalId, otherHospitalId) = await SeedTenantAndTwoHospitalsAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, authorizedHospitalId)]);
+        using var client = CreateClient(tenantId);
+
+        var response = await client.GetAsync($"/api/v1/hospitals/{otherHospitalId:D}/patients");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private async Task<(Guid AuthorizedHospitalId, Guid OtherHospitalId)> SeedTenantAndTwoHospitalsAsync(Guid tenantId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            Name = "Hospital-scoped test tenant",
+            Slug = $"hospital-{tenantId:N}",
+            Status = TenantStatuses.Active
+        });
+        await db.SaveChangesAsync();
+
+        var authorized = new Hospital { Name = "Authorized Hospital", Code = Guid.NewGuid().ToString("N")[..8] };
+        var other = new Hospital { Name = "Other Hospital", Code = Guid.NewGuid().ToString("N")[..8] };
+        db.Hospitals.AddRange(authorized, other);
+        await db.SaveChangesAsync();
+        return (authorized.Id, other.Id);
+    }
+
     private async Task<(Guid HospitalId, Guid DepartmentId)> SeedHospitalAndDepartmentAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
