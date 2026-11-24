@@ -14,7 +14,7 @@ public sealed class PatientService(
         PatientRegistrationInput input,
         CancellationToken cancellationToken)
     {
-        if (hospitalId == Guid.Empty || !organizationScope.CanAccessHospital(hospitalId))
+        if (hospitalId == Guid.Empty || !HasHospitalWidePatientScope(hospitalId))
             return PatientResult<PatientDto>.Failure("Hospital not found.", 404);
 
         var givenName = Normalize(input.GivenName);
@@ -123,6 +123,9 @@ public sealed class PatientService(
 
         return PatientResult<PatientPage>.Success(new(items, page, pageSize, total));
     }
+
+    private bool HasHospitalWidePatientScope(Guid hospitalId) =>
+        organizationScope.IsTenantWide || organizationScope.HospitalIds.Contains(hospitalId);
 
     private static PatientDto ToDto(Patient patient, HospitalPatientRegistration registration) =>
         new(patient.Id, patient.GivenName, patient.MiddleName, patient.FamilyName,
