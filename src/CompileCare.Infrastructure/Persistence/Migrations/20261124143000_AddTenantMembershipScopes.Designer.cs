@@ -41,36 +41,6 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembershipScope", b =>
-                {
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
-                        .HasPrincipalKey("TenantId", "HospitalId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "HospitalId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("CompileCare.Infrastructure.Persistence.TenantMembership", "Membership")
-                        .WithMany("Scopes")
-                        .HasForeignKey("TenantId", "MembershipId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Membership");
-                });
-
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -422,6 +392,36 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("wards", (string)null);
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembershipScope", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.TenantMembership", "Membership")
+                        .WithMany("Scopes")
+                        .HasForeignKey("TenantId", "MembershipId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Membership");
                 });
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.AuditEvent", b =>
