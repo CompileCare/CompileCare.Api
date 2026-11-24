@@ -1,0 +1,61 @@
+using CompileCare.Api.Security;
+using CompileCare.Application.Patients;
+
+namespace CompileCare.Api;
+
+public static class PatientEndpoints
+{
+    public static IEndpointRouteBuilder MapPatientEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/v1/hospitals/{hospitalId:guid}/patients")
+            .WithTags("Patients")
+            .WithMetadata(TenantScopedEndpointMetadata.Instance)
+            .RequireAuthorization();
+
+        group.MapPost("/", async (
+            Guid hospitalId,
+            PatientRegistrationInput request,
+            IPatientService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.RegisterAsync(hospitalId, request, ct);
+            return result.IsSuccess
+                ? Results.Created($"/api/v1/hospitals/{hospitalId:D}/patients/{result.Value!.Id:D}", result.Value)
+                : Results.Problem(title: "Patient registration failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("RegisterPatient")
+        .RequireAuthorization(AuthorizationPolicies.PatientRegister);
+
+        group.MapGet("/", async (
+            Guid hospitalId,
+            string? query,
+            int page,
+            int pageSize,
+            IPatientService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.SearchAsync(hospitalId, new(query, page, pageSize), ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.Problem(title: "Patient search failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("SearchHospitalPatients")
+        .RequireAuthorization(AuthorizationPolicies.PatientRead);
+
+        group.MapGet("/{patientId:guid}", async (
+            Guid hospitalId,
+            Guid patientId,
+            IPatientService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.GetAsync(hospitalId, patientId, ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.Problem(title: "Patient not found", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("GetHospitalPatient")
+        .RequireAuthorization(AuthorizationPolicies.PatientRead);
+
+        return endpoints;
+    }
+}
