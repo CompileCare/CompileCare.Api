@@ -26,6 +26,7 @@ public sealed record OpdEncounterNoteInput(
     string? Plan);
 
 public sealed record OpdEncounterAmendmentInput(string Reason, string Content);
+public sealed record OpdEncounterCancelInput(string Reason);
 
 public sealed record OpdEncounterAmendmentDto(
     Guid Id,
