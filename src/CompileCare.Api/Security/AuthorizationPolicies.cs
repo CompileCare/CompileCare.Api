@@ -23,6 +23,7 @@ public static class AuthorizationPolicies
     public const string PatientIdentifierPolicyManage = "PatientIdentifierPolicyManage";
     public const string StaffRead = "StaffRead";
     public const string StaffManage = "StaffManage";
+    public const string AvailabilityRead = "AvailabilityRead";
     public const string AvailabilityManage = "AvailabilityManage";
     public const string AppointmentRead = "AppointmentRead";
     public const string AppointmentManage = "AppointmentManage";
@@ -74,6 +75,9 @@ public static class AuthorizationPolicies
         options.AddPolicy(StaffManage, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, StaffPermissions.Manage)));
+        options.AddPolicy(AvailabilityRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, AppointmentPermissions.AvailabilityRead)));
         options.AddPolicy(AvailabilityManage, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, AppointmentPermissions.AvailabilityManage)));
