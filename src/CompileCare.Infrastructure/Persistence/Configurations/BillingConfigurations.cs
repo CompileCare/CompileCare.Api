@@ -43,7 +43,7 @@ public sealed class BillingInvoiceConfiguration : IEntityTypeConfiguration<Billi
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
         builder.HasAlternateKey(x => new { x.TenantId, x.HospitalId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.InvoiceNumber }).IsUnique();
-        builder.HasIndex(x => new { x.TenantId, x.QueueEntryId }).IsUnique();
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.QueueEntryId }).IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PatientId, x.IssuedAtUtc });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId });
         builder.HasOne<Hospital>().WithMany()
@@ -77,6 +77,8 @@ public sealed class BillingInvoiceLineConfiguration : IEntityTypeConfiguration<B
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.InvoiceId });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId });
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.InvoiceId });
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.ServiceItemId });
         builder.HasOne<BillingInvoice>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.InvoiceId })
             .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.Id }).OnDelete(DeleteBehavior.Restrict);
@@ -102,6 +104,7 @@ public sealed class BillingPaymentConfiguration : IEntityTypeConfiguration<Billi
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.ReceiptNumber }).IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.InvoiceId, x.PaidAtUtc });
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.InvoiceId });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PaidAtUtc });
         builder.HasOne<BillingInvoice>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.InvoiceId })
