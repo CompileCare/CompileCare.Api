@@ -115,6 +115,50 @@ public sealed class PatientDuplicateDetectionApiTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task DuplicateCheck_BoundsCandidateResultToTwenty()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar);
+        var hospitalId = await SeedHospitalAsync(tenantId, "Candidate Limit Hospital");
+        using var client = CreateClient(tenantId);
+
+        for (var i = 0; i < 21; i++)
+        {
+            _ = await RegisterPatientAsync(
+                client, hospitalId, "Asha", null, $"Patil{i:D2}", new DateOnly(1990, 4, 12));
+        }
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Asha", null, null, new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<PatientDuplicateCheckDto>();
+        Assert.NotNull(result);
+        Assert.True(result!.Evaluated);
+        Assert.Equal(20, result.Candidates.Count);
+        Assert.True(result.HasMoreCandidates);
+    }
+
+    [Fact]
+    public async Task DepartmentScopedRegistrar_CannotRunHospitalWideDuplicateCheck()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId) = await SeedHospitalAndDepartmentAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentId)]);
+        using var client = CreateClient(tenantId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Asha", null, null, new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private async Task<PatientDto> RegisterPatientAsync(
         HttpClient client,
         Guid hospitalId,
@@ -141,6 +185,34 @@ public sealed class PatientDuplicateDetectionApiTests
         db.Hospitals.Add(hospital);
         await db.SaveChangesAsync();
         return hospital.Id;
+    }
+
+    private async Task<(Guid HospitalId, Guid DepartmentId)> SeedHospitalAndDepartmentAsync(Guid tenantId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            Name = "Duplicate department scope tenant",
+            Slug = $"duplicate-department-{tenantId:N}",
+            Status = TenantStatuses.Active
+        });
+        await db.SaveChangesAsync();
+
+        var hospital = new Hospital
+        {
+            Name = "Department-scoped Duplicate Hospital",
+            Code = Guid.NewGuid().ToString("N")[..8]
+        };
+        db.Hospitals.Add(hospital);
+        await db.SaveChangesAsync();
+
+        var department = new Department { HospitalId = hospital.Id, Name = "Cardiology", Code = "CARD" };
+        db.Departments.Add(department);
+        await db.SaveChangesAsync();
+        return (hospital.Id, department.Id);
     }
 
     private async Task<(Guid AuthorizedHospitalId, Guid OtherHospitalId)> SeedTenantAndTwoHospitalsAsync(Guid tenantId)
