@@ -89,14 +89,21 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
             });
         }
 
-        db.TenantMemberships.Add(new TenantMembership
+        var membership = new TenantMembership
         {
             TenantId = tenantId,
             Issuer = TestJwtTokenFactory.Issuer,
             Subject = TestJwtTokenFactory.Subject,
             Role = role,
             IsActive = isActive
+        };
+        membership.Scopes.Add(new TenantMembershipScope
+        {
+            TenantId = tenantId,
+            MembershipId = membership.Id,
+            ScopeType = OrganizationScopeTypes.Tenant
         });
+        db.TenantMemberships.Add(membership);
 
         await db.SaveChangesAsync();
     }

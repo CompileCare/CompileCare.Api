@@ -11,7 +11,7 @@ public sealed partial class FacilityService
         PageRequest page,
         CancellationToken ct)
     {
-        var query = db.Beds
+        var query = ScopedBeds()
             .AsNoTracking()
             .Where(bed => bed.RoomId == roomId);
 
@@ -32,7 +32,7 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var bed = await db.Beds
+        var bed = await ScopedBeds()
             .AsNoTracking()
             .FirstOrDefaultAsync(bed => bed.RoomId == roomId && bed.Id == id, ct);
 
@@ -46,14 +46,14 @@ public sealed partial class FacilityService
         BedInput input,
         CancellationToken ct)
     {
-        if (!await db.Rooms.AnyAsync(room => room.Id == roomId, ct))
+        if (!await ScopedRooms().AnyAsync(room => room.Id == roomId, ct))
             return NotFound<BedDto>();
 
         var number = NormalizeText(input.Number);
         if (string.IsNullOrWhiteSpace(number) || number.Length > 50)
             return ValidationFailure<BedDto>("number", "required, max 50 chars");
 
-        if (await db.Beds.AnyAsync(
+        if (await ScopedBeds().AnyAsync(
                 bed => bed.RoomId == roomId && bed.Number == number,
                 ct))
         {
@@ -67,7 +67,7 @@ public sealed partial class FacilityService
             IsActive = input.IsActive
         };
 
-        db.Beds.Add(bed);
+        ScopedBeds().Add(bed);
 
         try
         {
@@ -91,7 +91,7 @@ public sealed partial class FacilityService
         BedInput input,
         CancellationToken ct)
     {
-        var bed = await db.Beds.FirstOrDefaultAsync(
+        var bed = await ScopedBeds().FirstOrDefaultAsync(
             bed => bed.RoomId == roomId && bed.Id == id,
             ct);
 
@@ -102,7 +102,7 @@ public sealed partial class FacilityService
         if (string.IsNullOrWhiteSpace(number) || number.Length > 50)
             return ValidationFailure<BedDto>("number", "required, max 50 chars");
 
-        if (await db.Beds.AnyAsync(
+        if (await ScopedBeds().AnyAsync(
                 candidate => candidate.RoomId == roomId &&
                     candidate.Id != id &&
                     candidate.Number == number,
@@ -134,14 +134,14 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var bed = await db.Beds.FirstOrDefaultAsync(
+        var bed = await ScopedBeds().FirstOrDefaultAsync(
             bed => bed.RoomId == roomId && bed.Id == id,
             ct);
 
         if (bed is null)
             return NotFound<bool>();
 
-        db.Beds.Remove(bed);
+        ScopedBeds().Remove(bed);
 
         try
         {

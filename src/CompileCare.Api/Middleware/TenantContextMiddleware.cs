@@ -5,10 +5,6 @@ using Serilog.Context;
 
 namespace CompileCare.Api.Middleware;
 
-/// <summary>
-/// Establishes tenant context only after an authenticated OIDC issuer/subject
-/// has been resolved to an active CompileCare tenant membership.
-/// </summary>
 public sealed class TenantContextMiddleware(RequestDelegate next)
 {
     public const string HeaderName = "X-Tenant-ID";
@@ -16,11 +12,11 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
     public async Task InvokeAsync(
         HttpContext context,
         ITenantContext tenantContext,
+        IOrganizationScopeContext organizationScopeContext,
         ITenantMembershipReader membershipReader)
     {
         var isTenantScoped = context.GetEndpoint()?.Metadata
             .GetMetadata<TenantScopedEndpointMetadata>() is not null;
-
         if (!isTenantScoped || context.User.Identity?.IsAuthenticated != true)
         {
             await next(context);
@@ -39,8 +35,6 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             return;
         }
 
-        // JWT claim mapping is disabled. These values come from the validated
-        // token, not from an email address or a caller-controlled identity header.
         var issuer = context.User.FindFirst(AuthorizationPolicies.ValidatedIssuerClaim)?.Value;
         var subject = context.User.FindFirst("sub")?.Value;
         if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject))
@@ -53,16 +47,21 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
         }
 
         var membership = await membershipReader.FindActiveMembershipAsync(
-            tenantId,
-            issuer,
-            subject,
-            context.RequestAborted);
-
+            tenantId, issuer, subject, context.RequestAborted);
         if (membership is null)
         {
             await Results.Problem(
                 title: "Tenant access denied",
                 detail: "The authenticated user does not have an active membership in the requested tenant.",
+                statusCode: StatusCodes.Status403Forbidden).ExecuteAsync(context);
+            return;
+        }
+
+        if (membership.Scopes.Count == 0)
+        {
+            await Results.Problem(
+                title: "Organization scope is not provisioned",
+                detail: "The tenant membership has no active organization scope. Contact the tenant administrator.",
                 statusCode: StatusCodes.Status403Forbidden).ExecuteAsync(context);
             return;
         }
@@ -77,9 +76,6 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             return;
         }
 
-        // Remove reserved authorization claims from the external identity before adding
-        // membership-derived claims. A valid issuer may still carry profile/group claims;
-        // those must never grant CompileCare tenant permissions.
         var reservedClaimTypes = new HashSet<string>(StringComparer.Ordinal)
         {
             AuthorizationPolicies.TenantIdClaim,
@@ -90,35 +86,30 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             "roles",
             ClaimTypes.Role
         };
-
         foreach (var identity in context.User.Identities)
         {
-            foreach (var claim in identity.Claims
-                         .Where(claim => reservedClaimTypes.Contains(claim.Type))
-                         .ToArray())
-            {
+            foreach (var claim in identity.Claims.Where(claim => reservedClaimTypes.Contains(claim.Type)).ToArray())
                 identity.RemoveClaim(claim);
-            }
         }
 
-        // Only server-loaded membership data creates CompileCare permission claims.
         var membershipClaims = new List<Claim>
         {
             new(AuthorizationPolicies.ValidatedIssuerClaim, issuer),
             new(AuthorizationPolicies.TenantIdClaim, tenantId.ToString("D")),
             new(AuthorizationPolicies.TenantRoleClaim, membership.Role)
         };
-        membershipClaims.AddRange(permissions.Select(
-            permission => new Claim(AuthorizationPolicies.PermissionClaim, permission)));
+        membershipClaims.AddRange(permissions.Select(permission =>
+            new Claim(AuthorizationPolicies.PermissionClaim, permission)));
 
         context.User.AddIdentity(new ClaimsIdentity(
             membershipClaims,
             authenticationType: AuthorizationPolicies.MembershipIdentityAuthenticationType));
 
         tenantContext.SetTenant(tenantId);
+        organizationScopeContext.SetMembership(membership.MembershipId, membership.Role, membership.Scopes);
+
         using (LogContext.PushProperty("TenantId", tenantId))
-        {
+        using (LogContext.PushProperty("OrganizationScopeCount", membership.Scopes.Count))
             await next(context);
-        }
     }
 }

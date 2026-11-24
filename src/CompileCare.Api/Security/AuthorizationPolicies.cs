@@ -9,6 +9,7 @@ public static class AuthorizationPolicies
     public const string FacilityRead = "FacilityRead";
     public const string FacilityWrite = "FacilityWrite";
     public const string FacilityDelete = "FacilityDelete";
+    public const string TenantMembershipManage = "TenantMembershipManage";
     public const string PlatformOperator = "PlatformOperator";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
@@ -22,15 +23,15 @@ public static class AuthorizationPolicies
         options.AddPolicy(FacilityRead, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.FacilityRead)));
-
         options.AddPolicy(FacilityWrite, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.FacilityWrite)));
-
         options.AddPolicy(FacilityDelete, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.FacilityDelete)));
-
+        options.AddPolicy(TenantMembershipManage, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.MembershipManage)));
         options.AddPolicy(PlatformOperator, policy =>
             policy.RequireAuthenticatedUser()
                 .AddRequirements(new PlatformOperatorRequirement()));
@@ -38,9 +39,6 @@ public static class AuthorizationPolicies
 
     private static bool HasMembershipPermission(ClaimsPrincipal principal, string permission) =>
         principal.Identities.Any(identity =>
-            string.Equals(
-                identity.AuthenticationType,
-                MembershipIdentityAuthenticationType,
-                StringComparison.Ordinal) &&
+            string.Equals(identity.AuthenticationType, MembershipIdentityAuthenticationType, StringComparison.Ordinal) &&
             identity.HasClaim(PermissionClaim, permission));
 }

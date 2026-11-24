@@ -1,6 +1,7 @@
 using CompileCare.Infrastructure.Persistence;
 using CompileCare.Infrastructure.Facilities;
 using CompileCare.Infrastructure.Tenants;
+using CompileCare.Infrastructure.Memberships;
 using CompileCare.Application.Facilities;
 using CompileCare.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -14,28 +15,20 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("CompileCare");
-
-        // Register the DbContext even when a connection string is not configured.
-        // Minimal API endpoint binding needs it recognized as a service at startup;
-        // without registration, DbContext parameters are inferred as request bodies
-        // and can make unrelated endpoints fail during route initialization.
         services.AddDbContext<CompileCareDbContext>(options =>
         {
             if (!string.IsNullOrWhiteSpace(connectionString))
-            {
                 options.UseNpgsql(connectionString, npgsql =>
                     npgsql.MigrationsAssembly(typeof(CompileCareDbContext).Assembly.FullName));
-            }
         });
 
         if (!string.IsNullOrWhiteSpace(connectionString))
-        {
             services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
-        }
 
         services.AddScoped<ITenantMembershipReader, TenantMembershipReader>();
         services.AddScoped<IPlatformOperatorReader, PlatformOperatorReader>();
         services.AddScoped<ITenantRegistryService, TenantRegistryService>();
+        services.AddScoped<ITenantMembershipAdministrationService, TenantMembershipAdministrationService>();
         services.AddScoped<FacilityService>();
         services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
         services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());

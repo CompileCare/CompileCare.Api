@@ -11,7 +11,8 @@ internal static class TenantRolePermissions
             [
                 TenantPermissions.FacilityRead,
                 TenantPermissions.FacilityWrite,
-                TenantPermissions.FacilityDelete
+                TenantPermissions.FacilityDelete,
+                TenantPermissions.MembershipManage
             ],
             TenantRoles.FacilityManager =>
             [

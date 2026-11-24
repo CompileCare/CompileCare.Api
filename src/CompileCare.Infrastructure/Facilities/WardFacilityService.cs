@@ -11,7 +11,7 @@ public sealed partial class FacilityService
         PageRequest page,
         CancellationToken ct)
     {
-        var query = db.Wards
+        var query = ScopedWards()
             .AsNoTracking()
             .Where(ward => ward.DepartmentId == departmentId);
 
@@ -32,7 +32,7 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var ward = await db.Wards
+        var ward = await ScopedWards()
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 ward => ward.DepartmentId == departmentId && ward.Id == id,
@@ -48,14 +48,14 @@ public sealed partial class FacilityService
         NamedInput input,
         CancellationToken ct)
     {
-        if (!await db.Departments.AnyAsync(department => department.Id == departmentId, ct))
+        if (!await ScopedDepartments().AnyAsync(department => department.Id == departmentId, ct))
             return NotFound<WardDto>();
 
         var name = NormalizeText(input.Name);
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return ValidationFailure<WardDto>("name", "required, max 200 chars");
 
-        if (await db.Wards.AnyAsync(
+        if (await ScopedWards().AnyAsync(
                 ward => ward.DepartmentId == departmentId && ward.Name == name,
                 ct))
         {
@@ -68,7 +68,7 @@ public sealed partial class FacilityService
             Name = name
         };
 
-        db.Wards.Add(ward);
+        ScopedWards().Add(ward);
 
         try
         {
@@ -92,7 +92,7 @@ public sealed partial class FacilityService
         NamedInput input,
         CancellationToken ct)
     {
-        var ward = await db.Wards.FirstOrDefaultAsync(
+        var ward = await ScopedWards().FirstOrDefaultAsync(
             ward => ward.DepartmentId == departmentId && ward.Id == id,
             ct);
 
@@ -103,7 +103,7 @@ public sealed partial class FacilityService
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return ValidationFailure<WardDto>("name", "required, max 200 chars");
 
-        if (await db.Wards.AnyAsync(
+        if (await ScopedWards().AnyAsync(
                 candidate => candidate.DepartmentId == departmentId &&
                     candidate.Id != id &&
                     candidate.Name == name,
@@ -134,14 +134,14 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var ward = await db.Wards.FirstOrDefaultAsync(
+        var ward = await ScopedWards().FirstOrDefaultAsync(
             ward => ward.DepartmentId == departmentId && ward.Id == id,
             ct);
 
         if (ward is null)
             return NotFound<bool>();
 
-        db.Wards.Remove(ward);
+        ScopedWards().Remove(ward);
 
         try
         {

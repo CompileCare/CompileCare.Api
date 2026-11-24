@@ -39,6 +39,36 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembershipScope", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.TenantMembership", "Membership")
+                        .WithMany("Scopes")
+                        .HasForeignKey("TenantId", "MembershipId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Membership");
+                });
+
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -181,6 +211,8 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "HospitalId", "Id");
 
                     b.HasIndex("TenantId", "HospitalId", "Code")
                         .IsUnique()
@@ -330,6 +362,29 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("tenant_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembershipScope", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid?>("DepartmentId").HasColumnType("uuid");
+                    b.Property<Guid?>("HospitalId").HasColumnType("uuid");
+                    b.Property<Guid>("MembershipId").HasColumnType("uuid");
+                    b.Property<string>("ScopeType").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "MembershipId").IsUnique().HasFilter("\"ScopeType\" = 'Tenant'");
+                    b.HasIndex("TenantId", "MembershipId", "HospitalId").IsUnique().HasFilter("\"ScopeType\" = 'Hospital'");
+                    b.HasIndex("TenantId", "MembershipId", "DepartmentId").IsUnique().HasFilter("\"ScopeType\" = 'Department'");
+                    b.ToTable("tenant_membership_scopes", (string)null, t =>
+                        {
+                            t.HasCheckConstraint(
+                                "CK_tenant_membership_scopes_shape",
+                                "(\"ScopeType\" = 'Tenant' AND \"HospitalId\" IS NULL AND \"DepartmentId\" IS NULL) OR (\"ScopeType\" = 'Hospital' AND \"HospitalId\" IS NOT NULL AND \"DepartmentId\" IS NULL) OR (\"ScopeType\" = 'Department' AND \"HospitalId\" IS NOT NULL AND \"DepartmentId\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Ward", b =>
@@ -490,6 +545,11 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Room", b =>
                 {
                     b.Navigation("Beds");
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembership", b =>
+                {
+                    b.Navigation("Scopes");
                 });
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Ward", b =>

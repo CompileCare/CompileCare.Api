@@ -11,7 +11,7 @@ public sealed partial class FacilityService
         PageRequest page,
         CancellationToken ct)
     {
-        var query = db.Departments
+        var query = ScopedDepartments()
             .AsNoTracking()
             .Where(department => department.HospitalId == hospitalId);
 
@@ -36,7 +36,7 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var department = await db.Departments
+        var department = await ScopedDepartments()
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 department => department.HospitalId == hospitalId && department.Id == id,
@@ -56,7 +56,10 @@ public sealed partial class FacilityService
         DepartmentInput input,
         CancellationToken ct)
     {
-        if (!await db.Hospitals.AnyAsync(hospital => hospital.Id == hospitalId, ct))
+        if (!organizationScopeContext.CanManageHospital(hospitalId))
+            return NotFound<DepartmentDto>();
+
+        if (!await ScopedHospitals().AnyAsync(hospital => hospital.Id == hospitalId, ct))
             return NotFound<DepartmentDto>();
 
         var name = NormalizeText(input.Name);
@@ -68,7 +71,7 @@ public sealed partial class FacilityService
         if (code?.Length > 50)
             return ValidationFailure<DepartmentDto>("code", "max 50 chars");
 
-        if (await db.Departments.AnyAsync(
+        if (await ScopedDepartments().AnyAsync(
                 department => department.HospitalId == hospitalId &&
                     (department.Name == name || (code != null && department.Code == code)),
                 ct))
@@ -83,7 +86,7 @@ public sealed partial class FacilityService
             Code = code
         };
 
-        db.Departments.Add(department);
+        ScopedDepartments().Add(department);
 
         try
         {
@@ -111,7 +114,7 @@ public sealed partial class FacilityService
         DepartmentInput input,
         CancellationToken ct)
     {
-        var department = await db.Departments.FirstOrDefaultAsync(
+        var department = await ScopedDepartments().FirstOrDefaultAsync(
             department => department.HospitalId == hospitalId && department.Id == id,
             ct);
 
@@ -127,7 +130,7 @@ public sealed partial class FacilityService
         if (code?.Length > 50)
             return ValidationFailure<DepartmentDto>("code", "max 50 chars");
 
-        if (await db.Departments.AnyAsync(
+        if (await ScopedDepartments().AnyAsync(
                 candidate => candidate.HospitalId == hospitalId &&
                     candidate.Id != id &&
                     (candidate.Name == name || (code != null && candidate.Code == code)),
@@ -163,14 +166,14 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var department = await db.Departments.FirstOrDefaultAsync(
+        var department = await ScopedDepartments().FirstOrDefaultAsync(
             department => department.HospitalId == hospitalId && department.Id == id,
             ct);
 
         if (department is null)
             return NotFound<bool>();
 
-        db.Departments.Remove(department);
+        ScopedDepartments().Remove(department);
 
         try
         {
