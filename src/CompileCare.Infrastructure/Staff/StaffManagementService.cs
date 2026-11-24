@@ -143,8 +143,9 @@ public sealed class StaffManagementService(
     {
         var profile = await ManageableProfiles().FirstOrDefaultAsync(x => x.Id == staffId, cancellationToken);
         if (profile is null) return StaffResult<StaffAssignmentDto>.Failure("Staff profile not found.", 404);
-        if (!profile.IsActive || !await CanManageAssignmentAsync(input.HospitalId, input.DepartmentId, cancellationToken))
-            return StaffResult<StaffAssignmentDto>.Failure("Hospital or department not found.", 404);
+        if (!profile.IsActive || input.EffectiveFrom == default ||
+            !await CanManageAssignmentAsync(input.HospitalId, input.DepartmentId, cancellationToken))
+            return StaffResult<StaffAssignmentDto>.Failure("Hospital, department or effective start date is invalid.", 404);
 
         var duplicate = await db.StaffAssignments.AnyAsync(x =>
             x.StaffProfileId == staffId && x.HospitalId == input.HospitalId &&
@@ -213,10 +214,9 @@ public sealed class StaffManagementService(
         var hospitalIds = organizationScope.HospitalIds.ToArray();
         var departmentIds = organizationScope.DepartmentIds.ToArray();
         return db.StaffProfiles.Where(profile =>
-            db.StaffAssignments.Any(assignment =>
-                assignment.StaffProfileId == profile.Id && assignment.IsActive) &&
+            db.StaffAssignments.Any(assignment => assignment.StaffProfileId == profile.Id) &&
             !db.StaffAssignments.Any(assignment =>
-                assignment.StaffProfileId == profile.Id && assignment.IsActive &&
+                assignment.StaffProfileId == profile.Id &&
                 !hospitalIds.Contains(assignment.HospitalId) &&
                 (!assignment.DepartmentId.HasValue ||
                  !departmentIds.Contains(assignment.DepartmentId.Value))));
