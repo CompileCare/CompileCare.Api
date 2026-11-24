@@ -100,12 +100,12 @@ public sealed class AppointmentSchedulingService(
         return AppointmentResult<AvailabilitySessionDto>.Success(ToDto(session));
     }
 
-    public async Task<AppointmentResult<AppointmentPage>> ListAvailabilityAsync(
+    public async Task<AppointmentResult<AvailabilitySessionPage>> ListAvailabilityAsync(
         Guid hospitalId, DateOnly localDate, Guid? departmentId, int page, int pageSize,
         CancellationToken cancellationToken)
     {
         if (!CanReadHospital(hospitalId, departmentId))
-            return AppointmentResult<AppointmentPage>.Failure("Availability not found.", 404);
+            return AppointmentResult<AvailabilitySessionPage>.Failure("Availability not found.", 404);
 
         page = page < 1 ? 1 : Math.Min(page, 2_000_000);
         pageSize = pageSize < 1 ? 25 : Math.Min(pageSize, 100);
@@ -121,7 +121,7 @@ public sealed class AppointmentSchedulingService(
                 x.Id, x.HospitalId, x.DepartmentId, x.ProviderStaffId, x.LocalDate,
                 x.StartsAtUtc, x.EndsAtUtc, x.SlotDurationMinutes, x.TimeZoneId, x.CreatedAtUtc))
             .ToListAsync(cancellationToken);
-        return AppointmentResult<AppointmentPage>.Success(new(items, page, pageSize, total));
+        return AppointmentResult<AvailabilitySessionPage>.Success(new(items, page, pageSize, total));
     }
 
     public async Task<AppointmentResult<IReadOnlyList<AppointmentSlotDto>>> GetSlotsAsync(
