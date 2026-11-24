@@ -1,11 +1,6 @@
 name: Generate EF Core Migration
 
 on:
-  push:
-    branches:
-      - feature/patient-master-registration-foundation
-    paths:
-      - .github/migration-trigger
   workflow_dispatch:
     inputs:
       migration_name:
