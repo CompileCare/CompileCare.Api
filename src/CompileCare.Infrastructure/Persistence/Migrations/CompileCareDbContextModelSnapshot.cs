@@ -33,6 +33,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PatientId").HasColumnType("uuid");
                     b.Property<Guid>("ProviderStaffId").HasColumnType("uuid");
                     b.Property<string>("Reason").HasMaxLength(250).HasColumnType("character varying(250)");
+                    b.Property<Guid?>("RescheduledFromAppointmentId").HasColumnType("uuid");
                     b.Property<DateTimeOffset>("SlotEndsAtUtc").HasColumnType("timestamp with time zone");
                     b.Property<DateTimeOffset>("SlotStartsAtUtc").HasColumnType("timestamp with time zone");
                     b.Property<string>("Status").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
@@ -44,6 +45,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "HospitalId", "DepartmentId");
                     b.HasIndex("TenantId", "HospitalId", "PatientId");
                     b.HasIndex("TenantId", "ProviderStaffId");
+                    b.HasIndex("TenantId", "RescheduledFromAppointmentId");
                     b.HasIndex("TenantId", "AvailabilitySessionId", "SlotStartsAtUtc").IsUnique().HasFilter("\"Status\" = 'Booked'");
                     b.HasIndex("TenantId", "PatientId", "SlotStartsAtUtc").HasFilter("\"Status\" = 'Booked'");
                     b.ToTable("appointments", (string)null, t =>
@@ -1120,6 +1122,10 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Appointment", b =>
                 {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Appointment", null).WithMany()
+                        .HasForeignKey("TenantId", "RescheduledFromAppointmentId")
+                        .HasPrincipalKey("TenantId", "Id").OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_appointments_rescheduled_from");
                     b.HasOne("CompileCare.Infrastructure.Persistence.Department", null).WithMany()
                         .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
                         .HasPrincipalKey("TenantId", "HospitalId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
