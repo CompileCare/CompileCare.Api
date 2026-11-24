@@ -89,8 +89,8 @@ public sealed class StaffManagementService(
             .OrderBy(x => x.EffectiveFrom)
             .ToListAsync(cancellationToken);
         var assignmentMap = assignments.GroupBy(x => x.StaffProfileId)
-            .ToDictionary(x => x.Key, x => (IReadOnlyList<StaffAssignmentDto>)x.Select(ToDto).ToArray());
-        var items = profiles.Select(x => ToDto(x, assignmentMap.GetValueOrDefault(x.Id, []))).ToArray();
+            .ToDictionary(x => x.Key, x => (IReadOnlyList<StaffAssignment>)x.ToArray());
+        var items = profiles.Select(x => ToDto(x, assignmentMap.GetValueOrDefault(x.Id, Array.Empty<StaffAssignment>()))).ToArray();
         return StaffResult<StaffPage>.Success(new(items, page, pageSize, total));
     }
 
@@ -130,7 +130,8 @@ public sealed class StaffManagementService(
             foreach (var assignment in activeAssignments)
             {
                 assignment.IsActive = false;
-                assignment.EffectiveTo = DateOnly.FromDateTime(DateTime.UtcNow);
+                var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                assignment.EffectiveTo = today < assignment.EffectiveFrom ? assignment.EffectiveFrom : today;
             }
         }
         await db.SaveChangesAsync(cancellationToken);
@@ -170,7 +171,9 @@ public sealed class StaffManagementService(
         if (profile is null) return StaffResult<StaffAssignmentDto>.Failure("Staff profile not found.", 404);
         var assignment = await db.StaffAssignments.FirstOrDefaultAsync(
             x => x.Id == assignmentId && x.StaffProfileId == staffId, cancellationToken);
-        if (assignment is null) return StaffResult<StaffAssignmentDto>.Failure("Assignment not found.", 404);
+        if (assignment is null ||
+            !await CanManageAssignmentAsync(assignment.HospitalId, assignment.DepartmentId, cancellationToken))
+            return StaffResult<StaffAssignmentDto>.Failure("Assignment not found.", 404);
         if (input.EffectiveTo < assignment.EffectiveFrom)
             return StaffResult<StaffAssignmentDto>.Failure("Assignment end date cannot precede its start date.", 400);
         if (assignment.EffectiveTo.HasValue)
@@ -204,14 +207,20 @@ public sealed class StaffManagementService(
             (x.DepartmentId.HasValue && departmentIds.Contains(x.DepartmentId.Value)));
     }
 
-    private IQueryable<StaffProfile> ManageableProfiles() =>
-        organizationScope.IsTenantWide
-            ? db.StaffProfiles
-            : db.StaffProfiles.Where(profile => db.StaffAssignments.Any(assignment =>
-                assignment.StaffProfileId == profile.Id &&
-                (organizationScope.HospitalIds.Contains(assignment.HospitalId) ||
-                 (assignment.DepartmentId.HasValue &&
-                  organizationScope.DepartmentIds.Contains(assignment.DepartmentId.Value)))));
+    private IQueryable<StaffProfile> ManageableProfiles()
+    {
+        if (organizationScope.IsTenantWide) return db.StaffProfiles;
+        var hospitalIds = organizationScope.HospitalIds.ToArray();
+        var departmentIds = organizationScope.DepartmentIds.ToArray();
+        return db.StaffProfiles.Where(profile =>
+            db.StaffAssignments.Any(assignment =>
+                assignment.StaffProfileId == profile.Id && assignment.IsActive) &&
+            !db.StaffAssignments.Any(assignment =>
+                assignment.StaffProfileId == profile.Id && assignment.IsActive &&
+                !hospitalIds.Contains(assignment.HospitalId) &&
+                (!assignment.DepartmentId.HasValue ||
+                 !departmentIds.Contains(assignment.DepartmentId.Value))));
+    }
 
     private async Task<bool> CanManageAssignmentAsync(Guid hospitalId, Guid? departmentId, CancellationToken cancellationToken)
     {
