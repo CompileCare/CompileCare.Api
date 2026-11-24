@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace CompileCare.Infrastructure.Persistence.Migrations;
 
-public partial class AddPatientNameNormalizationAndMatching : Migration
+partial class AddPatientNameNormalizationAndMatching : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
