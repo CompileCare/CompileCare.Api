@@ -28,11 +28,11 @@ public static class PatientEndpoints
 
         group.MapGet("/", async (
             Guid hospitalId,
-            string? query,
-            int page,
-            int pageSize,
             IPatientService service,
-            CancellationToken ct) =>
+            CancellationToken ct,
+            string? query = null,
+            int page = 1,
+            int pageSize = 25) =>
         {
             var result = await service.SearchAsync(hospitalId, new(query, page, pageSize), ct);
             return result.IsSuccess
