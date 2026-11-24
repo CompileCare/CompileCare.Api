@@ -17,8 +17,10 @@ public sealed class QueueEntryConfiguration : IEntityTypeConfiguration<QueueEntr
         builder.Property(x => x.TimeZoneId).HasMaxLength(100).IsRequired();
         builder.Property(x => x.ClosureReason).HasMaxLength(250);
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
-        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId, x.QueueDateLocal, x.TokenNumber }).IsUnique();
-        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId, x.QueueDateLocal, x.Status, x.TokenNumber });
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId, x.QueueDateLocal, x.TokenNumber })
+            .HasDatabaseName("IX_queue_entries_daily_token").IsUnique();
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId, x.QueueDateLocal, x.Status, x.TokenNumber })
+            .HasDatabaseName("IX_queue_entries_daily_status_token");
         builder.HasIndex(x => new { x.TenantId, x.AppointmentId }).IsUnique().HasFilter("\"AppointmentId\" IS NOT NULL");
         builder.HasOne<Hospital>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.HospitalId })
