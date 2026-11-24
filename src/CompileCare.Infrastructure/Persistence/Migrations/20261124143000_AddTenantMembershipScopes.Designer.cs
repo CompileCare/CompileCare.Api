@@ -351,6 +351,8 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "MembershipId").IsUnique().HasFilter("\"ScopeType\" = 'Tenant'");
                     b.HasIndex("TenantId", "MembershipId", "HospitalId").IsUnique().HasFilter("\"ScopeType\" = 'Hospital'");
                     b.HasIndex("TenantId", "MembershipId", "DepartmentId").IsUnique().HasFilter("\"ScopeType\" = 'Department'");
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+
                     b.ToTable("tenant_membership_scopes", (string)null, t =>
                         {
                             t.HasCheckConstraint(

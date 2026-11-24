@@ -61,6 +61,11 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                 unique: true,
                 filter: "\"ScopeType\" = 'Department'");
 
+            migrationBuilder.CreateIndex(
+                name: "IX_tenant_membership_scopes_TenantId_HospitalId_DepartmentId",
+                table: "tenant_membership_scopes",
+                columns: new[] { "TenantId", "HospitalId", "DepartmentId" });
+
             migrationBuilder.AddForeignKey(
                 name: "FK_tenant_membership_scopes_tenants_TenantId",
                 table: "tenant_membership_scopes",

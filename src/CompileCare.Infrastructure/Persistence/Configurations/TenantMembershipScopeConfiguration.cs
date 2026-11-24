@@ -28,6 +28,9 @@ public sealed class TenantMembershipScopeConfiguration : IEntityTypeConfiguratio
             .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.DepartmentId })
             .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.Id })
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId });
+
         builder.HasIndex(x => new { x.TenantId, x.MembershipId })
             .IsUnique().HasFilter("\"ScopeType\" = 'Tenant'");
         builder.HasIndex(x => new { x.TenantId, x.MembershipId, x.HospitalId })
