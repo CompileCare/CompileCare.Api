@@ -54,7 +54,8 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         builder.HasOne<Appointment>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.RescheduledFromAppointmentId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id })
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_appointments_rescheduled_from");
         builder.HasOne<ProviderAvailabilitySession>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.AvailabilitySessionId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id })
