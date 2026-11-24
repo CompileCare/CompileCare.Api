@@ -22,23 +22,6 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.PlatformOperator", b =>
-                {
-                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
-                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
-                    b.Property<bool>("IsActive").HasColumnType("boolean");
-                    b.Property<string>("Issuer").IsRequired().HasMaxLength(255).HasColumnType("character varying(255)");
-                    b.Property<string>("Subject").IsRequired().HasMaxLength(255).HasColumnType("character varying(255)");
-                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
-                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
-                    b.HasKey("Id");
-                    b.HasIndex("Issuer", "Subject").IsUnique();
-                    b.ToTable("platform_operators", (string)null, t =>
-                        {
-                            t.HasCheckConstraint("CK_platform_operators_identity", "\"Issuer\" <> '' AND \"Subject\" <> ''");
-                        });
-                });
-
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -182,8 +165,6 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "HospitalId", "Id");
-
                     b.HasIndex("TenantId", "HospitalId", "Code")
                         .IsUnique()
                         .HasFilter("\"Code\" IS NOT NULL");
@@ -234,6 +215,128 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.ToTable("hospitals", (string)null);
                 });
 
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.HospitalPatientRegistration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("HospitalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RegisteredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "PatientId");
+
+                    b.HasIndex("TenantId", "HospitalId", "PatientId")
+                        .IsUnique();
+
+                    b.ToTable("hospital_patient_registrations", (string)null);
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Patient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
+
+                    b.Property<string>("FamilyName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("GivenName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("MiddleName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "FamilyName", "GivenName");
+
+                    b.ToTable("patients", (string)null);
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.PlatformOperator", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Issuer", "Subject")
+                        .IsUnique();
+
+                    b.ToTable("platform_operators", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_platform_operators_identity", "\"Issuer\" <> '' AND \"Subject\" <> ''");
+                        });
+                });
+
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Room", b =>
                 {
                     b.Property<Guid>("Id")
@@ -271,18 +374,44 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Tenant", b =>
                 {
-                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
-                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
-                    b.Property<string>("Name").IsRequired().HasMaxLength(200).HasColumnType("character varying(200)");
-                    b.Property<string>("Slug").IsRequired().HasMaxLength(63).HasColumnType("character varying(63)");
-                    b.Property<string>("Status").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
-                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
-                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
-                    b.HasIndex("Slug").IsUnique();
-                    b.ToTable("tenants", (string)null, t =>
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("tenants", null, t =>
                         {
                             t.HasCheckConstraint("CK_tenants_slug_format", "\"Slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'");
+
                             t.HasCheckConstraint("CK_tenants_status", "\"Status\" IN ('Provisioning', 'Active', 'Suspended', 'Closed')");
                         });
                 });
@@ -326,8 +455,6 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("TenantId", "Issuer", "Subject")
                         .IsUnique();
 
@@ -336,26 +463,56 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembershipScope", b =>
                 {
-                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
-                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
-                    b.Property<Guid?>("DepartmentId").HasColumnType("uuid");
-                    b.Property<Guid?>("HospitalId").HasColumnType("uuid");
-                    b.Property<Guid>("MembershipId").HasColumnType("uuid");
-                    b.Property<string>("ScopeType").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
-                    b.Property<Guid>("TenantId").HasColumnType("uuid");
-                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
-                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DepartmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("HospitalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MembershipId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
-                    b.HasIndex("TenantId", "MembershipId").IsUnique().HasFilter("\"ScopeType\" = 'Tenant'");
-                    b.HasIndex("TenantId", "MembershipId", "HospitalId").IsUnique().HasFilter("\"ScopeType\" = 'Hospital'");
-                    b.HasIndex("TenantId", "MembershipId", "DepartmentId").IsUnique().HasFilter("\"ScopeType\" = 'Department'");
+
+                    b.HasIndex("TenantId", "MembershipId")
+                        .IsUnique()
+                        .HasFilter("\"ScopeType\" = 'Tenant'");
+
                     b.HasIndex("TenantId", "HospitalId", "DepartmentId");
 
-                    b.ToTable("tenant_membership_scopes", (string)null, t =>
+                    b.HasIndex("TenantId", "MembershipId", "DepartmentId")
+                        .IsUnique()
+                        .HasFilter("\"ScopeType\" = 'Department'");
+
+                    b.HasIndex("TenantId", "MembershipId", "HospitalId")
+                        .IsUnique()
+                        .HasFilter("\"ScopeType\" = 'Hospital'");
+
+                    b.ToTable("tenant_membership_scopes", null, t =>
                         {
-                            t.HasCheckConstraint(
-                                "CK_tenant_membership_scopes_shape",
-                                "(\"ScopeType\" = 'Tenant' AND \"HospitalId\" IS NULL AND \"DepartmentId\" IS NULL) OR (\"ScopeType\" = 'Hospital' AND \"HospitalId\" IS NOT NULL AND \"DepartmentId\" IS NULL) OR (\"ScopeType\" = 'Department' AND \"HospitalId\" IS NOT NULL AND \"DepartmentId\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_tenant_membership_scopes_shape", "(\"ScopeType\" = 'Tenant' AND \"HospitalId\" IS NULL AND \"DepartmentId\" IS NULL) OR (\"ScopeType\" = 'Hospital' AND \"HospitalId\" IS NOT NULL AND \"DepartmentId\" IS NULL) OR (\"ScopeType\" = 'Department' AND \"HospitalId\" IS NOT NULL AND \"DepartmentId\" IS NOT NULL)");
                         });
                 });
 
@@ -394,36 +551,6 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.ToTable("wards", (string)null);
                 });
 
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembershipScope", b =>
-                {
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
-                        .HasPrincipalKey("TenantId", "HospitalId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "HospitalId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("CompileCare.Infrastructure.Persistence.TenantMembership", "Membership")
-                        .WithMany("Scopes")
-                        .HasForeignKey("TenantId", "MembershipId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Membership");
-                });
-
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.AuditEvent", b =>
                 {
                     b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
@@ -439,55 +566,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
 
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Department", b =>
-                {
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Hospital", b =>
-                {
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Room", b =>
-                {
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembership", b =>
-                {
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Ward", b =>
-                {
-                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Bed", b =>
-                {
                     b.HasOne("CompileCare.Infrastructure.Persistence.Room", "Room")
                         .WithMany("Beds")
                         .HasForeignKey("TenantId", "RoomId")
@@ -500,6 +579,12 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Department", b =>
                 {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", "Hospital")
                         .WithMany("Departments")
                         .HasForeignKey("TenantId", "HospitalId")
@@ -510,8 +595,59 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.Navigation("Hospital");
                 });
 
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Hospital", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.HospitalPatientRegistration", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", "Hospital")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Patient", "Patient")
+                        .WithMany("HospitalRegistrations")
+                        .HasForeignKey("TenantId", "PatientId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Hospital");
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Patient", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Room", b =>
                 {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("CompileCare.Infrastructure.Persistence.Ward", "Ward")
                         .WithMany("Rooms")
                         .HasForeignKey("TenantId", "WardId")
@@ -522,8 +658,53 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.Navigation("Ward");
                 });
 
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembership", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.TenantMembershipScope", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.TenantMembership", "Membership")
+                        .WithMany("Scopes")
+                        .HasForeignKey("TenantId", "MembershipId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Membership");
+                });
+
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Ward", b =>
                 {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("CompileCare.Infrastructure.Persistence.Department", "Department")
                         .WithMany("Wards")
                         .HasForeignKey("TenantId", "DepartmentId")
@@ -542,6 +723,11 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Hospital", b =>
                 {
                     b.Navigation("Departments");
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Patient", b =>
+                {
+                    b.Navigation("HospitalRegistrations");
                 });
 
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Room", b =>
