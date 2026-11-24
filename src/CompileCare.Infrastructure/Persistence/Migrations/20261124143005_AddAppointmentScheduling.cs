@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace CompileCare.Infrastructure.Persistence.Migrations;
 
-public partial class AddAppointmentScheduling : Migration
+partial class AddAppointmentScheduling : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
