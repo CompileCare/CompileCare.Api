@@ -87,7 +87,8 @@ public interface IAppointmentSchedulingService
     Task<AppointmentResult<IReadOnlyList<AppointmentSlotDto>>> GetSlotsAsync(
         Guid hospitalId, Guid sessionId, CancellationToken cancellationToken);
     Task<AppointmentResult<AppointmentDto>> BookAsync(
-        Guid hospitalId, AppointmentBookInput input, CancellationToken cancellationToken);
+        Guid hospitalId, AppointmentBookInput input, CancellationToken cancellationToken,
+        Guid? rescheduledFromAppointmentId = null);
     Task<AppointmentResult<AppointmentDto>> GetAppointmentAsync(
         Guid hospitalId, Guid appointmentId, CancellationToken cancellationToken);
     Task<AppointmentResult<AppointmentDto>> CancelAsync(
