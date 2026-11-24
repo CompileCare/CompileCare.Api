@@ -90,6 +90,60 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
     }
 
     [Fact]
+    public async Task TenantMembershipScopeMigration_BackfillsLegacyMembershipsAsTenantWide()
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var databaseName = db.Database.GetDbConnection().Database;
+
+        if (!databaseName.EndsWith("_test", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Refusing to reset database '{databaseName}'. Integration tests require a dedicated database ending in '_test'.");
+        }
+
+        await db.Database.EnsureDeletedAsync();
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261124100000_AddTenantRegistry");
+
+        var tenantId = Guid.NewGuid();
+        var membershipId = Guid.NewGuid();
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            Name = "Scope backfill tenant",
+            Slug = $"scope-backfill-{tenantId:N}",
+            Status = TenantStatuses.Active
+        });
+        await db.SaveChangesAsync();
+
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        tenantContext.SetTenant(tenantId);
+
+        db.TenantMemberships.Add(new TenantMembership
+        {
+            Id = membershipId,
+            TenantId = tenantId,
+            Issuer = TestJwtTokenFactory.Issuer,
+            Subject = "legacy-member",
+            Role = TenantRoles.FacilityManager,
+            IsActive = true
+        });
+        await db.SaveChangesAsync();
+
+        await migrator.MigrateAsync();
+
+        var scopeRecord = await db.TenantMembershipScopes
+            .IgnoreQueryFilters()
+            .SingleAsync(value => value.MembershipId == membershipId);
+
+        Assert.Equal(tenantId, scopeRecord.TenantId);
+        Assert.Equal(OrganizationScopeTypes.Tenant, scopeRecord.ScopeType);
+        Assert.Null(scopeRecord.HospitalId);
+        Assert.Null(scopeRecord.DepartmentId);
+    }
+
+    [Fact]
     public async Task ApplyingMigrationsMoreThanOnce_IsIdempotent()
     {
         factory.ResetDatabase();

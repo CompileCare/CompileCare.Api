@@ -26,6 +26,7 @@ public sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departmen
         b.Property(x => x.Name).HasMaxLength(200).IsRequired();
         b.Property(x => x.Code).HasMaxLength(50);
         b.HasAlternateKey(x => new { x.TenantId, x.Id });
+        b.HasAlternateKey(x => new { x.TenantId, x.HospitalId, x.Id });
         b.HasIndex(x => new { x.TenantId, x.HospitalId, x.Name }).IsUnique();
         b.HasIndex(x => new { x.TenantId, x.HospitalId, x.Code }).IsUnique().HasFilter("\"Code\" IS NOT NULL");
         b.HasMany(x => x.Wards).WithOne(x => x.Department)

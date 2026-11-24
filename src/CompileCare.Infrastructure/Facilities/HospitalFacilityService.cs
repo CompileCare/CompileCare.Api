@@ -10,7 +10,7 @@ public sealed partial class FacilityService
         PageRequest page,
         CancellationToken ct)
     {
-        var query = db.Hospitals.AsNoTracking();
+        var query = ScopedHospitals().AsNoTracking();
         var total = await query.CountAsync(ct);
 
         var items = await query
@@ -31,7 +31,7 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var hospital = await db.Hospitals
+        var hospital = await ScopedHospitals()
             .AsNoTracking()
             .FirstOrDefaultAsync(hospital => hospital.Id == id, ct);
 
@@ -49,6 +49,8 @@ public sealed partial class FacilityService
     {
         if (db.CurrentTenantId is null || db.CurrentTenantId == Guid.Empty)
             return FacilityResult<HospitalDto>.Failure("Tenant context required.", 400);
+        if (!organizationScopeContext.IsTenantWide)
+            return FacilityResult<HospitalDto>.Failure("A tenant-wide organization scope is required to create a hospital.", 403);
 
         var name = NormalizeText(input.Name);
         var code = NormalizeCode(input.Code);
@@ -59,7 +61,7 @@ public sealed partial class FacilityService
         if (code?.Length > 50)
             return ValidationFailure<HospitalDto>("code", "max 50 chars");
 
-        if (await db.Hospitals.AnyAsync(
+        if (await ScopedHospitals().AnyAsync(
                 hospital => hospital.Name == name ||
                     (code != null && hospital.Code == code),
                 ct))
@@ -96,7 +98,10 @@ public sealed partial class FacilityService
         HospitalInput input,
         CancellationToken ct)
     {
-        var hospital = await db.Hospitals.FirstOrDefaultAsync(
+        if (!organizationScopeContext.CanManageHospital(id))
+            return NotFound<HospitalDto>();
+
+        var hospital = await ScopedHospitals().FirstOrDefaultAsync(
             hospital => hospital.Id == id,
             ct);
 
@@ -112,7 +117,7 @@ public sealed partial class FacilityService
         if (code?.Length > 50)
             return ValidationFailure<HospitalDto>("code", "max 50 chars");
 
-        if (await db.Hospitals.AnyAsync(
+        if (await ScopedHospitals().AnyAsync(
                 candidate => candidate.Id != id &&
                     (candidate.Name == name || (code != null && candidate.Code == code)),
                 ct))
@@ -147,7 +152,10 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var hospital = await db.Hospitals.FirstOrDefaultAsync(
+        if (!organizationScopeContext.CanManageHospital(id))
+            return NotFound<bool>();
+
+        var hospital = await ScopedHospitals().FirstOrDefaultAsync(
             hospital => hospital.Id == id,
             ct);
 

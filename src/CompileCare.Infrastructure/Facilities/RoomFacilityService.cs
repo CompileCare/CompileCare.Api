@@ -11,7 +11,7 @@ public sealed partial class FacilityService
         PageRequest page,
         CancellationToken ct)
     {
-        var query = db.Rooms
+        var query = ScopedRooms()
             .AsNoTracking()
             .Where(room => room.WardId == wardId);
 
@@ -32,7 +32,7 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var room = await db.Rooms
+        var room = await ScopedRooms()
             .AsNoTracking()
             .FirstOrDefaultAsync(room => room.WardId == wardId && room.Id == id, ct);
 
@@ -46,14 +46,14 @@ public sealed partial class FacilityService
         NamedInput input,
         CancellationToken ct)
     {
-        if (!await db.Wards.AnyAsync(ward => ward.Id == wardId, ct))
+        if (!await ScopedWards().AnyAsync(ward => ward.Id == wardId, ct))
             return NotFound<RoomDto>();
 
         var name = NormalizeText(input.Name);
         if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
             return ValidationFailure<RoomDto>("name", "required, max 100 chars");
 
-        if (await db.Rooms.AnyAsync(
+        if (await ScopedRooms().AnyAsync(
                 room => room.WardId == wardId && room.Name == name,
                 ct))
         {
@@ -90,7 +90,7 @@ public sealed partial class FacilityService
         NamedInput input,
         CancellationToken ct)
     {
-        var room = await db.Rooms.FirstOrDefaultAsync(
+        var room = await ScopedRooms().FirstOrDefaultAsync(
             room => room.WardId == wardId && room.Id == id,
             ct);
 
@@ -101,7 +101,7 @@ public sealed partial class FacilityService
         if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
             return ValidationFailure<RoomDto>("name", "required, max 100 chars");
 
-        if (await db.Rooms.AnyAsync(
+        if (await ScopedRooms().AnyAsync(
                 candidate => candidate.WardId == wardId &&
                     candidate.Id != id &&
                     candidate.Name == name,
@@ -132,7 +132,7 @@ public sealed partial class FacilityService
         Guid id,
         CancellationToken ct)
     {
-        var room = await db.Rooms.FirstOrDefaultAsync(
+        var room = await ScopedRooms().FirstOrDefaultAsync(
             room => room.WardId == wardId && room.Id == id,
             ct);
 

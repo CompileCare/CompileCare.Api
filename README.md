@@ -68,7 +68,7 @@ Tenant roles are stored in the CompileCare database. Current facility permission
 - `FacilityManager`: read and create/update facility records.
 - `FacilityViewer`: read facility records only.
 
-Token-supplied role or permission claims do not grant CompileCare access. Tenant registry endpoints are available only to persisted platform operators at `/api/v1/platform/tenants`. New tenants start in `Provisioning`; activation, suspension and closure are explicit lifecycle transitions. The first platform operator must be bootstrapped out-of-band by an authorised database administrator using the exact validated OIDC issuer and subject. Tenant membership provisioning and administration remain a separate planned milestone.
+Token-supplied role or permission claims do not grant CompileCare access. Tenant registry endpoints are available only to persisted platform operators at `/api/v1/platform/tenants`. New tenants start in `Provisioning`; activation, suspension and closure are explicit lifecycle transitions. The first platform operator must be bootstrapped out-of-band by an authorised database administrator using the exact validated OIDC issuer and subject. Platform operators can provision exactly one initial tenant-wide HospitalAdmin while a tenant is in Provisioning. Tenant HospitalAdmins can create, update, deactivate and reactivate memberships inside their assigned organization scope. New memberships require an explicit tenant, hospital or department scope.
 
 ### Platform tenant registry
 
@@ -93,7 +93,34 @@ VALUES
      TRUE, now(), now(), gen_random_uuid());
 ```
 
-No public platform-operator enrolment endpoint exists. Protect and audit the database bootstrap procedure. Tenant membership provisioning is not included in this milestone.
+No public platform-operator enrolment endpoint exists. Protect and audit the database bootstrap procedure. The separate tenant membership bootstrap and administration routes are described below.
+
+### Tenant membership and organization scopes
+
+The first platform operator provisions the initial tenant-wide HospitalAdmin:
+
+- `POST /api/v1/platform/tenants/{tenantId}/initial-administrator`
+- Body: `{ "issuer": "<configured OIDC authority>", "subject": "<validated OIDC sub>" }`
+
+The route is platform-operator-only, idempotent for the same initial identity and available only while the tenant is `Provisioning`. Concurrent bootstrap attempts are serialized on the tenant record; only one initial membership is created.
+
+Tenant HospitalAdmins manage memberships within their assigned organization scope:
+
+- `GET /api/v1/tenant/memberships?page=1&pageSize=50`
+- `POST /api/v1/tenant/memberships`
+- `PUT /api/v1/tenant/memberships/{membershipId}`
+- `POST /api/v1/tenant/memberships/{membershipId}/deactivate`
+- `POST /api/v1/tenant/memberships/{membershipId}/reactivate`
+
+A membership requires an issuer matching the configured OIDC authority, a subject (`sub`), one supported CompileCare role, and one or more explicit scopes. Scope shapes are:
+
+- Tenant: `{ "scopeType": "Tenant" }`
+- Hospital: `{ "scopeType": "Hospital", "hospitalId": "<guid>" }`
+- Department: `{ "scopeType": "Department", "departmentId": "<guid>" }`
+
+Department scope is resolved to its owning hospital by the API. Cross-tenant and cross-hospital department assignments are rejected. A tenant-wide scope cannot be combined with narrower scopes. Existing memberships are backfilled to tenant-wide scope to preserve their pre-existing access. Membership records are deactivated/reactivated rather than physically deleted.
+
+Only HospitalAdmin receives `membership.manage`; the service additionally checks that the acting administrator can manage every scope assigned to the target member. Administrators cannot modify or deactivate their own membership, and the last active tenant-wide HospitalAdmin cannot be demoted, de-scoped or deactivated.
 
 The integration suite uses synthetic, signed HS256 JWTs and a local static OIDC signing configuration. Its test key is not used by any deployed environment.
 
