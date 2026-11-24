@@ -31,7 +31,7 @@ Queue actions are `call`, `recall`, `start`, `complete`, `cancel` and `noshow`. 
 - PostgreSQL exclusion constraints prevent overlapping sessions for the same tenant/provider and prevent overlapping active appointments for the same tenant/patient. A filtered unique index independently protects one active booking per provider slot.
 - Booking requires an existing patient registration for the same tenant and hospital. It does not create a patient or silently associate one across facilities.
 - Appointment states are `Booked`, `Cancelled`, `Completed` and `NoShow`. Only booked appointments can be cancelled or rescheduled. Rescheduling retains the patient and is rejected after check-in. Appointment check-in is idempotent and is allowed from 60 minutes before until 30 minutes after the slot start. The early/late window is a provisional pilot default and should be validated by each hospital.
-- Appointment reason is optional, limited to 250 characters and intended for short operational context only. Do not put diagnoses, symptoms, triage notes or clinical instructions here.
+- Appointment reason is optional, limited to 250 characters. Rescheduling atomically cancels the original booking, creates its replacement and persists a tenant-scoped `RescheduledFromAppointmentId` link on the new appointment; the appointment response exposes that link for history navigation. and intended for short operational context only. Do not put diagnoses, symptoms, triage notes or clinical instructions here.
 
 
 ## Front-desk queue
