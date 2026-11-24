@@ -1,8 +1,6 @@
 name: Generate EF Core Migration
 
 on:
-  push:
-    branches: [feat/opd-billing-foundation]
   workflow_dispatch:
     inputs:
       migration_name:
@@ -20,7 +18,7 @@ concurrency:
 
 jobs:
   generate-and-commit:
-    if: github.ref == 'refs/heads/feat/opd-billing-foundation'
+    if: github.ref == 'refs/heads/feature/patient-identifier-mrn-management'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -46,10 +44,10 @@ jobs:
       - name: Validate target branch and migration name
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
-          test "$GITHUB_REF" = "refs/heads/feat/opd-billing-foundation"
+          test "$GITHUB_REF" = "refs/heads/feature/patient-identifier-mrn-management"
           if [[ ! "$MIGRATION_NAME" =~ ^[A-Z][A-Za-z0-9]*$ ]]; then
             echo "::error::Migration name must be PascalCase alphanumeric and start with an uppercase letter."
             exit 1
@@ -78,7 +76,7 @@ jobs:
       - name: Generate migration from the committed EF model
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           dotnet ef migrations add "$MIGRATION_NAME" \
             --project src/CompileCare.Infrastructure \
@@ -86,26 +84,10 @@ jobs:
             --context CompileCareDbContext \
             --output-dir Persistence/Migrations
 
-      - name: Preserve the manually authored billing migration target-model helper
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path("src/CompileCare.Infrastructure/Persistence/Migrations/CompileCareDbContextModelSnapshot.cs")
-          content = path.read_text(encoding="utf-8-sig")
-          marker = "        protected override void BuildModel(ModelBuilder modelBuilder)"
-          helper = "        internal static void BuildModelForMigration(ModelBuilder modelBuilder) =>\n            new CompileCareDbContextModelSnapshot().BuildModel(modelBuilder);\n\n"
-          if "BuildModelForMigration" not in content:
-              if marker not in content:
-                  raise SystemExit("Could not locate snapshot BuildModel method.")
-              content = content.replace(marker, helper + marker, 1)
-              path.write_text(content, encoding="utf-8-sig")
-          PY
-
       - name: Ensure migration ID follows existing migration history
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
           migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
@@ -128,33 +110,6 @@ jobs:
             sed -i "s/$old_base/$new_base/g" "$migration_dir/$new_base.Designer.cs"
           fi
 
-      - name: Inspect generated migration operations
-        shell: bash
-        env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
-        run: |
-          set -euo pipefail
-          generated_file="$(find src/CompileCare.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name "*_$MIGRATION_NAME.cs" ! -name "*.Designer.cs" -print -quit)"
-          echo "Generated migration: $generated_file"
-          cat "$generated_file"
-
-      - name: Keep the regenerated snapshot and discard redundant schema operations
-        shell: bash
-        env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
-        run: |
-          set -euo pipefail
-          migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
-          generated_file="$(find "$migration_dir" -maxdepth 1 -type f -name "*_$MIGRATION_NAME.cs" ! -name "*.Designer.cs" -print -quit)"
-          if [[ -z "$generated_file" ]]; then
-            echo "::error::Generated migration source file was not found."
-            exit 1
-          fi
-          # Existing migrations already create the desired indexes. The generated
-          # operations only correct a hand-authored snapshot, so retain the fresh
-          # snapshot and do not add a schema migration that would drop absent indexes.
-          rm "$generated_file" "${generated_file%.cs}.Designer.cs"
-
       - name: Build solution
         run: dotnet build CompileCare.Api.slnx --configuration Release --no-restore
 
@@ -167,7 +122,7 @@ jobs:
       - name: Commit and push generated migration
         shell: bash
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name || 'AlignOpdBillingModelSnapshot' }}
+          MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
           migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
