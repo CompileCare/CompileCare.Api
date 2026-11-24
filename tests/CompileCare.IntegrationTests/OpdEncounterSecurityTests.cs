@@ -55,11 +55,29 @@ public sealed class OpdEncounterSecurityTests
             new QueueActionInput(null));
         Assert.Equal(HttpStatusCode.OK, start.StatusCode);
 
+        var clinicianQueue = await clinician.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue?departmentId={departmentId:D}&date={queueEntry.QueueDateLocal:yyyy-MM-dd}&page=1&pageSize=25");
+        Assert.Equal(HttpStatusCode.OK, clinicianQueue.StatusCode);
+        var clinicianQueuePage = await clinicianQueue.Content.ReadFromJsonAsync<QueuePage>();
+        Assert.NotNull(clinicianQueuePage);
+        Assert.Contains(clinicianQueuePage!.Items, item => item.Id == queueEntry.Id);
+
+        var forbiddenQueueMutation = await clinician.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{queueEntry.Id:D}/complete",
+            new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenQueueMutation.StatusCode);
+
         var create = await clinician.PostAsync(
             $"/api/v1/hospitals/{hospitalId:D}/opd/queue/{queueEntry.Id:D}/encounter", null);
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         var encounter = await create.Content.ReadFromJsonAsync<OpdEncounterDto>();
         Assert.NotNull(encounter);
+
+        var resumed = await clinician.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/opd/queue/{queueEntry.Id:D}/encounter");
+        Assert.Equal(HttpStatusCode.OK, resumed.StatusCode);
+        var resumedEncounter = await resumed.Content.ReadFromJsonAsync<OpdEncounterDto>();
+        Assert.Equal(encounter!.Id, resumedEncounter!.Id);
 
         const string clinicalText = "SensitiveClinicalNote-Headache-OnlyInClinicalRecord";
         var update = await clinician.PutAsJsonAsync(
