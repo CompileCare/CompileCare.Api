@@ -50,6 +50,11 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         builder.HasIndex(x => new { x.TenantId, x.ProviderStaffId });
         builder.HasIndex(x => new { x.TenantId, x.PatientId, x.SlotStartsAtUtc })
             .HasFilter("\"Status\" = 'Booked'");
+        builder.HasIndex(x => new { x.TenantId, x.RescheduledFromAppointmentId });
+        builder.HasOne<Appointment>().WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.RescheduledFromAppointmentId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ProviderAvailabilitySession>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.AvailabilitySessionId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id })
