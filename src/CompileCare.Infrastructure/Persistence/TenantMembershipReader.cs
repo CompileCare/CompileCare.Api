@@ -31,7 +31,10 @@ public sealed class TenantMembershipReader(CompileCareDbContext db) : ITenantMem
                 membership.TenantId == tenantId &&
                 membership.Issuer == issuer &&
                 membership.Subject == subject &&
-                membership.IsActive)
+                membership.IsActive &&
+                db.Tenants.Any(tenant =>
+                    tenant.Id == tenantId &&
+                    tenant.Status == TenantStatuses.Active))
             .Select(membership => membership.Role)
             .SingleOrDefaultAsync(cancellationToken);
 

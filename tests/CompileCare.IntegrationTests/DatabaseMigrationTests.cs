@@ -1,6 +1,8 @@
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -38,6 +40,53 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
         Assert.Equal(0, await db.Wards.CountAsync());
         Assert.Equal(0, await db.Rooms.CountAsync());
         Assert.Equal(0, await db.Beds.CountAsync());
+    }
+
+    [Fact]
+    public async Task TenantRegistryMigration_BackfillsExistingTenantMemberships()
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var databaseName = db.Database.GetDbConnection().Database;
+
+        if (!databaseName.EndsWith("_test", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Refusing to reset database '{databaseName}'. Integration tests require a dedicated database ending in '_test'.");
+        }
+
+        await db.Database.EnsureDeletedAsync();
+
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261123163601_AddAuditEvents");
+
+        var tenantId = Guid.NewGuid();
+        var membershipId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO "tenant_memberships"
+                ("Id", "Issuer", "Subject", "Role", "IsActive", "TenantId",
+                 "CreatedAtUtc", "UpdatedAtUtc", "Version")
+            VALUES
+                ({membershipId}, {TestJwtTokenFactory.Issuer}, {TestJwtTokenFactory.Subject},
+                 {TenantRoles.HospitalAdmin}, TRUE, {tenantId}, {now}, {now}, {Guid.NewGuid()});
+            """);
+
+        await migrator.MigrateAsync();
+
+        var tenant = await db.Tenants.SingleAsync(value => value.Id == tenantId);
+        Assert.Equal("Legacy tenant", tenant.Name);
+        Assert.Equal($"legacy-{tenantId:N}", tenant.Slug);
+        Assert.Equal(TenantStatuses.Active, tenant.Status);
+
+        var membership = await db.TenantMemberships
+            .IgnoreQueryFilters()
+            .SingleAsync(value => value.Id == membershipId);
+        Assert.Equal(tenantId, membership.TenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, membership.Issuer);
+        Assert.Equal(TestJwtTokenFactory.Subject, membership.Subject);
     }
 
     [Fact]

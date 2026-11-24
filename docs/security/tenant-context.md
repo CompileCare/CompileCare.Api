@@ -2,7 +2,11 @@
 
 Tenant isolation is a mandatory platform invariant.
 
-The current API foundation reads an optional `X-Tenant-ID` GUID into a request-scoped `ITenantContext`. Invalid values are rejected. This header is not an authorization claim and does not grant tenant access.
+The API reads exactly one `X-Tenant-ID` GUID on tenant-scoped routes into a request-scoped `ITenantContext`. Invalid or missing values are rejected. The header only selects a tenant; it never grants access.
+
+The platform tenant registry is global (not tenant-filtered). A tenant has an explicit lifecycle: `Provisioning`, `Active`, `Suspended`, or `Closed`. Only an `Active` tenant with an active issuer/subject membership can enter tenant-scoped routes. Suspended and closed tenants are denied even when a membership row remains active.
+
+Tenant creation and lifecycle operations are platform-operator-only. Platform operator access is resolved from a persisted `platform_operators` record using the validated OIDC issuer and `sub`; token role/permission claims and client headers do not grant platform privileges. The first platform operator must be bootstrapped out-of-band by an authorised database administrator. No public platform-operator self-enrolment route exists.
 
 Before tenant-owned data access:
 - Authenticate the caller.

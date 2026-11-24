@@ -9,6 +9,7 @@ public static class AuthorizationPolicies
     public const string FacilityRead = "FacilityRead";
     public const string FacilityWrite = "FacilityWrite";
     public const string FacilityDelete = "FacilityDelete";
+    public const string PlatformOperator = "PlatformOperator";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
@@ -29,6 +30,10 @@ public static class AuthorizationPolicies
         options.AddPolicy(FacilityDelete, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.FacilityDelete)));
+
+        options.AddPolicy(PlatformOperator, policy =>
+            policy.RequireAuthenticatedUser()
+                .AddRequirements(new PlatformOperatorRequirement()));
     }
 
     private static bool HasMembershipPermission(ClaimsPrincipal principal, string permission) =>

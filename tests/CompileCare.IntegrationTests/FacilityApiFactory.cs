@@ -77,6 +77,18 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         tenantContext.SetTenant(tenantId);
 
         var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var tenantExists = await db.Tenants.AnyAsync(value => value.Id == tenantId);
+        if (!tenantExists)
+        {
+            db.Tenants.Add(new Tenant
+            {
+                Id = tenantId,
+                Name = "Test tenant",
+                Slug = $"test-{tenantId:N}",
+                Status = TenantStatuses.Active
+            });
+        }
+
         db.TenantMemberships.Add(new TenantMembership
         {
             TenantId = tenantId,
@@ -86,6 +98,19 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
             IsActive = isActive
         });
 
+        await db.SaveChangesAsync();
+    }
+
+    public async Task SeedPlatformOperatorAsync()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        db.PlatformOperators.Add(new PlatformOperator
+        {
+            Issuer = TestJwtTokenFactory.Issuer,
+            Subject = TestJwtTokenFactory.Subject,
+            IsActive = true
+        });
         await db.SaveChangesAsync();
     }
 

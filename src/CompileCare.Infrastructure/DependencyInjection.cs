@@ -1,6 +1,8 @@
 using CompileCare.Infrastructure.Persistence;
 using CompileCare.Infrastructure.Facilities;
+using CompileCare.Infrastructure.Tenants;
 using CompileCare.Application.Facilities;
+using CompileCare.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,7 +33,9 @@ public static class DependencyInjection
             services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
         }
 
-        services.AddScoped<CompileCare.Application.Tenancy.ITenantMembershipReader, TenantMembershipReader>();
+        services.AddScoped<ITenantMembershipReader, TenantMembershipReader>();
+        services.AddScoped<IPlatformOperatorReader, PlatformOperatorReader>();
+        services.AddScoped<ITenantRegistryService, TenantRegistryService>();
         services.AddScoped<FacilityService>();
         services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
         services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());

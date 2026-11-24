@@ -68,7 +68,32 @@ Tenant roles are stored in the CompileCare database. Current facility permission
 - `FacilityManager`: read and create/update facility records.
 - `FacilityViewer`: read facility records only.
 
-Token-supplied role or permission claims do not grant CompileCare access. Membership provisioning and lifecycle management must be performed by a trusted administrative process; a self-service tenant onboarding or membership administration API is not yet included.
+Token-supplied role or permission claims do not grant CompileCare access. Tenant registry endpoints are available only to persisted platform operators at `/api/v1/platform/tenants`. New tenants start in `Provisioning`; activation, suspension and closure are explicit lifecycle transitions. The first platform operator must be bootstrapped out-of-band by an authorised database administrator using the exact validated OIDC issuer and subject. Tenant membership provisioning and administration remain a separate planned milestone.
+
+### Platform tenant registry
+
+Platform-operator-only routes:
+
+- `GET /api/v1/platform/tenants?page=1&pageSize=50`
+- `GET /api/v1/platform/tenants/{id}`
+- `POST /api/v1/platform/tenants` with `{ "name": "...", "slug": "..." }`
+- `POST /api/v1/platform/tenants/{id}/activate`
+- `POST /api/v1/platform/tenants/{id}/suspend`
+- `POST /api/v1/platform/tenants/{id}/close`
+
+Creation produces a `Provisioning` tenant. Only active tenants can be used for tenant-scoped requests. Slugs are unique, lowercase, and limited to letters/digits separated by single hyphens. Closing is terminal; tenant records are not physically deleted.
+
+The initial platform operator is bootstrapped by a restricted database administrator after verifying the operator's exact issuer and subject with the identity provider. Example SQL (replace both placeholders with verified values; do not use an email address as the subject):
+
+```sql
+INSERT INTO platform_operators
+    ("Id", "Issuer", "Subject", "IsActive", "CreatedAtUtc", "UpdatedAtUtc", "Version")
+VALUES
+    (gen_random_uuid(), '<validated-oidc-issuer>', '<validated-oidc-subject>',
+     TRUE, now(), now(), gen_random_uuid());
+```
+
+No public platform-operator enrolment endpoint exists. Protect and audit the database bootstrap procedure. Tenant membership provisioning is not included in this milestone.
 
 The integration suite uses synthetic, signed HS256 JWTs and a local static OIDC signing configuration. Its test key is not used by any deployed environment.
 

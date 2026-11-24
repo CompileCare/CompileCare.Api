@@ -9,7 +9,7 @@ using Serilog.Context;
 namespace CompileCare.Api.Middleware;
 
 /// <summary>
-/// Writes a metadata-only audit event for each tenant-scoped API request.
+/// Writes metadata-only audit events for tenant-scoped and platform-operator API requests.
 /// Successful business changes and their audit event commit in one database transaction.
 /// No request/response bodies, query strings, or patient payloads are persisted.
 /// </summary>
@@ -27,7 +27,18 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         ILogger<AuditEventMiddleware> logger)
     {
         var endpoint = context.GetEndpoint();
-        if (endpoint?.Metadata.GetMetadata<TenantScopedEndpointMetadata>() is null)
+        if (endpoint is null)
+        {
+            await next(context);
+            return;
+        }
+
+        var isTenantScoped =
+            endpoint.Metadata.GetMetadata<TenantScopedEndpointMetadata>() is not null;
+        var isPlatformOperatorRoute =
+            endpoint.Metadata.GetMetadata<PlatformOperatorEndpointMetadata>() is not null;
+
+        if (!isTenantScoped && !isPlatformOperatorRoute)
         {
             await next(context);
             return;
@@ -46,7 +57,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         {
             logger.LogCritical(
                 exception,
-                "Cannot start the audit transaction for tenant-scoped endpoint {Endpoint}.",
+                "Cannot start the audit transaction for endpoint {Endpoint}.",
                 endpoint.DisplayName);
 
             await WriteAuditUnavailableProblemAsync(context);
@@ -95,7 +106,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
             {
                 logger.LogError(
                     rollbackException,
-                    "Failed to roll back the tenant-scoped request transaction.");
+                    "Failed to roll back the audited request transaction.");
             }
             finally
             {
@@ -120,7 +131,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
             // writes are rolled back, and the buffered success response is discarded.
             logger.LogCritical(
                 exception,
-                "Audit persistence failed for tenant-scoped endpoint {Endpoint}; the request transaction was rolled back.",
+                "Audit persistence failed for endpoint {Endpoint}; the request transaction was rolled back.",
                 endpoint.DisplayName);
 
             responseBuffer.SetLength(0);
@@ -235,7 +246,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         {
             logger.LogCritical(
                 auditException,
-                "Failed to persist the failure audit event for tenant-scoped endpoint {Endpoint}.",
+                "Failed to persist the failure audit event for endpoint {Endpoint}.",
                 endpoint.DisplayName);
         }
     }
