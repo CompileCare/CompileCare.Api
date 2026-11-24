@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CompileCare.Application.Appointments;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
@@ -22,6 +23,9 @@ public static class AuthorizationPolicies
     public const string PatientIdentifierPolicyManage = "PatientIdentifierPolicyManage";
     public const string StaffRead = "StaffRead";
     public const string StaffManage = "StaffManage";
+    public const string AvailabilityManage = "AvailabilityManage";
+    public const string AppointmentRead = "AppointmentRead";
+    public const string AppointmentManage = "AppointmentManage";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
@@ -70,6 +74,15 @@ public static class AuthorizationPolicies
         options.AddPolicy(StaffManage, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, StaffPermissions.Manage)));
+        options.AddPolicy(AvailabilityManage, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, AppointmentPermissions.AvailabilityManage)));
+        options.AddPolicy(AppointmentRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, AppointmentPermissions.AppointmentRead)));
+        options.AddPolicy(AppointmentManage, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, AppointmentPermissions.AppointmentManage)));
         options.AddPolicy(PlatformOperator, policy =>
             policy.RequireAuthenticatedUser()
                 .AddRequirements(new PlatformOperatorRequirement()));
