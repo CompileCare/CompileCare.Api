@@ -53,20 +53,16 @@ public sealed class TenantMembershipAdministrationService(
             return Failure<TenantMembershipDto>(identityError!, 400);
         }
 
+        // Lock before reading tenant status. If activation is concurrently in
+        // progress, this transaction waits and then reads the committed lifecycle
+        // value rather than relying on a stale pre-lock entity.
+        if (!await LockTenantAsync(tenantId, cancellationToken))
+            return Failure<TenantMembershipDto>("Tenant not found.", 404);
+
         var tenant = await db.Tenants.SingleOrDefaultAsync(
             value => value.Id == tenantId,
             cancellationToken);
         if (tenant is null)
-            return Failure<TenantMembershipDto>("Tenant not found.", 404);
-
-        if (tenant.Status != TenantStatuses.Provisioning)
-            return Failure<TenantMembershipDto>(
-                "The initial administrator can only be assigned while the tenant is provisioning.",
-                409);
-
-        // Serialize bootstrap attempts on the tenant row. This prevents two different
-        // platform operators from concurrently creating competing initial admins.
-        if (!await LockTenantAsync(tenantId, cancellationToken))
             return Failure<TenantMembershipDto>("Tenant not found.", 404);
 
         tenantContext.SetTenant(tenantId);
@@ -91,6 +87,11 @@ public sealed class TenantMembershipAdministrationService(
                 ? TenantMembershipResult<TenantMembershipDto>.Success(ToDto(existing))
                 : Failure<TenantMembershipDto>("A membership already exists for this identity.", 409);
         }
+
+        if (tenant.Status != TenantStatuses.Provisioning)
+            return Failure<TenantMembershipDto>(
+                "The initial administrator can only be assigned while the tenant is provisioning.",
+                409);
 
         var hasAnyMembership = await db.TenantMemberships.IgnoreQueryFilters()
             .AnyAsync(value => value.TenantId == tenantId, cancellationToken);

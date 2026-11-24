@@ -71,6 +71,14 @@ public sealed class TenantMembershipApiTests
             content: null);
         Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
 
+        var retryBootstrap = await platformClient.PostAsJsonAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/initial-administrator",
+            new { issuer = TestJwtTokenFactory.Issuer, subject = membership.Subject });
+        Assert.Equal(HttpStatusCode.OK, retryBootstrap.StatusCode);
+        var retriedMembership = await retryBootstrap.Content.ReadFromJsonAsync<MembershipResponse>();
+        Assert.NotNull(retriedMembership);
+        Assert.Equal(membership.Id, retriedMembership!.Id);
+
         using var winningAdminClient = CreateClient(membership.Subject, tenantId);
         var hospitalList = await winningAdminClient.GetAsync("/api/v1/hospitals");
         Assert.Equal(HttpStatusCode.OK, hospitalList.StatusCode);
@@ -115,6 +123,57 @@ public sealed class TenantMembershipApiTests
         Assert.Equal(HttpStatusCode.Created, membershipResponse.StatusCode);
         var membership = await membershipResponse.Content.ReadFromJsonAsync<MembershipResponse>();
         Assert.NotNull(membership);
+
+        // Replacing the same scope must delete the old row before inserting its
+        // replacement, rather than colliding with the filtered unique index.
+        var sameScopeUpdate = await adminClient.PutAsJsonAsync(
+            $"/api/v1/tenant/memberships/{membership!.Id:D}",
+            new
+            {
+                role = TenantRoles.FacilityManager,
+                scopes = new[]
+                {
+                    new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentA }
+                }
+            });
+        Assert.Equal(HttpStatusCode.OK, sameScopeUpdate.StatusCode);
+
+        var reassignResponse = await adminClient.PostAsJsonAsync(
+            "/api/v1/tenant/memberships",
+            new
+            {
+                issuer = TestJwtTokenFactory.Issuer,
+                subject = "scope-reassigned",
+                role = TenantRoles.FacilityViewer,
+                scopes = new[]
+                {
+                    new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentA }
+                }
+            });
+        Assert.Equal(HttpStatusCode.Created, reassignResponse.StatusCode);
+        var reassignMembership = await reassignResponse.Content.ReadFromJsonAsync<MembershipResponse>();
+        Assert.NotNull(reassignMembership);
+
+        var reassignment = await adminClient.PutAsJsonAsync(
+            $"/api/v1/tenant/memberships/{reassignMembership!.Id:D}",
+            new
+            {
+                role = TenantRoles.FacilityViewer,
+                scopes = new[]
+                {
+                    new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentB }
+                }
+            });
+        Assert.Equal(HttpStatusCode.OK, reassignment.StatusCode);
+
+        using (var verifyScope = _factory.Services.CreateScope())
+        {
+            var verifyDb = verifyScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var persistedScope = await verifyDb.TenantMembershipScopes.IgnoreQueryFilters()
+                .SingleAsync(value => value.MembershipId == reassignMembership.Id);
+            Assert.Equal(departmentB, persistedScope.DepartmentId);
+            Assert.Equal(hospitalB, persistedScope.HospitalId);
+        }
 
         using var managerClient = CreateClient("department-manager", tenantId);
         var hospitalList = await managerClient.GetFromJsonAsync<JsonElement>("/api/v1/hospitals");
@@ -176,8 +235,14 @@ public sealed class TenantMembershipApiTests
         var activeRead = await managerClient.GetAsync("/api/v1/hospitals");
         Assert.Equal(HttpStatusCode.OK, activeRead.StatusCode);
 
+        var initialAdminId = await GetInitialAdminIdAsync(tenantId);
+        var selfDeactivate = await adminClient.PostAsync(
+            $"/api/v1/tenant/memberships/{initialAdminId:D}/deactivate",
+            content: null);
+        Assert.Equal(HttpStatusCode.Conflict, selfDeactivate.StatusCode);
+
         var selfUpdate = await adminClient.PutAsJsonAsync(
-            $"/api/v1/tenant/memberships/{(await GetInitialAdminIdAsync(tenantId)):D}",
+            $"/api/v1/tenant/memberships/{initialAdminId:D}",
             new
             {
                 role = TenantRoles.FacilityViewer,
