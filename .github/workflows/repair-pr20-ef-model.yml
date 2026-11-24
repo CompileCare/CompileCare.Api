@@ -6,6 +6,8 @@ on:
       - feat/appointment-checkin-queue-lifecycle
     paths:
       - .github/workflows/repair-pr20-ef-model.yml
+      - src/CompileCare.Infrastructure/Persistence/Configurations/QueueEntryConfiguration.cs
+      - src/CompileCare.Infrastructure/Persistence/Migrations/20261124150000_AddFrontDeskQueue.cs
 
 permissions:
   contents: read
