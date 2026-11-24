@@ -25,7 +25,7 @@ All routes are tenant-scoped and hospital-scoped under `/api/v1/hospitals/{hospi
 | POST | `/encounters/{encounterId}/close` | `encounter.manage` |
 | POST | `/encounters/{encounterId}/cancel` | `encounter.manage` |
 
-The initial role mapping is the explicitly provisioned `ClinicalUser` membership role. It receives read-only `facility.read` to load its assigned hospital's department context, read-only `queue.read` to discover operational queue tokens, and the four encounter permissions. It does not receive `queue.manage`; clinical users cannot call, cancel, mark no-show or otherwise transition queue entries. All access still requires a matching hospital/department scope. This role is an administrative authorization assertion; it does not prove a professional qualification, licence or clinical privilege. Queue permissions do not grant access to clinical notes.
+The initial role mapping is the explicitly provisioned `ClinicalUser` membership role. It receives `patient.read` to verify the patient linked to an encounter, read-only `facility.read` to load its assigned hospital's department context, read-only `queue.read` to discover operational queue tokens, and the four encounter permissions. It does not receive `queue.manage`; clinical users cannot call, cancel, mark no-show or otherwise transition queue entries. All access still requires a matching hospital/department scope. This role is an administrative authorization assertion; it does not prove a professional qualification, licence or clinical privilege. Queue permissions do not grant access to clinical notes.
 
 ## Encounter lifecycle
 
