@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using CompileCare.Api.Middleware;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
