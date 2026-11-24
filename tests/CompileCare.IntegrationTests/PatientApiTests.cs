@@ -98,6 +98,47 @@ public sealed class PatientApiTests
         Assert.Equal(HttpStatusCode.BadRequest, futureDate.StatusCode);
     }
 
+
+    [Fact]
+    public async Task DepartmentScopedPatientRegistrar_CannotReadHospitalWidePatientRecords()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId) = await SeedHospitalAndDepartmentAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentId)]);
+        using var client = CreateClient(tenantId);
+
+        var response = await client.GetAsync($"/api/v1/hospitals/{hospitalId:D}/patients");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private async Task<(Guid HospitalId, Guid DepartmentId)> SeedHospitalAndDepartmentAsync(Guid tenantId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            Name = "Department-scoped test tenant",
+            Slug = $"department-{tenantId:N}",
+            Status = TenantStatuses.Active
+        });
+        await db.SaveChangesAsync();
+
+        var hospital = new Hospital { Name = "Department Scope Hospital", Code = Guid.NewGuid().ToString("N")[..8] };
+        db.Hospitals.Add(hospital);
+        await db.SaveChangesAsync();
+
+        var department = new Department { HospitalId = hospital.Id, Name = "Cardiology", Code = "CARD" };
+        db.Departments.Add(department);
+        await db.SaveChangesAsync();
+        return (hospital.Id, department.Id);
+    }
+
     private async Task<Guid> SeedHospitalAsync(Guid tenantId, string name)
     {
         using var scope = _factory.Services.CreateScope();
