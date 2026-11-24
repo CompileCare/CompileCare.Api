@@ -152,6 +152,18 @@ public partial class AddAppointmentScheduling : Migration
             table: "provider_availability_sessions",
             columns: new[] { "TenantId", "ProviderStaffId", "LocalDate", "StartsAtUtc", "EndsAtUtc" });
         migrationBuilder.CreateIndex(
+            name: "IX_appointments_TenantId_HospitalId_DepartmentId",
+            table: "appointments",
+            columns: new[] { "TenantId", "HospitalId", "DepartmentId" });
+        migrationBuilder.CreateIndex(
+            name: "IX_appointments_TenantId_HospitalId_PatientId",
+            table: "appointments",
+            columns: new[] { "TenantId", "HospitalId", "PatientId" });
+        migrationBuilder.CreateIndex(
+            name: "IX_appointments_TenantId_ProviderStaffId",
+            table: "appointments",
+            columns: new[] { "TenantId", "ProviderStaffId" });
+        migrationBuilder.CreateIndex(
             name: "IX_appointments_TenantId_AvailabilitySessionId_SlotStartsAtUtc",
             table: "appointments",
             columns: new[] { "TenantId", "AvailabilitySessionId", "SlotStartsAtUtc" },
