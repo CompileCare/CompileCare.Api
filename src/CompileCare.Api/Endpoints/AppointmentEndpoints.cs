@@ -41,7 +41,7 @@ public static class AppointmentEndpoints
                 : Results.Problem(title: "Availability search failed", detail: result.Error, statusCode: result.StatusCode);
         })
         .WithName("ListProviderAvailabilitySessions")
-        .RequireAuthorization(AuthorizationPolicies.AppointmentRead);
+        .RequireAuthorization(AuthorizationPolicies.AvailabilityRead);
 
         group.MapGet("/availability-sessions/{sessionId:guid}/slots", async (
             Guid hospitalId,
@@ -55,7 +55,7 @@ public static class AppointmentEndpoints
                 : Results.Problem(title: "Availability slots not found", detail: result.Error, statusCode: result.StatusCode);
         })
         .WithName("GetProviderAvailabilitySlots")
-        .RequireAuthorization(AuthorizationPolicies.AppointmentRead);
+        .RequireAuthorization(AuthorizationPolicies.AvailabilityRead);
 
         group.MapPost("/appointments", async (
             Guid hospitalId,
