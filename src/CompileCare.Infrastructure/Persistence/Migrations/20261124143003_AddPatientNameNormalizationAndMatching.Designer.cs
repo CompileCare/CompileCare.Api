@@ -3,6 +3,7 @@ using System;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,7 +13,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CompileCareDbContext))]
     [Migration("20261124143003_AddPatientNameNormalizationAndMatching")]
-    partial class AddPatientNameNormalizationAndMatching
+    partial class AddPatientNameNormalizationAndMatching : Migration
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
