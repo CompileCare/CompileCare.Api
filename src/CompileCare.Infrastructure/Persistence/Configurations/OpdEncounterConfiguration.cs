@@ -31,6 +31,7 @@ public sealed class OpdEncounterConfiguration : IEntityTypeConfiguration<OpdEnco
 
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.QueueEntryId }).IsUnique();
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PatientId, x.StartedAtUtc });
 
         builder.HasOne<QueueEntry>().WithMany()
@@ -71,6 +72,7 @@ public sealed class OpdEncounterAmendmentConfiguration : IEntityTypeConfiguratio
 
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.EncounterId, x.CreatedAtUtc });
+        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId });
 
         builder.HasOne<OpdEncounter>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.EncounterId })
