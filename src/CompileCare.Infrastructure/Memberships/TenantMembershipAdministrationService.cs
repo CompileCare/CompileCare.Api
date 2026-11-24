@@ -239,13 +239,14 @@ public sealed class TenantMembershipAdministrationService(
         {
             var previousScopes = membership.Scopes.ToArray();
             db.TenantMembershipScopes.RemoveRange(previousScopes);
-            membership.Scopes.Clear();
 
             // The request audit middleware owns the enclosing transaction. Persist
-            // the deletes before inserting replacements to avoid a transient clash
-            // with the filtered unique indexes on the scope rows.
+            // the deletes before severing the now-deleted navigation and inserting
+            // replacements. Clearing a required relationship before SaveChanges can
+            // make EF treat the membership FK as severed instead of as a row delete.
             await db.SaveChangesAsync(cancellationToken);
 
+            membership.Scopes.Clear();
             AddScopes(membership, resolution.Scopes);
         }
 
