@@ -1,7 +1,9 @@
+using CompileCare.Application.Appointments;
 using CompileCare.Application.Facilities;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
+using CompileCare.Infrastructure.Appointments;
 using CompileCare.Infrastructure.Facilities;
 using CompileCare.Infrastructure.Memberships;
 using CompileCare.Infrastructure.Patients;
@@ -37,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientDuplicateDetectionService, PatientDuplicateDetectionService>();
         services.AddScoped<IPatientIdentifierService, PatientIdentifierService>();
         services.AddScoped<IStaffManagementService, StaffManagementService>();
+        services.AddScoped<IAppointmentSchedulingService, AppointmentSchedulingService>();
         services.AddScoped<FacilityService>();
         services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
         services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());

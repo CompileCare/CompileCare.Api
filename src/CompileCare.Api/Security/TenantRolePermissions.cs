@@ -1,3 +1,4 @@
+using CompileCare.Application.Appointments;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
@@ -18,7 +19,9 @@ internal static class TenantRolePermissions
                 PatientIdentifierPermissions.PolicyRead,
                 PatientIdentifierPermissions.PolicyManage,
                 StaffPermissions.Read,
-                StaffPermissions.Manage
+                StaffPermissions.Manage,
+                AppointmentPermissions.AvailabilityRead,
+                AppointmentPermissions.AvailabilityManage
             ],
             TenantRoles.FacilityManager =>
             [
@@ -35,7 +38,10 @@ internal static class TenantRolePermissions
                 PatientPermissions.Register,
                 PatientDuplicatePermissions.Review,
                 PatientIdentifierPermissions.Read,
-                PatientIdentifierPermissions.Assign
+                PatientIdentifierPermissions.Assign,
+                AppointmentPermissions.AvailabilityRead,
+                AppointmentPermissions.AppointmentRead,
+                AppointmentPermissions.AppointmentManage
             ],
             _ => Array.Empty<string>()
         };

@@ -22,6 +22,63 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Appointment", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<Guid>("AvailabilitySessionId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("DepartmentId").HasColumnType("uuid");
+                    b.Property<Guid>("HospitalId").HasColumnType("uuid");
+                    b.Property<Guid>("PatientId").HasColumnType("uuid");
+                    b.Property<Guid>("ProviderStaffId").HasColumnType("uuid");
+                    b.Property<string>("Reason").HasMaxLength(250).HasColumnType("character varying(250)");
+                    b.Property<DateTimeOffset>("SlotEndsAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset>("SlotStartsAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("TenantId", "Id");
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+                    b.HasIndex("TenantId", "HospitalId", "PatientId");
+                    b.HasIndex("TenantId", "ProviderStaffId");
+                    b.HasIndex("TenantId", "AvailabilitySessionId", "SlotStartsAtUtc").IsUnique().HasFilter("\"Status\" = 'Booked'");
+                    b.HasIndex("TenantId", "PatientId", "SlotStartsAtUtc").HasFilter("\"Status\" = 'Booked'");
+                    b.ToTable("appointments", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_appointments_time_range", "\"SlotEndsAtUtc\" > \"SlotStartsAtUtc\"");
+                            t.HasCheckConstraint("CK_appointments_status", "\"Status\" IN ('Booked', 'Cancelled', 'Completed', 'NoShow')");
+                        });
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.ProviderAvailabilitySession", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("DepartmentId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("EndsAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("HospitalId").HasColumnType("uuid");
+                    b.Property<DateOnly>("LocalDate").HasColumnType("date");
+                    b.Property<Guid>("ProviderStaffId").HasColumnType("uuid");
+                    b.Property<int>("SlotDurationMinutes").HasColumnType("integer");
+                    b.Property<DateTimeOffset>("StartsAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid");
+                    b.Property<string>("TimeZoneId").IsRequired().HasMaxLength(100).HasColumnType("character varying(100)");
+                    b.Property<DateTimeOffset>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("TenantId", "Id");
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId", "LocalDate");
+                    b.HasIndex("TenantId", "ProviderStaffId", "LocalDate", "StartsAtUtc", "EndsAtUtc");
+                    b.ToTable("provider_availability_sessions", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_provider_availability_sessions_time_range", "\"EndsAtUtc\" > \"StartsAtUtc\"");
+                            t.HasCheckConstraint("CK_provider_availability_sessions_slot_duration", "\"SlotDurationMinutes\" BETWEEN 5 AND 120");
+                        });
+                });
+
             modelBuilder.Entity("CompileCare.Infrastructure.Persistence.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1060,7 +1117,44 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-#pragma warning restore 612, 618
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.Appointment", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.HospitalPatientRegistration", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "PatientId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "PatientId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId")
+                        .HasPrincipalKey("TenantId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.ProviderAvailabilitySession", null).WithMany()
+                        .HasForeignKey("TenantId", "AvailabilitySessionId")
+                        .HasPrincipalKey("TenantId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.StaffProfile", null).WithMany()
+                        .HasForeignKey("TenantId", "ProviderStaffId")
+                        .HasPrincipalKey("TenantId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
+                        .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
+            modelBuilder.Entity("CompileCare.Infrastructure.Persistence.ProviderAvailabilitySession", b =>
+                {
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Department", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Hospital", null).WithMany()
+                        .HasForeignKey("TenantId", "HospitalId")
+                        .HasPrincipalKey("TenantId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.StaffProfile", null).WithMany()
+                        .HasForeignKey("TenantId", "ProviderStaffId")
+                        .HasPrincipalKey("TenantId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("CompileCare.Infrastructure.Persistence.Tenant", null).WithMany()
+                        .HasForeignKey("TenantId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
+            #pragma warning restore 612, 618
         }
     }
 }
