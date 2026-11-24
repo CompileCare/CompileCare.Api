@@ -10,11 +10,7 @@ public sealed class TenantMembershipScopeConfiguration : IEntityTypeConfiguratio
         builder.ToTable("tenant_membership_scopes", table =>
             table.HasCheckConstraint(
                 "CK_tenant_membership_scopes_shape",
-                """
-                ("ScopeType" = 'Tenant' AND "HospitalId" IS NULL AND "DepartmentId" IS NULL)
-                OR ("ScopeType" = 'Hospital' AND "HospitalId" IS NOT NULL AND "DepartmentId" IS NULL)
-                OR ("ScopeType" = 'Department' AND "HospitalId" IS NOT NULL AND "DepartmentId" IS NOT NULL)
-                """));
+                "(\"ScopeType\" = 'Tenant' AND \"HospitalId\" IS NULL AND \"DepartmentId\" IS NULL) OR (\"ScopeType\" = 'Hospital' AND \"HospitalId\" IS NOT NULL AND \"DepartmentId\" IS NULL) OR (\"ScopeType\" = 'Department' AND \"HospitalId\" IS NOT NULL AND \"DepartmentId\" IS NOT NULL)"));
 
         builder.Property(x => x.ScopeType).HasMaxLength(20).IsRequired();
         builder.HasOne(x => x.Membership).WithMany(x => x.Scopes)
