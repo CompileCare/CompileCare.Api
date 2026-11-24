@@ -25,14 +25,26 @@ public sealed class AppointmentQueueService(
         if (await db.QueueEntries.AnyAsync(x => x.AppointmentId == appointmentId, cancellationToken))
             return AppointmentResult<AppointmentDto>.Failure("A checked-in appointment cannot be rescheduled.", 409);
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         current.Status = AppointmentStatuses.Cancelled;
         var replacement = await scheduling.BookAsync(hospitalId, input, cancellationToken);
         if (!replacement.IsSuccess)
         {
+            await transaction.RollbackAsync(cancellationToken);
             current.Status = AppointmentStatuses.Booked;
             return replacement;
         }
-        return replacement;
+
+        var replacementEntity = await db.Appointments.SingleAsync(
+            x => x.Id == replacement.Value!.Id && x.HospitalId == hospitalId, cancellationToken);
+        replacementEntity.RescheduledFromAppointmentId = current.Id;
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return AppointmentResult<AppointmentDto>.Success(new(
+            replacement.Value.Id, replacement.Value.HospitalId, replacement.Value.DepartmentId,
+            replacement.Value.PatientId, replacement.Value.ProviderStaffId, replacement.Value.AvailabilitySessionId,
+            replacement.Value.SlotStartsAtUtc, replacement.Value.SlotEndsAtUtc, replacement.Value.Status,
+            replacement.Value.Reason, replacement.Value.CreatedAtUtc, current.Id));
     }
 
     public async Task<AppointmentResult<QueueEntryDto>> CheckInAsync(
