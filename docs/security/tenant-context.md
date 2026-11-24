@@ -24,3 +24,17 @@ Before tenant-owned data access:
 - Test cross-tenant reads and writes explicitly.
 
 Never derive tenant authorization solely from a client-supplied header, query string or route value.
+
+
+## Current-user tenant context discovery
+
+Authenticated staff clients can discover their own active tenant memberships before selecting a tenant:
+
+- `GET /api/v1/me/tenant-contexts?page=1&pageSize=50`
+- Requires a validated OIDC bearer token; no `X-Tenant-ID` header is accepted or needed.
+- Resolves memberships only by the validated issuer and `sub` claims. External role/permission claims are ignored.
+- Returns active memberships for active tenants, with the persisted CompileCare role and organization scopes. Results are bounded and paginated.
+- Does not create or select a tenant context for the request. The client must choose one of the returned tenant IDs and then send that ID as `X-Tenant-ID` on subsequent tenant-scoped API requests.
+- The endpoint is user-scoped and its reads, denials and failures are written to the metadata-only audit log. No membership credentials, request bodies or patient data are included.
+
+The UI may use the returned scope data to present a tenant/facility selection experience, but it must not infer access from the selection itself. The API re-resolves the membership and enforces its active tenant lifecycle, role and hospital/department scope on every tenant-scoped request.
