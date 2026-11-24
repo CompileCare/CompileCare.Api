@@ -8,6 +8,7 @@ public partial class AddAppointmentScheduling : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
+        migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS btree_gist;");
         migrationBuilder.CreateTable(
             name: "provider_availability_sessions",
             columns: table => new
@@ -120,6 +121,27 @@ public partial class AddAppointmentScheduling : Migration
                     principalColumn: "Id",
                     onDelete: ReferentialAction.Restrict);
             });
+
+        migrationBuilder.Sql("""
+            ALTER TABLE provider_availability_sessions
+            ADD CONSTRAINT EX_provider_availability_provider_time
+            EXCLUDE USING gist (
+                "TenantId" WITH =,
+                "ProviderStaffId" WITH =,
+                tstzrange("StartsAtUtc", "EndsAtUtc", '[)') WITH &&
+            );
+            """);
+
+        migrationBuilder.Sql("""
+            ALTER TABLE appointments
+            ADD CONSTRAINT EX_appointments_patient_time
+            EXCLUDE USING gist (
+                "TenantId" WITH =,
+                "PatientId" WITH =,
+                tstzrange("SlotStartsAtUtc", "SlotEndsAtUtc", '[)') WITH &&
+            )
+            WHERE ("Status" = 'Booked');
+            """);
 
         migrationBuilder.CreateIndex(
             name: "IX_provider_availability_sessions_TenantId_HospitalId_DepartmentId_LocalDate",
