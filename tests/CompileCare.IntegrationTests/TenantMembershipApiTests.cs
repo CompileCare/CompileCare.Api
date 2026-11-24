@@ -44,8 +44,12 @@ public sealed class TenantMembershipApiTests
         using var secondResponse = await secondTask;
 
         var statuses = new[] { firstResponse.StatusCode, secondResponse.StatusCode };
-        Assert.Single(statuses.Where(status => status == HttpStatusCode.Created));
-        Assert.Single(statuses.Where(status => status == HttpStatusCode.Conflict));
+        Assert.Equal(
+            HttpStatusCode.Created,
+            Assert.Single(statuses, status => status == HttpStatusCode.Created));
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            Assert.Single(statuses, status => status == HttpStatusCode.Conflict));
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();

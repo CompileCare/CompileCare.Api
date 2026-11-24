@@ -93,7 +93,7 @@ VALUES
      TRUE, now(), now(), gen_random_uuid());
 ```
 
-No public platform-operator enrolment endpoint exists. Protect and audit the database bootstrap procedure. Tenant membership provisioning is not included in this milestone.
+No public platform-operator enrolment endpoint exists. Protect and audit the database bootstrap procedure. The separate tenant membership bootstrap and administration routes are described below.
 
 ### Tenant membership and organization scopes
 
