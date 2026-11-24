@@ -45,6 +45,10 @@ public sealed class PatientApiTests
         Assert.NotNull(search);
         Assert.Single(search!.Items);
         Assert.Equal(created.Id, search.Items[0].Id);
+        var details = await client.GetFromJsonAsync<PatientDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/{created.Id:D}");
+        Assert.NotNull(details);
+        Assert.Equal(created.Id, details!.Id);
 
         var otherHospitalSearch = await client.GetFromJsonAsync<PatientPage>(
             $"/api/v1/hospitals/{otherHospitalId:D}/patients?page=1&pageSize=10");
