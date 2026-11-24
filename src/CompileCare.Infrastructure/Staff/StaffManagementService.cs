@@ -2,6 +2,7 @@ using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CompileCare.Infrastructure.Staff;
 
@@ -46,7 +47,15 @@ public sealed class StaffManagementService(
         };
         db.StaffProfiles.Add(profile);
         db.StaffAssignments.Add(assignment);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (
+            exception.InnerException is PostgresException { SqlState: "23505" })
+        {
+            return StaffResult<StaffProfileDto>.Failure("A staff profile with this staff code already exists in the tenant.", 409);
+        }
         return StaffResult<StaffProfileDto>.Success(ToDto(profile, [assignment]));
     }
 
@@ -164,7 +173,15 @@ public sealed class StaffManagementService(
             EffectiveFrom = input.EffectiveFrom
         };
         db.StaffAssignments.Add(assignment);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (
+            exception.InnerException is PostgresException { SqlState: "23505" })
+        {
+            return StaffResult<StaffAssignmentDto>.Failure("An active assignment already exists for this location.", 409);
+        }
         return StaffResult<StaffAssignmentDto>.Success(ToDto(assignment));
     }
 
