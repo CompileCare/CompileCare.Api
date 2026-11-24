@@ -1176,6 +1176,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Version").IsConcurrencyToken().HasColumnType("uuid");
                     b.HasKey("Id");
                     b.HasAlternateKey("TenantId", "Id");
+                    b.HasIndex("TenantId", "HospitalId", "PatientId");
                     b.HasIndex("TenantId", "AppointmentId").IsUnique().HasFilter("\"AppointmentId\" IS NOT NULL");
                     b.HasIndex("TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "Status", "TokenNumber").HasDatabaseName("IX_queue_entries_daily_status_token");
                     b.HasIndex("TenantId", "HospitalId", "DepartmentId", "QueueDateLocal", "TokenNumber").IsUnique().HasDatabaseName("IX_queue_entries_daily_token");
