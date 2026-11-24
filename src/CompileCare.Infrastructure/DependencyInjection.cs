@@ -4,6 +4,7 @@ using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Facilities;
 using CompileCare.Infrastructure.Memberships;
 using CompileCare.Infrastructure.Patients;
+using CompileCare.Infrastructure.Staff;
 using CompileCare.Infrastructure.Persistence;
 using CompileCare.Infrastructure.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientService, PatientService>();
         services.AddScoped<IPatientDuplicateDetectionService, PatientDuplicateDetectionService>();
         services.AddScoped<IPatientIdentifierService, PatientIdentifierService>();
+        services.AddScoped<IStaffManagementService, StaffManagementService>();
         services.AddScoped<FacilityService>();
         services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
         services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());
