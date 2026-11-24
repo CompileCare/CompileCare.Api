@@ -173,7 +173,7 @@ public sealed class TenantRegistryApiTests
         var audit = await db.AuditEvents
             .SingleAsync(value => value.Action == "CreateInitialTenantAdministrator");
 
-        Assert.Null(audit.TenantId);
+        Assert.Equal(tenant.Id, audit.TenantId);
         Assert.Null(audit.RequestedTenantId);
         Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
         Assert.Equal(TestJwtTokenFactory.Subject, audit.ActorSubject);
