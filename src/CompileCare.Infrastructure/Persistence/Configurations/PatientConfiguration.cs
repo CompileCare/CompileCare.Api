@@ -26,7 +26,7 @@ public sealed class HospitalPatientRegistrationConfiguration : IEntityTypeConfig
     {
         builder.ToTable("hospital_patient_registrations");
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
-        builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PatientId }).IsUnique();
+        builder.HasAlternateKey(x => new { x.TenantId, x.HospitalId, x.PatientId });
         builder.HasOne(x => x.Hospital).WithMany()
             .HasForeignKey(x => new { x.TenantId, x.HospitalId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id })

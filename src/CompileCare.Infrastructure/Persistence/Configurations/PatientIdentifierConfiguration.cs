@@ -25,13 +25,9 @@ public sealed class PatientIdentifierConfiguration : IEntityTypeConfiguration<Pa
             .IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PatientId, x.TypeCode })
             .IsUnique();
-        builder.HasOne(x => x.Patient).WithMany()
-            .HasForeignKey(x => new { x.TenantId, x.PatientId })
-            .HasPrincipalKey(x => new { x.TenantId, x.Id })
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne(x => x.Hospital).WithMany()
-            .HasForeignKey(x => new { x.TenantId, x.HospitalId })
-            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+        builder.HasOne(x => x.Registration).WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.PatientId })
+            .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.PatientId })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

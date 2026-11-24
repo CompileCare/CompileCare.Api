@@ -38,9 +38,8 @@ public sealed partial class PatientIdentifierService(
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
-        // Serialize policy creation for one hospital. The request audit middleware
-        // normally owns this transaction; the local transaction keeps this service
-        // safe when invoked outside an HTTP request as well.
+        // Serialize policy creation for one hospital. In HTTP requests the audit
+        // middleware owns the transaction; this local transaction supports reuse.
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""SELECT "Id" FROM "hospitals" WHERE "TenantId" = {tenantId.Value} AND "Id" = {hospitalId} FOR UPDATE""",
             cancellationToken);
@@ -106,8 +105,8 @@ public sealed partial class PatientIdentifierService(
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
-        // The policy row is the per-hospital sequence lock. PostgreSQL holds it
-        // until the surrounding request/audit transaction commits or rolls back.
+        // Locking the per-hospital policy row serializes sequence allocation.
+        // The lock is held through the metadata audit commit of this request.
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""SELECT "Id" FROM "hospital_patient_identifier_policies" WHERE "TenantId" = {tenantId.Value} AND "HospitalId" = {hospitalId} FOR UPDATE""",
             cancellationToken);
@@ -205,16 +204,13 @@ public sealed partial class PatientIdentifierService(
                         x.NormalizedValue == normalized)
             .Select(x => new PatientIdentifierLookupDto(
                 new PatientDto(
-                    x.Patient.Id,
-                    x.Patient.GivenName,
-                    x.Patient.MiddleName,
-                    x.Patient.FamilyName,
-                    x.Patient.DateOfBirth,
+                    x.Registration.Patient.Id,
+                    x.Registration.Patient.GivenName,
+                    x.Registration.Patient.MiddleName,
+                    x.Registration.Patient.FamilyName,
+                    x.Registration.Patient.DateOfBirth,
                     x.HospitalId,
-                    db.HospitalPatientRegistrations
-                        .Where(r => r.HospitalId == x.HospitalId && r.PatientId == x.PatientId)
-                        .Select(r => r.RegisteredAtUtc)
-                        .First()),
+                    x.Registration.RegisteredAtUtc),
                 new PatientIdentifierDto(
                     x.Id, x.PatientId, x.HospitalId, x.TypeCode, x.Value, x.AssignedAtUtc)))
             .FirstOrDefaultAsync(cancellationToken);

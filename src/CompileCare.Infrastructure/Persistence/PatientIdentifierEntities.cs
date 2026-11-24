@@ -8,9 +8,8 @@ public static class PatientIdentifierTypes
 public sealed class PatientIdentifier : TenantOwnedEntity
 {
     public Guid PatientId { get; set; }
-    public Patient Patient { get; set; } = null!;
     public Guid HospitalId { get; set; }
-    public Hospital Hospital { get; set; } = null!;
+    public HospitalPatientRegistration Registration { get; set; } = null!;
     public string TypeCode { get; set; } = PatientIdentifierTypes.MedicalRecordNumber;
     public string Value { get; set; } = string.Empty;
     public string NormalizedValue { get; set; } = string.Empty;
