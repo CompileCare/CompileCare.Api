@@ -55,6 +55,10 @@ public sealed class OpdEncounterSecurityTests
             new QueueActionInput(null));
         Assert.Equal(HttpStatusCode.OK, start.StatusCode);
 
+        var clinicianPatient = await clinician.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/{patientId:D}");
+        Assert.Equal(HttpStatusCode.OK, clinicianPatient.StatusCode);
+
         var clinicianDepartments = await clinician.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/departments?page=1&pageSize=100");
         Assert.Equal(HttpStatusCode.OK, clinicianDepartments.StatusCode);
