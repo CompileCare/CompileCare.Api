@@ -43,6 +43,7 @@ app.MapStaffEndpoints();
 app.MapPatientIdentifierEndpoints();
 app.MapAppointmentEndpoints();
 app.MapOpdEncounterEndpoints();
+app.MapBillingEndpoints();
 app.Run();
 
 public partial class Program;

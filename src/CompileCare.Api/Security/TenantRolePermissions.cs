@@ -1,4 +1,5 @@
 using CompileCare.Application.Appointments;
+using CompileCare.Application.Billing;
 using CompileCare.Application.Clinical;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
@@ -24,7 +25,12 @@ internal static class TenantRolePermissions
                 AppointmentPermissions.AvailabilityRead,
                 AppointmentPermissions.AvailabilityManage,
                 QueuePermissions.Read,
-                QueuePermissions.Manage
+                QueuePermissions.Manage,
+                BillingPermissions.CatalogueManage,
+                BillingPermissions.InvoiceRead,
+                BillingPermissions.InvoiceManage,
+                BillingPermissions.PaymentManage,
+                BillingPermissions.ReportRead
             ],
             TenantRoles.FacilityManager =>
             [
@@ -46,7 +52,11 @@ internal static class TenantRolePermissions
                 AppointmentPermissions.AppointmentRead,
                 AppointmentPermissions.AppointmentManage,
                 QueuePermissions.Read,
-                QueuePermissions.Manage
+                QueuePermissions.Manage,
+                BillingPermissions.InvoiceRead,
+                BillingPermissions.InvoiceManage,
+                BillingPermissions.PaymentManage,
+                BillingPermissions.ReportRead
             ],
             TenantRoles.ClinicalUser =>
             [

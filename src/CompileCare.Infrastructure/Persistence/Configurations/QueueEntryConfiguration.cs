@@ -17,6 +17,7 @@ public sealed class QueueEntryConfiguration : IEntityTypeConfiguration<QueueEntr
         builder.Property(x => x.TimeZoneId).HasMaxLength(100).IsRequired();
         builder.Property(x => x.ClosureReason).HasMaxLength(250);
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
+        builder.HasAlternateKey(x => new { x.TenantId, x.HospitalId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId, x.QueueDateLocal, x.TokenNumber })
             .HasDatabaseName("IX_queue_entries_daily_token").IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.DepartmentId, x.QueueDateLocal, x.Status, x.TokenNumber })

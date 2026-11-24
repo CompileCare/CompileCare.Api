@@ -1,4 +1,5 @@
 using CompileCare.Application.Appointments;
+using CompileCare.Application.Billing;
 using CompileCare.Application.Clinical;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Staff;
@@ -33,6 +34,10 @@ public sealed class CompileCareDbContext(
     public DbSet<QueueEntry> QueueEntries => Set<QueueEntry>();
     public DbSet<OpdEncounter> OpdEncounters => Set<OpdEncounter>();
     public DbSet<OpdEncounterAmendment> OpdEncounterAmendments => Set<OpdEncounterAmendment>();
+    public DbSet<BillingServiceItem> BillingServiceItems => Set<BillingServiceItem>();
+    public DbSet<BillingInvoice> BillingInvoices => Set<BillingInvoice>();
+    public DbSet<BillingInvoiceLine> BillingInvoiceLines => Set<BillingInvoiceLine>();
+    public DbSet<BillingPayment> BillingPayments => Set<BillingPayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -84,6 +89,14 @@ public sealed class CompileCareDbContext(
         modelBuilder.Entity<OpdEncounter>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<OpdEncounterAmendment>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<BillingServiceItem>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<BillingInvoice>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<BillingInvoiceLine>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<BillingPayment>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
 
         TenantModelConfiguration.ApplyTenantFilters(modelBuilder, this);
@@ -153,6 +166,25 @@ public sealed class CompileCareDbContext(
             }
             else if (entry.State == EntityState.Deleted)
                 throw new InvalidOperationException("Platform records cannot be physically deleted.");
+        }
+
+        foreach (var entry in ChangeTracker.Entries<BillingInvoiceLine>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+                throw new InvalidOperationException("Issued invoice lines are immutable and cannot be modified or deleted.");
+        }
+
+        foreach (var entry in ChangeTracker.Entries<BillingPayment>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+                throw new InvalidOperationException("Billing payments are append-only and cannot be modified or deleted.");
+        }
+
+        foreach (var entry in ChangeTracker.Entries<BillingInvoice>())
+        {
+            if (entry.State == EntityState.Modified &&
+                entry.Properties.Any(property => property.IsModified && property.Metadata.Name != nameof(BillingInvoice.PaymentSequence)))
+                throw new InvalidOperationException("Issued invoices are immutable except for the internal payment concurrency sequence.");
         }
 
         foreach (var entry in ChangeTracker.Entries<PatientIdentifier>())
