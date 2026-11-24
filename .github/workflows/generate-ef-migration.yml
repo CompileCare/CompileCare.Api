@@ -95,15 +95,17 @@ jobs:
 
       - name: Commit and push generated migration
         shell: bash
+        env:
+          MIGRATION_NAME: ${{ inputs.migration_name }}
         run: |
           set -euo pipefail
           MIGRATION_DIR="src/CompileCare.Infrastructure/Persistence/Migrations"
-          if git diff --quiet -- "$MIGRATION_DIR"; then
+          if [[ -z "$(git status --porcelain -- "$MIGRATION_DIR")" ]]; then
             echo "::error::EF tooling produced no migration changes; refusing to create an empty commit."
             exit 1
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$MIGRATION_DIR"
-          git commit -m "chore(database): add migration"
+          git commit -m "chore(database): add ${MIGRATION_NAME} migration"
           git push origin "HEAD:$GITHUB_REF_NAME"
