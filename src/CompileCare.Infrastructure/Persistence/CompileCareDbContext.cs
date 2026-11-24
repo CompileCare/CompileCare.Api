@@ -1,4 +1,5 @@
 using CompileCare.Application.Patients;
+using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +24,8 @@ public sealed class CompileCareDbContext(
     public DbSet<HospitalPatientRegistration> HospitalPatientRegistrations => Set<HospitalPatientRegistration>();
     public DbSet<PatientIdentifier> PatientIdentifiers => Set<PatientIdentifier>();
     public DbSet<HospitalPatientIdentifierPolicy> HospitalPatientIdentifierPolicies => Set<HospitalPatientIdentifierPolicy>();
+    public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
+    public DbSet<StaffAssignment> StaffAssignments => Set<StaffAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +63,10 @@ public sealed class CompileCareDbContext(
         modelBuilder.Entity<PatientIdentifier>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<HospitalPatientIdentifierPolicy>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<StaffProfile>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<StaffAssignment>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
 
         TenantModelConfiguration.ApplyTenantFilters(modelBuilder, this);
