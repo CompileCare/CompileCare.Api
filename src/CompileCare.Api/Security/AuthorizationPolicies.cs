@@ -14,6 +14,7 @@ public static class AuthorizationPolicies
     public const string PlatformOperator = "PlatformOperator";
     public const string PatientRead = "PatientRead";
     public const string PatientRegister = "PatientRegister";
+    public const string PatientDuplicateReview = "PatientDuplicateReview";
     public const string PatientIdentifierRead = "PatientIdentifierRead";
     public const string PatientIdentifierAssign = "PatientIdentifierAssign";
     public const string PatientIdentifierPolicyRead = "PatientIdentifierPolicyRead";
@@ -45,6 +46,9 @@ public static class AuthorizationPolicies
         options.AddPolicy(PatientRegister, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, PatientPermissions.Register)));
+        options.AddPolicy(PatientDuplicateReview, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, PatientDuplicatePermissions.Review)));
         options.AddPolicy(PatientIdentifierRead, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, PatientIdentifierPermissions.Read)));

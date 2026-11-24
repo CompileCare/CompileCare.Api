@@ -30,6 +30,7 @@ internal static class TenantRolePermissions
             [
                 PatientPermissions.Read,
                 PatientPermissions.Register,
+                PatientDuplicatePermissions.Review,
                 PatientIdentifierPermissions.Read,
                 PatientIdentifierPermissions.Assign
             ],
