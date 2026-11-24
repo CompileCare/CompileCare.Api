@@ -111,7 +111,6 @@ public sealed class AddOpdEncounters : Migration
     {
         migrationBuilder.DropTable(name: "opd_encounter_amendments");
         migrationBuilder.DropTable(name: "opd_encounters");
-        migrationBuilder.DropTable(name: "opd_encounters");
     }
 
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
