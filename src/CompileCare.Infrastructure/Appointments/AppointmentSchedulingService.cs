@@ -50,6 +50,9 @@ public sealed class AppointmentSchedulingService(
 
         var startsAtUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localStart, timeZone));
         var endsAtUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localEnd, timeZone));
+        if ((endsAtUtc - startsAtUtc).TotalMinutes != duration)
+            return AppointmentResult<AvailabilitySessionDto>.Failure(
+                "Availability sessions cannot cross a time-zone offset transition; publish separate sessions instead.", 400);
 
         var departmentExists = await db.Departments.AnyAsync(
             x => x.Id == input.DepartmentId && x.HospitalId == hospitalId, cancellationToken);
@@ -166,6 +169,8 @@ public sealed class AppointmentSchedulingService(
 
         var slotStart = input.SlotStartsAtUtc.ToUniversalTime();
         var slotEnd = slotStart.AddMinutes(session.SlotDurationMinutes);
+        if (slotStart <= DateTimeOffset.UtcNow)
+            return AppointmentResult<AppointmentDto>.Failure("Appointments must be booked for a future time.", 400);
         var offset = (slotStart - session.StartsAtUtc).TotalMinutes;
         if (slotStart < session.StartsAtUtc || slotEnd > session.EndsAtUtc ||
             offset < 0 || offset % session.SlotDurationMinutes != 0)
