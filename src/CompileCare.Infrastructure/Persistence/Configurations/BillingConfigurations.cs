@@ -18,6 +18,7 @@ public sealed class BillingServiceItemConfiguration : IEntityTypeConfiguration<B
         builder.Property(x => x.Category).HasMaxLength(80).IsRequired();
         builder.Property(x => x.UnitPrice).HasPrecision(18, 2);
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
+        builder.HasAlternateKey(x => new { x.TenantId, x.HospitalId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.Code }).IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.IsActive, x.Category });
         builder.HasOne<Hospital>().WithMany()
@@ -40,6 +41,7 @@ public sealed class BillingInvoiceConfiguration : IEntityTypeConfiguration<Billi
         builder.Property(x => x.Status).HasMaxLength(20).IsRequired();
         builder.Property(x => x.Subtotal).HasPrecision(18, 2);
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
+        builder.HasAlternateKey(x => new { x.TenantId, x.HospitalId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.InvoiceNumber }).IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.QueueEntryId }).IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PatientId, x.IssuedAtUtc });
@@ -76,11 +78,11 @@ public sealed class BillingInvoiceLineConfiguration : IEntityTypeConfiguration<B
         builder.HasIndex(x => new { x.TenantId, x.InvoiceId });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId });
         builder.HasOne<BillingInvoice>().WithMany()
-            .HasForeignKey(x => new { x.TenantId, x.InvoiceId })
-            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.InvoiceId })
+            .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<BillingServiceItem>().WithMany()
-            .HasForeignKey(x => new { x.TenantId, x.ServiceItemId })
-            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.ServiceItemId })
+            .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -102,8 +104,8 @@ public sealed class BillingPaymentConfiguration : IEntityTypeConfiguration<Billi
         builder.HasIndex(x => new { x.TenantId, x.InvoiceId, x.PaidAtUtc });
         builder.HasIndex(x => new { x.TenantId, x.HospitalId, x.PaidAtUtc });
         builder.HasOne<BillingInvoice>().WithMany()
-            .HasForeignKey(x => new { x.TenantId, x.InvoiceId })
-            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(x => new { x.TenantId, x.HospitalId, x.InvoiceId })
+            .HasPrincipalKey(x => new { x.TenantId, x.HospitalId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Hospital>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.HospitalId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
