@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CompileCare.Application.Tenancy;
+using CompileCare.Application.Patients;
 using Microsoft.AspNetCore.Authorization;
 
 namespace CompileCare.Api.Security;
