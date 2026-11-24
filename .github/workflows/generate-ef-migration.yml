@@ -106,7 +106,7 @@ jobs:
             latest_epoch="$(python -c "from datetime import datetime; print(int(datetime.strptime('$latest_id', '%Y%m%d%H%M%S').timestamp()))")"
             next_id="$(python -c "from datetime import datetime, timezone; import sys; print(datetime.fromtimestamp(int(sys.argv[1]) + 1, timezone.utc).strftime('%Y%m%d%H%M%S'))" "$latest_epoch")"
             old_base="$(basename "$generated_file" .cs)"
-            new_base="$next_id_$MIGRATION_NAME"
+            new_base="${next_id}_${MIGRATION_NAME}"
             designer_file="$migration_dir/$old_base.Designer.cs"
             mv "$generated_file" "$migration_dir/$new_base.cs"
             mv "$designer_file" "$migration_dir/$new_base.Designer.cs"
