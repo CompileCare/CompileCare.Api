@@ -11,6 +11,8 @@ public static class AuthorizationPolicies
     public const string FacilityDelete = "FacilityDelete";
     public const string TenantMembershipManage = "TenantMembershipManage";
     public const string PlatformOperator = "PlatformOperator";
+    public const string PatientRead = "PatientRead";
+    public const string PatientRegister = "PatientRegister";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
@@ -32,6 +34,12 @@ public static class AuthorizationPolicies
         options.AddPolicy(TenantMembershipManage, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, TenantPermissions.MembershipManage)));
+        options.AddPolicy(PatientRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, PatientPermissions.Read)));
+        options.AddPolicy(PatientRegister, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, PatientPermissions.Register)));
         options.AddPolicy(PlatformOperator, policy =>
             policy.RequireAuthenticatedUser()
                 .AddRequirements(new PlatformOperatorRequirement()));
