@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientIdentifierService, PatientIdentifierService>();
         services.AddScoped<IStaffManagementService, StaffManagementService>();
         services.AddScoped<IAppointmentSchedulingService, AppointmentSchedulingService>();
+        services.AddScoped<IAppointmentQueueService, AppointmentQueueService>();
         services.AddScoped<FacilityService>();
         services.AddScoped<IHospitalService>(sp => sp.GetRequiredService<FacilityService>());
         services.AddScoped<IDepartmentService>(sp => sp.GetRequiredService<FacilityService>());

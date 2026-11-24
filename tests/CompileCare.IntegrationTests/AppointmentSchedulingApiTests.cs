@@ -96,6 +96,60 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Fact]
+    public async Task ReschedulingPersistsTenantScopedAppointmentLineage()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "reschedule-reception-user");
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        using var registrar = CreateClient(tenantId, "reschedule-reception-user");
+        var date = new DateOnly(2026, 12, 11);
+        var sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentId, providerId, date, new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await registrar.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        Assert.Equal(2, slots!.Count);
+
+        var bookingResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, patientId, slots[0].StartsAtUtc, "Initial booking"));
+        Assert.Equal(HttpStatusCode.Created, bookingResponse.StatusCode);
+        var original = await bookingResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(original);
+
+        var rescheduleResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{original!.Id:D}/reschedule",
+            new AppointmentBookInput(session.Id, patientId, slots[1].StartsAtUtc, "Rescheduled"));
+        Assert.True(rescheduleResponse.StatusCode == HttpStatusCode.OK,
+            $"Reschedule failed: {(int)rescheduleResponse.StatusCode} {await rescheduleResponse.Content.ReadAsStringAsync()}");
+        var replacement = await rescheduleResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(replacement);
+        Assert.Equal(original.Id, replacement!.RescheduledFromAppointmentId);
+        Assert.Equal(AppointmentStatuses.Booked, replacement.Status);
+
+        var originalResponse = await registrar.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{original.Id:D}");
+        Assert.Equal(HttpStatusCode.OK, originalResponse.StatusCode);
+        var cancelled = await originalResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(cancelled);
+        Assert.Equal(AppointmentStatuses.Cancelled, cancelled!.Status);
+    }
+
+    [Fact]
     public async Task AvailabilityRejectsInvalidTimeZoneAndSlotDuration()
     {
         var tenantId = Guid.NewGuid();
@@ -116,6 +170,96 @@ public sealed class AppointmentSchedulingApiTests
             new AvailabilitySessionCreateInput(departmentId, providerId, new DateOnly(2026, 12, 10),
                 new TimeOnly(9, 0), new TimeOnly(10, 0), 17, "Asia/Kolkata"));
         Assert.Equal(HttpStatusCode.BadRequest, invalidDuration.StatusCode);
+    }
+
+    [Fact]
+    public async Task WalkInsReceiveSequentialTokensAndQueueTransitionsAreEnforced()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, _, patientId) = await SeedSchedulingDataAsync(tenantId);
+        const string registrarSubject = "queue-reception-user";
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: registrarSubject);
+        using var registrar = CreateClient(tenantId, registrarSubject);
+
+        var request = new WalkInCreateInput(departmentId, patientId, "Asia/Kolkata");
+        var responses = await Task.WhenAll(
+            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins", request),
+            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins", request));
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.Created, response.StatusCode));
+        var entries = await Task.WhenAll(responses.Select(
+            response => response.Content.ReadFromJsonAsync<QueueEntryDto>()));
+        Assert.All(entries, entry => Assert.NotNull(entry));
+        Assert.Equal(new[] { 1, 2 }, entries.Select(entry => entry!.TokenNumber).Order().ToArray());
+
+        var first = entries.Single(entry => entry!.TokenNumber == 1)!;
+        var call = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{first.Id:D}/call", new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, call.StatusCode);
+        var start = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{first.Id:D}/start", new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, start.StatusCode);
+        var complete = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{first.Id:D}/complete", new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
+        var invalidRecall = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{first.Id:D}/recall", new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.Conflict, invalidRecall.StatusCode);
+    }
+
+    [Fact]
+    public async Task AppointmentCheckInCreatesOneQueueEntryAndIsIdempotent()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        const string registrarSubject = "appointment-checkin-user";
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: registrarSubject);
+        using var registrar = CreateClient(tenantId, registrarSubject);
+
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        var localStart = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).DateTime.AddMinutes(10);
+        var start = new TimeOnly(localStart.Hour, localStart.Minute, localStart.Second);
+        var date = DateOnly.FromDateTime(localStart);
+        var sessionResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(departmentId, providerId, date, start, start.AddMinutes(5), 5, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Forbidden, sessionResponse.StatusCode);
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(departmentId, providerId, date, start, start.AddMinutes(5), 5, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var booking = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session!.Id, patientId, session.StartsAtUtc, null));
+        Assert.Equal(HttpStatusCode.Created, booking.StatusCode);
+        var appointment = await booking.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(appointment);
+
+        var first = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment!.Id:D}/check-in", null);
+        var second = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/check-in", null);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var firstEntry = await first.Content.ReadFromJsonAsync<QueueEntryDto>();
+        var secondEntry = await second.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(firstEntry);
+        Assert.NotNull(secondEntry);
+        Assert.Equal(firstEntry!.Id, secondEntry!.Id);
+        Assert.Equal(firstEntry.TokenNumber, secondEntry.TokenNumber);
     }
 
     private async Task<(Guid HospitalId, Guid DepartmentId, Guid ProviderId, Guid PatientId)> SeedSchedulingDataAsync(Guid tenantId)

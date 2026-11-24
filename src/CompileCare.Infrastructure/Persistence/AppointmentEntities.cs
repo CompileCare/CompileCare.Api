@@ -23,4 +23,5 @@ public sealed class Appointment : TenantOwnedEntity
     public DateTimeOffset SlotEndsAtUtc { get; set; }
     public string Status { get; set; } = "Booked";
     public string? Reason { get; set; }
+    public Guid? RescheduledFromAppointmentId { get; set; }
 }

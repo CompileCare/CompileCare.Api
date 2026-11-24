@@ -29,6 +29,7 @@ public sealed class CompileCareDbContext(
     public DbSet<StaffAssignment> StaffAssignments => Set<StaffAssignment>();
     public DbSet<ProviderAvailabilitySession> ProviderAvailabilitySessions => Set<ProviderAvailabilitySession>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<QueueEntry> QueueEntries => Set<QueueEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +75,8 @@ public sealed class CompileCareDbContext(
         modelBuilder.Entity<ProviderAvailabilitySession>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Appointment>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<QueueEntry>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
 
         TenantModelConfiguration.ApplyTenantFilters(modelBuilder, this);
