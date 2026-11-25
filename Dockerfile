@@ -1,11 +1,7 @@
-# syntax=docker/dockerfile:1.7
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY . .
-# GitHub Packages credentials are provided only as a BuildKit secret. They are
-# never written into an image layer, build argument, or published artifact.
-RUN --mount=type=secret,id=nuget_credentials,required=true \
-    sh -c 'export NuGetPackageSourceCredentials_github="$(cat /run/secrets/nuget_credentials)" && dotnet publish src/CompileCare.Api/CompileCare.Api.csproj -c Release -o /app/publish /p:UseAppHost=false'
+RUN dotnet publish src/CompileCare.Api/CompileCare.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
