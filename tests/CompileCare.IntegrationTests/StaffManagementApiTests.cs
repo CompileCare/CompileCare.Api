@@ -154,6 +154,16 @@ public sealed class StaffManagementApiTests
         Assert.NotNull(page);
         Assert.Empty(page!.Items);
 
+        // Capture a per-test audit watermark after the successful tenant-B search.
+        // The shared integration database may contain earlier audit rows for the same test subject.
+        using var auditBaselineScope = _factory.Services.CreateScope();
+        auditBaselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
+        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var existingAuditIds = await auditBaselineDb.AuditEvents.AsNoTracking()
+            .Where(audit => audit.ActorSubject == TestJwtTokenFactory.Subject)
+            .Select(audit => audit.Id)
+            .ToListAsync();
+
         var attempts = new[]
         {
             await adminB.GetAsync($"/api/v1/staff/{profile.Id:D}"),
@@ -183,7 +193,8 @@ public sealed class StaffManagementApiTests
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
         var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
         var auditEvents = await db.AuditEvents.AsNoTracking()
-            .Where(audit => audit.ActorSubject == TestJwtTokenFactory.Subject)
+            .Where(audit => audit.ActorSubject == TestJwtTokenFactory.Subject &&
+                            !existingAuditIds.Contains(audit.Id))
             .OrderBy(audit => audit.OccurredAtUtc)
             .ToListAsync();
 
