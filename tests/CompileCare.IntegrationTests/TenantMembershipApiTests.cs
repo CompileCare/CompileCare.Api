@@ -298,6 +298,123 @@ public sealed class TenantMembershipApiTests
         Assert.Equal(HttpStatusCode.NotFound, outOfTenantHospital.StatusCode);
     }
 
+    [Fact]
+    public async Task MembershipRoleScopeAndActivationChanges_AreAuditedAsMetadata()
+    {
+        await _factory.SeedPlatformOperatorAsync();
+        using var platformClient = CreateClient(TestJwtTokenFactory.Subject);
+
+        var tenantId = await CreateTenantAsync(
+            platformClient, "Membership audit tenant", "membership-audit-tenant");
+        var provision = await platformClient.PostAsJsonAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/initial-administrator",
+            new { issuer = TestJwtTokenFactory.Issuer, subject = "membership-audit-admin" });
+        Assert.Equal(HttpStatusCode.Created, provision.StatusCode);
+
+        var activateTenant = await platformClient.PostAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/activate",
+            content: null);
+        Assert.Equal(HttpStatusCode.OK, activateTenant.StatusCode);
+
+        using var adminClient = CreateClient("membership-audit-admin", tenantId);
+        var hospitalId = await CreateHospitalAsync(
+            adminClient, "Membership audit hospital", "MEM-AUDIT");
+        var departmentId = await CreateDepartmentAsync(
+            adminClient, hospitalId, "Membership audit department");
+
+        var createMembership = await adminClient.PostAsJsonAsync(
+            "/api/v1/tenant/memberships",
+            new
+            {
+                issuer = TestJwtTokenFactory.Issuer,
+                subject = "membership-audit-target",
+                role = TenantRoles.FacilityViewer,
+                scopes = new[]
+                {
+                    new
+                    {
+                        scopeType = OrganizationScopeTypes.Department,
+                        departmentId
+                    }
+                }
+            });
+        Assert.Equal(HttpStatusCode.Created, createMembership.StatusCode);
+        var targetMembership = await createMembership.Content.ReadFromJsonAsync<MembershipResponse>();
+        Assert.NotNull(targetMembership);
+
+        using (var baselineScope = _factory.Services.CreateScope())
+        {
+            baselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var baselineDb = baselineScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var existingAuditIds = await baselineDb.AuditEvents.IgnoreQueryFilters()
+                .Where(value => value.TenantId == tenantId &&
+                                value.ActorSubject == "membership-audit-admin")
+                .Select(value => value.Id)
+                .ToListAsync();
+
+            var update = await adminClient.PutAsJsonAsync(
+                $"/api/v1/tenant/memberships/{targetMembership!.Id:D}",
+                new
+                {
+                    role = TenantRoles.FacilityManager,
+                    scopes = new[]
+                    {
+                        new
+                        {
+                            scopeType = OrganizationScopeTypes.Hospital,
+                            hospitalId
+                        }
+                    }
+                });
+            Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+            var deactivate = await adminClient.PostAsync(
+                $"/api/v1/tenant/memberships/{targetMembership.Id:D}/deactivate",
+                content: null);
+            Assert.Equal(HttpStatusCode.OK, deactivate.StatusCode);
+
+            var reactivate = await adminClient.PostAsync(
+                $"/api/v1/tenant/memberships/{targetMembership.Id:D}/reactivate",
+                content: null);
+            Assert.Equal(HttpStatusCode.OK, reactivate.StatusCode);
+
+            // Read the audit rows in the same tenant context and exclude fixture
+            // activity so this assertion is deterministic even as setup evolves.
+            var auditEvents = await baselineDb.AuditEvents.IgnoreQueryFilters()
+                .Where(value => value.TenantId == tenantId &&
+                                value.ActorSubject == "membership-audit-admin" &&
+                                !existingAuditIds.Contains(value.Id))
+                .OrderBy(value => value.OccurredAtUtc)
+                .ToListAsync();
+
+            Assert.Equal(3, auditEvents.Count);
+            Assert.Equal(
+                new[]
+                {
+                    "UpdateTenantMembership",
+                    "DeactivateTenantMembership",
+                    "ReactivateTenantMembership"
+                },
+                auditEvents.Select(value => value.Action).ToArray());
+
+            Assert.All(auditEvents, audit =>
+            {
+                Assert.Equal(tenantId, audit.TenantId);
+                Assert.Equal(tenantId, audit.RequestedTenantId);
+                Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+                Assert.Equal("membership-audit-admin", audit.ActorSubject);
+                Assert.Equal("Tenant memberships", audit.ResourceType);
+                Assert.Equal(targetMembership.Id, audit.ResourceId);
+                Assert.Equal("Succeeded", audit.Outcome);
+                Assert.Equal((int)HttpStatusCode.OK, audit.StatusCode);
+            });
+
+            Assert.Equal(
+                new[] { "PUT", "POST", "POST" },
+                auditEvents.Select(value => value.HttpMethod).ToArray());
+        }
+    }
+
     private async Task<Guid> CreateTenantAsync(HttpClient platformClient, string name, string slug)
     {
         var response = await platformClient.PostAsJsonAsync(
