@@ -21,7 +21,7 @@ public partial class AddInvoiceSettlementStatuses : Migration
         migrationBuilder.AddCheckConstraint(
             name: "CK_billing_invoices_status",
             table: "billing_invoices",
-            sql: "\\\"Status\\\" IN ('Issued', 'PartiallyPaid', 'Paid')");
+            sql: "\"Status\" IN ('Issued', 'PartiallyPaid', 'Paid')");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
@@ -32,6 +32,6 @@ public partial class AddInvoiceSettlementStatuses : Migration
         migrationBuilder.AddCheckConstraint(
             name: "CK_billing_invoices_status",
             table: "billing_invoices",
-            sql: "\\\"Status\\\" IN ('Issued')");
+            sql: "\"Status\" IN ('Issued')");
     }
 }
