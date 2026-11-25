@@ -37,6 +37,7 @@ public static class DependencyInjection
 
         services.AddScoped<ITenantMembershipReader, TenantMembershipReader>();
         services.AddScoped<IPlatformOperatorReader, PlatformOperatorReader>();
+        services.AddScoped<IPlatformOperatorBootstrapService, PlatformOperatorBootstrapService>();
         services.AddScoped<ITenantRegistryService, TenantRegistryService>();
         services.AddScoped<ITenantMembershipAdministrationService, TenantMembershipAdministrationService>();
         services.AddScoped<IPatientService, PatientService>();
