@@ -6,6 +6,7 @@ using CompileCare.Application.Patients;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
