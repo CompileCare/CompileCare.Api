@@ -85,12 +85,12 @@ public sealed class PatientApiTests
 
         var create = await client.PostAsJsonAsync(
             "/api/v1/hospitals",
-            new HospitalRequest("Unauthorized Hospital", Guid.NewGuid().ToString("N")[..8]));
+            new { name = "Unauthorized Hospital", code = Guid.NewGuid().ToString("N")[..8] });
         Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
 
         var update = await client.PutAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}",
-            new HospitalRequest("Changed Hospital", "CHANGED"));
+            new { name = "Changed Hospital", code = "CHANGED" });
         Assert.Equal(HttpStatusCode.Forbidden, update.StatusCode);
 
         var delete = await client.DeleteAsync($"/api/v1/hospitals/{hospitalId:D}");
