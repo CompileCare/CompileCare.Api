@@ -72,15 +72,29 @@ public sealed class PatientApiTests
     }
 
     [Fact]
-    public async Task PatientRegistrar_DoesNotReceiveFacilityAdministrationPermissions()
+    public async Task PatientRegistrar_CanReadButCannotAdministerFacilities()
     {
         var tenantId = Guid.NewGuid();
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar);
+        var hospitalId = await SeedHospitalAsync(tenantId, "Reception Hospital");
         using var client = CreateClient(tenantId);
 
-        var response = await client.GetAsync("/api/v1/hospitals");
+        // Reception needs read-only hospital discovery for its hospital selector.
+        var read = await client.GetAsync("/api/v1/hospitals?page=1&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var create = await client.PostAsJsonAsync(
+            "/api/v1/hospitals",
+            new { name = "Unauthorized Hospital", code = Guid.NewGuid().ToString("N")[..8] });
+        Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
+
+        var update = await client.PutAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}",
+            new { name = "Changed Hospital", code = "CHANGED" });
+        Assert.Equal(HttpStatusCode.Forbidden, update.StatusCode);
+
+        var delete = await client.DeleteAsync($"/api/v1/hospitals/{hospitalId:D}");
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
     }
 
     [Fact]

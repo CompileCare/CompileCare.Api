@@ -30,6 +30,8 @@ internal static class TenantRolePermissions
                 StaffPermissions.Manage,
                 AppointmentPermissions.AvailabilityRead,
                 AppointmentPermissions.AvailabilityManage,
+                AppointmentPermissions.AppointmentRead,
+                AppointmentPermissions.AppointmentManage,
                 QueuePermissions.Read,
                 QueuePermissions.Manage,
                 BillingPermissions.CatalogueManage,
@@ -49,6 +51,7 @@ internal static class TenantRolePermissions
             ],
             TenantRoles.PatientRegistrar =>
             [
+                TenantPermissions.FacilityRead,
                 PatientPermissions.Read,
                 PatientPermissions.IdentityRead,
                 PatientPermissions.Register,

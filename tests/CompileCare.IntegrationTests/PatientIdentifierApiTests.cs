@@ -29,6 +29,11 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
         using var admin = CreateClient(tenantId, adminSubject);
         using var registrar = CreateClient(tenantId, registrarSubject);
 
+        // Reception users need to load the hospital selector before they can
+        // perform hospital-scoped patient and appointment workflows.
+        var registrarHospitals = await registrar.GetAsync("/api/v1/hospitals?page=1&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, registrarHospitals.StatusCode);
+
         var policyResponse = await admin.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/patient-identifier-policy",
             new PatientIdentifierPolicyInput(" akh ", 6));
@@ -97,6 +102,18 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
         Assert.NotNull(adminAssignedIdentifier);
         Assert.Equal(firstIdentifiers[0].Id, adminAssignedIdentifier!.Id);
         Assert.Equal(firstIdentifiers[0].Value, adminAssignedIdentifier.Value);
+
+        // HospitalAdmin must be able to read and manage appointments. Use a
+        // non-existent identifier to verify authorization without creating data.
+        var missingAppointmentId = Guid.NewGuid();
+        var adminCanReadAppointment = await admin.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{missingAppointmentId:D}");
+        Assert.Equal(HttpStatusCode.NotFound, adminCanReadAppointment.StatusCode);
+
+        var adminCanManageAppointment = await admin.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{missingAppointmentId:D}/cancel",
+            content: null);
+        Assert.Equal(HttpStatusCode.NotFound, adminCanManageAppointment.StatusCode);
     }
 
     [Fact]
