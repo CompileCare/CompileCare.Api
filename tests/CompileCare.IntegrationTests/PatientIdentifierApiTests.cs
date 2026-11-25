@@ -88,10 +88,15 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
             new PatientIdentifierPolicyInput("DENIED", 6));
         Assert.Equal(HttpStatusCode.Forbidden, registrarCannotManagePolicy.StatusCode);
 
-        var adminCannotAssignMrn = await admin.PostAsync(
+        var adminCanAssignExistingMrn = await admin.PostAsync(
             $"/api/v1/hospitals/{hospitalId:D}/patients/{firstPatient.Id:D}/identifiers/mrn",
             content: null);
-        Assert.Equal(HttpStatusCode.Forbidden, adminCannotAssignMrn.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, adminCanAssignExistingMrn.StatusCode);
+        var adminAssignedIdentifier =
+            await adminCanAssignExistingMrn.Content.ReadFromJsonAsync<PatientIdentifierDto>();
+        Assert.NotNull(adminAssignedIdentifier);
+        Assert.Equal(firstIdentifiers[0].Id, adminAssignedIdentifier!.Id);
+        Assert.Equal(firstIdentifiers[0].Value, adminAssignedIdentifier.Value);
     }
 
     [Fact]
