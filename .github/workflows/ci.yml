@@ -45,3 +45,10 @@ jobs:
       - name: Detect pending EF Core model changes
         run: dotnet ef migrations has-pending-model-changes --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
       - run: dotnet test CompileCare.Api.slnx --configuration Release --no-build
+      - name: Build production API container with BuildKit secret
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf 'Username=%s;Password=%s;ValidAuthenticationTypes=Basic' "$GITHUB_ACTOR" "$GITHUB_TOKEN" > "$RUNNER_TEMP/nuget-source-credentials"
+          docker build --secret id=nuget_credentials,src="$RUNNER_TEMP/nuget-source-credentials" --tag compilecare-api:ci .
+          rm -f "$RUNNER_TEMP/nuget-source-credentials"
