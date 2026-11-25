@@ -282,6 +282,75 @@ public sealed class PatientApiTests
         return (authorized.Id, other.Id);
     }
 
+    [Fact]
+    public async Task HospitalScopedRegistrar_CannotReadPatientFromAnotherTenant_AndDenialIsAudited()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var (hospitalA, _) = await SeedHospitalAndDepartmentAsync(tenantA);
+        var (hospitalB, _) = await SeedHospitalAndDepartmentAsync(tenantB);
+
+        Guid patientBId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
+            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var patient = new Patient
+            {
+                GivenName = "Synthetic",
+                FamilyName = "TenantBPatient",
+                NormalizedGivenName = "SYNTHETIC",
+                NormalizedFamilyName = "TENANTBPATIENT"
+            };
+            db.Patients.Add(patient);
+            await db.SaveChangesAsync();
+            db.HospitalPatientRegistrations.Add(new HospitalPatientRegistration
+            {
+                PatientId = patient.Id,
+                HospitalId = hospitalB,
+                RegisteredAtUtc = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+            patientBId = patient.Id;
+        }
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantA,
+            TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)],
+            subject: "tenant-a-frontdesk");
+
+        using var tenantAClient = _factory.CreateClient();
+        tenantAClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken("tenant-a-frontdesk"));
+        tenantAClient.DefaultRequestHeaders.Add(
+            TenantContextMiddleware.HeaderName,
+            tenantA.ToString("D"));
+
+        var response = await tenantAClient.GetAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/patients/{patientBId:D}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantA);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvent = await auditDb.AuditEvents
+            .AsNoTracking()
+            .SingleAsync(item =>
+                item.TenantId == tenantA &&
+                item.ActorSubject == "tenant-a-frontdesk" &&
+                item.Action == "GetHospitalPatient");
+
+        Assert.Equal(tenantA, auditEvent.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
+        Assert.Equal(patientBId, auditEvent.ResourceId);
+        Assert.Equal("Rejected", auditEvent.Outcome);
+        Assert.Equal((int)HttpStatusCode.NotFound, auditEvent.StatusCode);
+    }
+
     private async Task<(Guid HospitalId, Guid DepartmentId)> SeedHospitalAndDepartmentAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
