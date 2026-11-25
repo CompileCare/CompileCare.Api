@@ -52,6 +52,17 @@ public static class SecurityServiceCollectionExtensions
                 };
                 options.Events = new JwtBearerEvents
                 {
+                    OnAuthenticationFailed = context =>
+                    {
+                        var logger = context.HttpContext.RequestServices
+                            .GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("CompileCare.Authentication");
+                        logger.LogWarning(
+                            context.Exception,
+                            "Bearer token validation failed for {Path}. Token contents are intentionally not logged.",
+                            context.Request.Path);
+                        return Task.CompletedTask;
+                    },
                     OnTokenValidated = context =>
                     {
                         var issuer = context.SecurityToken.Issuer;
