@@ -139,6 +139,28 @@ public sealed class BillingService(
         return BillingResult<InvoiceDto>.Success(ToInvoiceDto(invoice, lines, paid));
     }
 
+    public async Task<BillingResult<InvoiceDto>> GetInvoiceForVisitAsync(
+        Guid hospitalId, Guid queueEntryId, CancellationToken ct)
+    {
+        if (queueEntryId == Guid.Empty)
+            return BillingResult<InvoiceDto>.Failure("Invoice not found.", 404);
+
+        var invoice = await db.BillingInvoices.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.QueueEntryId == queueEntryId && x.HospitalId == hospitalId, ct);
+        if (invoice is null || !organizationScope.CanManageDepartment(hospitalId, invoice.DepartmentId))
+            return BillingResult<InvoiceDto>.Failure("Invoice not found.", 404);
+
+        var lines = await db.BillingInvoiceLines.AsNoTracking()
+            .Where(x => x.InvoiceId == invoice.Id)
+            .OrderBy(x => x.CreatedAtUtc)
+            .Select(x => new InvoiceLineDto(x.Id, x.ServiceCode, x.Description, x.Quantity, x.UnitPrice, x.LineTotal))
+            .ToListAsync(ct);
+        var paid = await db.BillingPayments.AsNoTracking()
+            .Where(x => x.InvoiceId == invoice.Id)
+            .SumAsync(x => (decimal?)x.Amount, ct) ?? 0m;
+        return BillingResult<InvoiceDto>.Success(ToInvoiceDto(invoice, lines, paid));
+    }
+
     public async Task<BillingResult<PaymentDto>> RecordPaymentAsync(
         Guid hospitalId, Guid invoiceId, PaymentCreateInput input, CancellationToken ct)
     {
