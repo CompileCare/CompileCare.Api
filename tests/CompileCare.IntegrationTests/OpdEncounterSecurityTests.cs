@@ -205,6 +205,129 @@ public sealed class OpdEncounterSecurityTests
         Assert.Equal(HttpStatusCode.NotFound, crossHospitalCreate.StatusCode);
     }
 
+    [Fact]
+    public async Task CrossTenantClinicalUserCannotReadOrModifyEncounterAndDenialsAreAudited()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var (hospitalA, departmentA, patientA) = await SeedPatientAsync(tenantA);
+        var (hospitalB, _, _) = await SeedPatientAsync(tenantB);
+
+        const string registrarA = "cross-tenant-opd-frontdesk-a";
+        const string clinicianA = "cross-tenant-opd-clinician-a";
+        const string clinicianB = "cross-tenant-opd-clinician-b";
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantA, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)],
+            subject: registrarA);
+        await _factory.SeedTenantMembershipAsync(
+            tenantA, TenantRoles.ClinicalUser,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)],
+            subject: clinicianA);
+        await _factory.SeedTenantMembershipAsync(
+            tenantB, TenantRoles.ClinicalUser,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalB)],
+            subject: clinicianB);
+
+        using var registrar = CreateClient(tenantA, registrarA);
+        using var clinician = CreateClient(tenantA, clinicianA);
+        using var crossTenantClinician = CreateClient(tenantB, clinicianB);
+
+        var walkIn = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/queue/walk-ins",
+            new WalkInCreateInput(departmentA, patientA, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, walkIn.StatusCode);
+        var queueEntry = await walkIn.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(queueEntry);
+
+        var call = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/queue/{queueEntry!.Id:D}/call",
+            new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, call.StatusCode);
+        var start = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/queue/{queueEntry.Id:D}/start",
+            new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, start.StatusCode);
+
+        var create = await clinician.PostAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/opd/queue/{queueEntry.Id:D}/encounter", null);
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var encounter = await create.Content.ReadFromJsonAsync<OpdEncounterDto>();
+        Assert.NotNull(encounter);
+
+        const string clinicalText = "TenantA-Confidential-Clinical-Note-Headache";
+        var originalNote = new OpdEncounterNoteInput(
+            clinicalText,
+            "Tenant A private history",
+            "Tenant A private examination",
+            "Tenant A private assessment",
+            "Tenant A private plan");
+        var update = await clinician.PutAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/opd/encounters/{encounter!.Id:D}/note",
+            originalNote);
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var billingBase = $"/api/v1/hospitals/{hospitalA:D}/opd";
+        var directRead = await crossTenantClinician.GetAsync(
+            $"{billingBase}/encounters/{encounter.Id:D}");
+        var queueRead = await crossTenantClinician.GetAsync(
+            $"{billingBase}/queue/{queueEntry.Id:D}/encounter");
+        var attemptedWrite = await crossTenantClinician.PutAsJsonAsync(
+            $"{billingBase}/encounters/{encounter.Id:D}/note",
+            originalNote with { Assessment = "Unauthorized tenant B change" });
+
+        Assert.Equal(HttpStatusCode.NotFound, directRead.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, queueRead.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, attemptedWrite.StatusCode);
+
+        var deniedBodies = await Task.WhenAll(
+            directRead.Content.ReadAsStringAsync(),
+            queueRead.Content.ReadAsStringAsync(),
+            attemptedWrite.Content.ReadAsStringAsync());
+        Assert.All(deniedBodies, body =>
+        {
+            Assert.DoesNotContain(clinicalText, body, StringComparison.Ordinal);
+            Assert.DoesNotContain("Tenant A private history", body, StringComparison.Ordinal);
+            Assert.DoesNotContain("Tenant A private assessment", body, StringComparison.Ordinal);
+        });
+
+        var ownerRead = await clinician.GetAsync(
+            $"{billingBase}/encounters/{encounter.Id:D}");
+        Assert.Equal(HttpStatusCode.OK, ownerRead.StatusCode);
+        var unchanged = await ownerRead.Content.ReadFromJsonAsync<OpdEncounterDto>();
+        Assert.NotNull(unchanged);
+        Assert.Equal(clinicalText, unchanged!.ChiefComplaint);
+        Assert.Equal("Tenant A private assessment", unchanged.Assessment);
+
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvents = await db.AuditEvents.AsNoTracking()
+            .Where(audit => audit.ActorSubject == clinicianB)
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(3, auditEvents.Count);
+        Assert.All(auditEvents, audit =>
+        {
+            Assert.Equal(tenantB, audit.TenantId);
+            Assert.Equal(tenantB, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal(clinicianB, audit.ActorSubject);
+            Assert.Equal("OPD encounters", audit.ResourceType);
+            Assert.Equal("Rejected", audit.Outcome);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+        });
+
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "GetOpdEncounter" && audit.ResourceId == encounter.Id);
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "GetOpdEncounterByQueueEntry" && audit.ResourceId == queueEntry.Id);
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "UpdateOpdEncounterNote" && audit.ResourceId == encounter.Id);
+    }
+
     private async Task<(Guid HospitalId, Guid DepartmentId, Guid PatientId)> SeedPatientAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
