@@ -64,3 +64,16 @@ public interface IPlatformOperatorReader
 {
     Task<bool> IsActiveAsync(string issuer, string subject, CancellationToken cancellationToken);
 }
+
+
+public sealed record PlatformOperatorBootstrapResult(bool Created, bool AlreadyInitialized, bool InvalidSecret);
+
+public interface IPlatformOperatorBootstrapService
+{
+    Task<PlatformOperatorBootstrapResult> BootstrapAsync(
+        string issuer,
+        string subject,
+        string configuredSecret,
+        string suppliedSecret,
+        CancellationToken cancellationToken);
+}
