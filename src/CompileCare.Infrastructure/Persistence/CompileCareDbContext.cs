@@ -187,7 +187,8 @@ public sealed class CompileCareDbContext(
             var sequence = entry.Property(nameof(BillingInvoice.PaymentSequence));
             var status = entry.Property(nameof(BillingInvoice.Status));
             if (entry.Properties.Any(property => property.IsModified &&
-                property.Metadata.Name is not nameof(BillingInvoice.PaymentSequence) and not nameof(BillingInvoice.Status)))
+                property.Metadata.Name != nameof(BillingInvoice.PaymentSequence) &&
+                property.Metadata.Name != nameof(BillingInvoice.Status)))
                 throw new InvalidOperationException("Issued invoice details are immutable after issue.");
 
             if (status.IsModified != sequence.IsModified)
