@@ -6,6 +6,7 @@ using CompileCare.Application.Billing;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
@@ -185,6 +186,100 @@ public sealed class BillingApiTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, paymentHistoryResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task CrossTenantRegistrarCannotReadInvoicesPaymentsOrReceiptsAndDenialsAreAudited()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var (hospitalA, _, queueEntryA, _) = await SeedVisitAsync(tenantA);
+        var (hospitalB, _, _, _) = await SeedVisitAsync(tenantB);
+
+        await _factory.SeedTenantMembershipAsync(tenantA, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)]);
+        await _factory.SeedTenantMembershipAsync(tenantA, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)],
+            subject: "billing-tenant-a-cashier");
+        await _factory.SeedTenantMembershipAsync(tenantB, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalB)],
+            subject: "billing-tenant-b-cashier");
+
+        using var admin = CreateClient(tenantA, TestJwtTokenFactory.Subject);
+        using var cashierA = CreateClient(tenantA, "billing-tenant-a-cashier");
+        using var cashierB = CreateClient(tenantB, "billing-tenant-b-cashier");
+
+        var serviceResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/billing/service-items",
+            new BillingServiceItemInput("CONSULT", "OPD Consultation", "Consultation", 500m));
+        Assert.Equal(HttpStatusCode.Created, serviceResponse.StatusCode);
+        var service = await serviceResponse.Content.ReadFromJsonAsync<BillingServiceItemDto>();
+        Assert.NotNull(service);
+
+        var invoiceResponse = await cashierA.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/billing/invoices",
+            new InvoiceCreateInput(queueEntryA, [new InvoiceLineInput(service!.Id, 1)]));
+        Assert.Equal(HttpStatusCode.Created, invoiceResponse.StatusCode);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<InvoiceDto>();
+        Assert.NotNull(invoice);
+
+        var paymentResponse = await cashierA.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/billing/invoices/{invoice!.Id:D}/payments",
+            new PaymentCreateInput(100m, PaymentMethods.Upi, "TENANT-A-ONLY-REF"));
+        Assert.Equal(HttpStatusCode.Created, paymentResponse.StatusCode);
+        var payment = await paymentResponse.Content.ReadFromJsonAsync<PaymentDto>();
+        Assert.NotNull(payment);
+
+        var billingBase = $"/api/v1/hospitals/{hospitalA:D}/billing";
+        var attempts = new[]
+        {
+            await cashierB.GetAsync($"{billingBase}/invoices/{invoice.Id:D}"),
+            await cashierB.GetAsync($"{billingBase}/invoices/{invoice.Id:D}/payments"),
+            await cashierB.GetAsync($"{billingBase}/payments/{payment!.Id:D}/receipt"),
+            await cashierB.GetAsync($"{billingBase}/visits/{queueEntryA:D}/invoice"),
+            await cashierB.GetAsync($"{billingBase}/service-items"),
+            await cashierB.GetAsync($"{billingBase}/reports/daily-collection?businessDate=2026-11-25&timeZoneId=Asia%2FKolkata")
+        };
+
+        Assert.All(attempts, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        var responseBodies = await Task.WhenAll(attempts.Select(response => response.Content.ReadAsStringAsync()));
+        Assert.All(responseBodies, body =>
+        {
+            Assert.DoesNotContain(invoice.InvoiceNumber, body, StringComparison.Ordinal);
+            Assert.DoesNotContain("TENANT-A-ONLY-REF", body, StringComparison.Ordinal);
+        });
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvents = await db.AuditEvents
+            .Where(audit => audit.ActorSubject == "billing-tenant-b-cashier")
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(6, auditEvents.Count);
+        Assert.All(auditEvents, audit =>
+        {
+            Assert.Equal(tenantB, audit.TenantId);
+            Assert.Equal(tenantB, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal("billing-tenant-b-cashier", audit.ActorSubject);
+            Assert.Equal("Billing", audit.ResourceType);
+            Assert.Equal("Rejected", audit.Outcome);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+        });
+
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "GetBillingInvoice" && audit.ResourceId == invoice.Id);
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "ListBillingInvoicePayments" && audit.ResourceId == invoice.Id);
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "GetBillingReceipt" && audit.ResourceId == payment!.Id);
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "GetBillingInvoiceForVisit" && audit.ResourceId == queueEntryA);
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "ListBillingServiceItems" && audit.ResourceId == hospitalA);
+        Assert.Contains(auditEvents, audit =>
+            audit.Action == "GetDailyBillingCollection" && audit.ResourceId == hospitalA);
     }
 
     [Fact]
