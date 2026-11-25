@@ -49,19 +49,6 @@ if [[ ! -s "$CREDENTIALS" ]]; then
 fi
 chmod 600 "$CREDENTIALS"
 
-# Vite reads local/.env at image build time; use a temporary ignored .env.local in Web.
-WEB_ENV="$WEB/.env.local"
-if [[ ! -f "$WEB_ENV" ]]; then
-  cat > "$WEB_ENV" <<EOF
-VITE_OIDC_AUTHORITY=$(sed -n 's/^OIDC_AUTHORITY=//p' "$LOCAL/.env" | tail -1)
-VITE_OIDC_CLIENT_ID=$(sed -n 's/^OIDC_CLIENT_ID=//p' "$LOCAL/.env" | tail -1)
-VITE_OIDC_REDIRECT_URI=http://localhost:8080/auth/callback
-VITE_OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:8080
-VITE_OIDC_SCOPE=$(sed -n 's/^OIDC_SCOPE=//p' "$LOCAL/.env" | tail -1)
-VITE_API_BASE_URL=http://localhost:8081
-EOF
-fi
-
 echo "Building and starting CompileCare..."
 docker compose --env-file "$LOCAL/.env" -f "$LOCAL/docker-compose.yml" up --build -d || fail "Docker Compose failed. Inspect logs with: docker compose --env-file local/.env -f local/docker-compose.yml logs"
 echo "Waiting for services..."
