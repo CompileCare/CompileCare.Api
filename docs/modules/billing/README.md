@@ -65,6 +65,13 @@ Supported methods: `Cash`, `UPI`, `Card`, `BankTransfer`. The optional reference
 
 These are initial application role mappings, not a substitute for pilot role review. A hospital should provision billing work only to staff with an approved finance/reception responsibility.
 
+## Invoice settlement lifecycle
+
+- New invoices start as `Issued` unless their total is zero, in which case they are immediately `Paid`.
+- A successful payment that leaves a positive balance moves the invoice to `PartiallyPaid`.
+- A successful payment that exactly clears the outstanding balance moves the invoice to `Paid`.
+- Payment overages and additional payments against a fully settled invoice return 409. The payment ledger remains append-only; settlement status is updated atomically with the payment and invoice concurrency sequence.
+
 ## Consistency and data protection
 
 - Tenant query filters and composite foreign keys bind service, invoice, visit, patient registration and payment to the same tenant/hospital.
