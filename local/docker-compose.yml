@@ -66,4 +66,4 @@ volumes:
 
 secrets:
   nuget_credentials:
-    file: ${NUGET_CREDENTIALS_FILE:-../.secrets/nuget-source-credentials}
+    file: .secrets/nuget-source-credentials
