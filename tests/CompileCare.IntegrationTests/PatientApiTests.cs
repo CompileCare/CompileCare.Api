@@ -239,6 +239,15 @@ public sealed class PatientApiTests
         var patient = Assert.Single(page!.Items);
         Assert.Equal(departmentPatientId, patient.Id);
 
+        var departmentDetails = await client.GetFromJsonAsync<PatientDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/departments/{departmentId:D}/patients/{departmentPatientId:D}");
+        Assert.NotNull(departmentDetails);
+        Assert.Equal(departmentPatientId, departmentDetails!.Id);
+
+        var hiddenDetails = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/departments/{departmentId:D}/patients/{otherDepartmentPatientId:D}");
+        Assert.Equal(HttpStatusCode.NotFound, hiddenDetails.StatusCode);
+
         var unrelatedPatient = await client.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/patients/departments/{departmentId:D}/patients?query=Ravi");
         var unrelatedPage = await unrelatedPatient.Content.ReadFromJsonAsync<PatientPage>();
