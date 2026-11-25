@@ -87,6 +87,12 @@ public sealed class BillingApiTests
             new PaymentCreateInput(1m, PaymentMethods.Cash, null));
         Assert.Equal(HttpStatusCode.Conflict, overpayment.StatusCode);
 
+        var paymentHistory = await registrar.GetFromJsonAsync<List<PaymentDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments");
+        Assert.NotNull(paymentHistory);
+        Assert.Equal(2, paymentHistory!.Count);
+        Assert.Equal(new[] { 200m, 300m }, paymentHistory.Select(x => x.Amount));
+
         var refreshedInvoice = await registrar.GetFromJsonAsync<InvoiceDto>(
             $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}");
         Assert.NotNull(refreshedInvoice);
@@ -171,8 +177,11 @@ public sealed class BillingApiTests
         using var otherDepartmentRegistrar = CreateClient(tenantId, "billing-other-department");
         var response = await otherDepartmentRegistrar.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/billing/visits/{queueEntryId:D}/invoice");
+        var paymentHistoryResponse = await otherDepartmentRegistrar.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{(await invoiceResponse.Content.ReadFromJsonAsync<InvoiceDto>())!.Id:D}/payments");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, paymentHistoryResponse.StatusCode);
     }
 
     [Fact]
