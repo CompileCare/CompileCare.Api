@@ -19,7 +19,7 @@ Before tenant-owned data access:
 - Resolve allowed tenant memberships from a trusted identity source.
 - Verify the selected tenant is permitted for the caller and operation.
 - Enforce tenant scope in every persistence path.
-- Include tenant context in audit records.
+- Include validated tenant context, actor identity, action outcome, correlation ID and the target resource identifier in metadata-only audit records. See [Audit events and traceability](audit-events.md).
 - Propagate trusted tenant context to messages and background jobs.
 - Test cross-tenant reads and writes explicitly.
 
