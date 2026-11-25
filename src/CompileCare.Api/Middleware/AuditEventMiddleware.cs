@@ -208,12 +208,27 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         return $"{context.Request.Method} {route}";
     }
 
-    private static Guid? ParseRouteResourceId(HttpContext context) =>
-        context.Request.RouteValues.TryGetValue("id", out var value) &&
-        Guid.TryParse(value?.ToString(), out var id) &&
-        id != Guid.Empty
-            ? id
-            : null;
+    private static Guid? ParseRouteResourceId(HttpContext context)
+    {
+        // Route values are already matched and typed by ASP.NET routing. The last
+        // GUID parameter in the route template identifies the target resource for
+        // both conventional {id} routes and named routes such as {encounterId},
+        // {queueEntryId}, and {patientId}. Parent hospital IDs therefore do not
+        // mask the more specific resource identifier.
+        if (context.GetEndpoint() is not RouteEndpoint routeEndpoint)
+            return null;
+
+        foreach (var parameter in routeEndpoint.RoutePattern.Parameters.Reverse())
+        {
+            if (!context.Request.RouteValues.TryGetValue(parameter.Name, out var value))
+                continue;
+
+            if (Guid.TryParse(value?.ToString(), out var resourceId) && resourceId != Guid.Empty)
+                return resourceId;
+        }
+
+        return null;
+    }
 
     private static Guid? ParseRequestedTenantId(HttpContext context)
     {
