@@ -166,6 +166,92 @@ public sealed class PatientApiTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task DepartmentScopedClinicalUser_CanSearchOnlyPatientsWithHistoryInAssignedDepartment()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId) = await SeedHospitalAndDepartmentAsync(tenantId);
+        Guid otherDepartmentId;
+        Guid departmentPatientId;
+        Guid otherDepartmentPatientId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var otherDepartment = new Department
+            {
+                HospitalId = hospitalId, Name = "Neurology", Code = "NEUR"
+            };
+            var departmentPatient = new Patient
+            {
+                GivenName = "Asha", FamilyName = "Patil",
+                NormalizedGivenName = "ASHA", NormalizedFamilyName = "PATIL"
+            };
+            var otherPatient = new Patient
+            {
+                GivenName = "Ravi", FamilyName = "Shah",
+                NormalizedGivenName = "RAVI", NormalizedFamilyName = "SHAH"
+            };
+            db.Departments.Add(otherDepartment);
+            db.Patients.AddRange(departmentPatient, otherPatient);
+            await db.SaveChangesAsync();
+            db.HospitalPatientRegistrations.AddRange(
+                new HospitalPatientRegistration
+                {
+                    PatientId = departmentPatient.Id, HospitalId = hospitalId,
+                    RegisteredAtUtc = DateTimeOffset.UtcNow
+                },
+                new HospitalPatientRegistration
+                {
+                    PatientId = otherPatient.Id, HospitalId = hospitalId,
+                    RegisteredAtUtc = DateTimeOffset.UtcNow
+                });
+            db.QueueEntries.AddRange(
+                new QueueEntry
+                {
+                    HospitalId = hospitalId, DepartmentId = departmentId,
+                    PatientId = departmentPatient.Id, QueueDateLocal = DateOnly.FromDateTime(DateTime.UtcNow),
+                    TimeZoneId = "Asia/Kolkata", TokenNumber = 1
+                },
+                new QueueEntry
+                {
+                    HospitalId = hospitalId, DepartmentId = otherDepartment.Id,
+                    PatientId = otherPatient.Id, QueueDateLocal = DateOnly.FromDateTime(DateTime.UtcNow),
+                    TimeZoneId = "Asia/Kolkata", TokenNumber = 1
+                });
+            await db.SaveChangesAsync();
+            otherDepartmentId = otherDepartment.Id;
+            departmentPatientId = departmentPatient.Id;
+            otherDepartmentPatientId = otherPatient.Id;
+        }
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.ClinicalUser,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentId)]);
+        using var client = CreateClient(tenantId);
+
+        var response = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/departments/{departmentId:D}/patients?query=Asha");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = await response.Content.ReadFromJsonAsync<PatientPage>();
+        Assert.NotNull(page);
+        var patient = Assert.Single(page!.Items);
+        Assert.Equal(departmentPatientId, patient.Id);
+
+        var unrelatedPatient = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/departments/{departmentId:D}/patients?query=Ravi");
+        var unrelatedPage = await unrelatedPatient.Content.ReadFromJsonAsync<PatientPage>();
+        Assert.Equal(HttpStatusCode.OK, unrelatedPatient.StatusCode);
+        Assert.NotNull(unrelatedPage);
+        Assert.Empty(unrelatedPage!.Items);
+
+        var outsideDepartment = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/departments/{otherDepartmentId:D}/patients");
+        Assert.Equal(HttpStatusCode.NotFound, outsideDepartment.StatusCode);
+        Assert.NotEqual(departmentPatientId, otherDepartmentPatientId);
+    }
+
     private async Task<(Guid AuthorizedHospitalId, Guid OtherHospitalId)> SeedTenantAndTwoHospitalsAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
