@@ -6,6 +6,7 @@ using CompileCare.Application.Staff;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
@@ -116,6 +117,86 @@ public sealed class StaffManagementApiTests
         var response = await client.GetAsync("/api/v1/staff");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CrossTenantAdminCannotDiscoverReadOrMutateStaffProfilesAndAssignments()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var (hospitalA, departmentA) = await SeedHospitalAndDepartmentAsync(tenantA);
+        var (hospitalB, _) = await SeedHospitalAndDepartmentAsync(tenantB);
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantA, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantB, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalB)]);
+
+        using var adminA = CreateClient(tenantA);
+        using var adminB = CreateClient(tenantB);
+
+        var create = await adminA.PostAsJsonAsync("/api/v1/staff", new StaffProfileCreateInput(
+            "EMP-A-001", "Asha", "R.", "Patil", "Consultant", hospitalA, departmentA,
+            new DateOnly(2026, 1, 1)));
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var profile = await create.Content.ReadFromJsonAsync<StaffProfileDto>();
+        Assert.NotNull(profile);
+        var assignment = Assert.Single(profile!.Assignments);
+
+        var search = await adminB.GetAsync("/api/v1/staff?query=Asha&page=1&pageSize=10");
+        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
+        var searchBody = await search.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("EMP-A-001", searchBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("Asha", searchBody, StringComparison.Ordinal);
+        var page = await search.Content.ReadFromJsonAsync<StaffPage>();
+        Assert.NotNull(page);
+        Assert.Empty(page!.Items);
+
+        var attempts = new[]
+        {
+            await adminB.GetAsync($"/api/v1/staff/{profile.Id:D}"),
+            await adminB.PutAsJsonAsync(
+                $"/api/v1/staff/{profile.Id:D}",
+                new StaffProfileUpdateInput("Asha", "R.", "Patil", "Unauthorized update")),
+            await adminB.PostAsync($"/api/v1/staff/{profile.Id:D}/deactivate", null),
+            await adminB.PostAsync($"/api/v1/staff/{profile.Id:D}/reactivate", null),
+            await adminB.PostAsJsonAsync(
+                $"/api/v1/staff/{profile.Id:D}/assignments",
+                new StaffAssignmentInput(hospitalA, null, new DateOnly(2026, 3, 1))),
+            await adminB.PostAsJsonAsync(
+                $"/api/v1/staff/{profile.Id:D}/assignments/{assignment.Id:D}/end",
+                new StaffAssignmentEndInput(new DateOnly(2026, 8, 31)))
+        };
+
+        Assert.All(attempts, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        var deniedBodies = await Task.WhenAll(attempts.Select(response => response.Content.ReadAsStringAsync()));
+        Assert.All(deniedBodies, body =>
+        {
+            Assert.DoesNotContain("EMP-A-001", body, StringComparison.Ordinal);
+            Assert.DoesNotContain("Asha", body, StringComparison.Ordinal);
+            Assert.DoesNotContain("Patil", body, StringComparison.Ordinal);
+        });
+
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvents = await db.AuditEvents.AsNoTracking()
+            .Where(audit => audit.ActorSubject == TestJwtTokenFactory.Subject)
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(attempts.Length, auditEvents.Count);
+        Assert.All(auditEvents, audit =>
+        {
+            Assert.Equal(tenantB, audit.TenantId);
+            Assert.Equal(tenantB, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal(TestJwtTokenFactory.Subject, audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+            Assert.Equal("Rejected", audit.Outcome);
+        });
     }
 
     private async Task<(Guid HospitalId, Guid DepartmentId)> SeedHospitalAndDepartmentAsync(Guid tenantId)
