@@ -34,7 +34,7 @@ public sealed class BillingInvoiceConfiguration : IEntityTypeConfiguration<Billi
         builder.ToTable("billing_invoices", table =>
         {
             table.HasCheckConstraint("CK_billing_invoices_subtotal", "\"Subtotal\" >= 0");
-            table.HasCheckConstraint("CK_billing_invoices_status", "\"Status\" IN ('Issued')");
+            table.HasCheckConstraint("CK_billing_invoices_status", "\"Status\" IN ('Issued', 'PartiallyPaid', 'Paid')");
             table.HasCheckConstraint("CK_billing_invoices_payment_sequence", "\"PaymentSequence\" >= 0");
         });
         builder.Property(x => x.InvoiceNumber).HasMaxLength(40).IsRequired();
