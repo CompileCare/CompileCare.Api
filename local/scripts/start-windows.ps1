@@ -33,7 +33,7 @@ if (-not (Test-Path $EnvFile)) {
   $content = $content -replace '(?m)^OIDC_AUDIENCE=.*$', "OIDC_AUDIENCE=$audience"
   $content = $content -replace '(?m)^OIDC_CLIENT_ID=.*$', "OIDC_CLIENT_ID=$client"
   $content = $content -replace '(?m)^OIDC_SCOPE=.*$', "OIDC_SCOPE=$scope"
-  Set-Content -Path $EnvFile -Value $content -NoNewline
+  Set-Content -Path $EnvFile -Value $content -NoNewline -Encoding ascii
 }
 $Secrets = Join-Path $Local ".secrets"
 New-Item -ItemType Directory -Force -Path $Secrets | Out-Null
@@ -46,7 +46,7 @@ if (-not (Test-Path $CredentialFile)) {
   try { $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
   if ([string]::IsNullOrWhiteSpace($token)) { throw "GitHub Packages token is required." }
-  Set-Content -Path $CredentialFile -Value "Username=$username;Password=$token;ValidAuthenticationTypes=Basic" -NoNewline
+  Set-Content -Path $CredentialFile -Value "Username=$username;Password=$token;ValidAuthenticationTypes=Basic" -NoNewline -Encoding ascii
   $token = $null
 }
 docker compose --env-file $EnvFile -f (Join-Path $Local "docker-compose.yml") up --build -d
