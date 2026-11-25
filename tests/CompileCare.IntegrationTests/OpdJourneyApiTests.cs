@@ -87,8 +87,8 @@ public sealed class OpdJourneyApiTests
         Assert.Equal(HttpStatusCode.Created, walkInResponse.StatusCode);
         var queueEntry = await walkInResponse.Content.ReadFromJsonAsync<QueueEntryDto>();
         Assert.NotNull(queueEntry);
-        Assert.Equal(patient.Id, patient.Id);
         Assert.Equal(departmentId, queueEntry!.DepartmentId);
+        Assert.Equal("Waiting", queueEntry.Status);
 
         // Queue operations remain with reception; clinical access is read-only and department-scoped.
         var callResponse = await reception.PostAsJsonAsync(
