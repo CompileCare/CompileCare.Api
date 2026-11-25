@@ -51,6 +51,10 @@ public sealed class BillingApiTests
         Assert.Equal(500m, invoice!.Subtotal);
         Assert.Equal(patientId, invoice.PatientId);
         Assert.Equal("OPD Consultation", Assert.Single(invoice.Lines).Description);
+        var invoiceByVisit = await registrar.GetFromJsonAsync<InvoiceDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/visits/{queueEntryId:D}/invoice");
+        Assert.NotNull(invoiceByVisit);
+        Assert.Equal(invoice.Id, invoiceByVisit!.Id);
 
         var partialPaymentResponse = await registrar.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments",
