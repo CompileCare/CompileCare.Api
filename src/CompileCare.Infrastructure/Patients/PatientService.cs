@@ -124,6 +124,56 @@ public sealed class PatientService(
         return PatientResult<PatientPage>.Success(new(items, page, pageSize, total));
     }
 
+    public async Task<PatientResult<PatientPage>> SearchDepartmentAsync(
+        Guid hospitalId,
+        Guid departmentId,
+        PatientSearchRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (hospitalId == Guid.Empty || departmentId == Guid.Empty ||
+            !organizationScope.CanAccessDepartment(hospitalId, departmentId))
+            return PatientResult<PatientPage>.Failure("Department not found.", 404);
+
+        var departmentExists = await db.Departments.AnyAsync(
+            x => x.Id == departmentId && x.HospitalId == hospitalId, cancellationToken);
+        if (!departmentExists)
+            return PatientResult<PatientPage>.Failure("Department not found.", 404);
+
+        // Department-scoped clinicians may discover only patients who have a queue
+        // history in their assigned department. Hospital registration alone is not
+        // sufficient to expose a patient's identity to another department.
+        var query = db.HospitalPatientRegistrations
+            .Where(registration => registration.HospitalId == hospitalId &&
+                db.QueueEntries.Any(queue => queue.HospitalId == hospitalId &&
+                    queue.DepartmentId == departmentId && queue.PatientId == registration.PatientId));
+
+        var term = Normalize(request.Query);
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            var pattern = $"%{EscapeLike(term)}%";
+            query = query.Where(x =>
+                EF.Functions.ILike(x.Patient.GivenName, pattern) ||
+                (x.Patient.MiddleName != null && EF.Functions.ILike(x.Patient.MiddleName, pattern)) ||
+                (x.Patient.FamilyName != null && EF.Functions.ILike(x.Patient.FamilyName, pattern)));
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var page = request.SafePage;
+        var pageSize = request.SafePageSize;
+        var items = await query
+            .OrderBy(x => x.Patient.FamilyName)
+            .ThenBy(x => x.Patient.GivenName)
+            .ThenBy(x => x.Patient.Id)
+            .Skip(request.Skip)
+            .Take(pageSize)
+            .Select(x => new PatientDto(
+                x.Patient.Id, x.Patient.GivenName, x.Patient.MiddleName, x.Patient.FamilyName,
+                x.Patient.DateOfBirth, x.HospitalId, x.RegisteredAtUtc))
+            .ToListAsync(cancellationToken);
+
+        return PatientResult<PatientPage>.Success(new(items, page, pageSize, total));
+    }
+
     private bool HasHospitalWidePatientScope(Guid hospitalId) =>
         organizationScope.IsTenantWide || organizationScope.HospitalIds.Contains(hospitalId);
 
