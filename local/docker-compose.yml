@@ -53,6 +53,13 @@ services:
     build:
       context: ${COMPILECARE_WEB_PATH:-../../CompileCare.Web}
       dockerfile: Dockerfile
+      args:
+        VITE_OIDC_AUTHORITY: ${OIDC_AUTHORITY}
+        VITE_OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+        VITE_OIDC_REDIRECT_URI: http://localhost:8080/auth/callback
+        VITE_OIDC_POST_LOGOUT_REDIRECT_URI: http://localhost:8080
+        VITE_OIDC_SCOPE: ${OIDC_SCOPE:-openid profile}
+        VITE_API_BASE_URL: http://localhost:8081
     container_name: compilecare-web
     ports:
       - "127.0.0.1:8080:80"
