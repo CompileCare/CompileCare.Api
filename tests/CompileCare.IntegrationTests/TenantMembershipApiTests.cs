@@ -378,11 +378,13 @@ public sealed class TenantMembershipApiTests
                 content: null);
             Assert.Equal(HttpStatusCode.OK, reactivate.StatusCode);
 
-            var adminMembership = await baselineDb.TenantMemberships.IgnoreQueryFilters()
-                .SingleAsync(value => value.TenantId == tenantId &&
-                                      value.Subject == "membership-audit-admin");
+            var adminMembershipId = await baselineDb.TenantMemberships.IgnoreQueryFilters()
+                .Where(value => value.TenantId == tenantId &&
+                                value.Subject == "membership-audit-admin")
+                .Select(value => value.Id)
+                .SingleAsync();
             var deniedSelfUpdate = await adminClient.PutAsJsonAsync(
-                $"/api/v1/tenant/memberships/{adminMembership.Id:D}",
+                $"/api/v1/tenant/memberships/{adminMembershipId:D}",
                 new
                 {
                     role = TenantRoles.FacilityViewer,
@@ -431,7 +433,7 @@ public sealed class TenantMembershipApiTests
             });
 
             var selfUpdateAudit = Assert.Single(
-                auditEvents, value => value.ResourceId == adminMembership.Id);
+                auditEvents, value => value.ResourceId == adminMembershipId);
             Assert.Equal("UpdateTenantMembership", selfUpdateAudit.Action);
             Assert.Equal("PUT", selfUpdateAudit.HttpMethod);
             Assert.Equal(tenantId, selfUpdateAudit.TenantId);
@@ -443,7 +445,8 @@ public sealed class TenantMembershipApiTests
             Assert.Equal((int)HttpStatusCode.Conflict, selfUpdateAudit.StatusCode);
 
             var persistedAdmin = await baselineDb.TenantMemberships.IgnoreQueryFilters()
-                .SingleAsync(value => value.Id == adminMembership.Id);
+                .AsNoTracking()
+                .SingleAsync(value => value.Id == adminMembershipId);
             Assert.Equal(TenantRoles.HospitalAdmin, persistedAdmin.Role);
             Assert.True(persistedAdmin.IsActive);
         }
