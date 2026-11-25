@@ -242,6 +242,64 @@ public sealed class OpdJourneyApiTests
         Assert.DoesNotContain("JOURNEY-UPI-001", auditJson, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task CrossDepartmentClinicalPatientRead_ReturnsNotFoundAndAuditsRejectedAttempt()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, authorizedDepartmentId) = await SeedHospitalAndDepartmentAsync(tenantId);
+        var unrelatedDepartmentId = Guid.NewGuid();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            db.Departments.Add(new Department
+            {
+                Id = unrelatedDepartmentId,
+                HospitalId = hospitalId,
+                Name = "Neurology",
+                Code = "NEUR"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        const string actorSubject = "clinical-user-other-department";
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.ClinicalUser,
+            scopes:
+            [
+                new OrganizationScope(
+                    OrganizationScopeTypes.Department,
+                    hospitalId,
+                    unrelatedDepartmentId)
+            ],
+            subject: actorSubject);
+
+        using var clinician = CreateClient(tenantId, actorSubject);
+        var requestedPatientId = Guid.NewGuid();
+        var response = await clinician.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/departments/{authorizedDepartmentId:D}/patients/{requestedPatientId:D}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvent = await auditDb.AuditEvents
+            .AsNoTracking()
+            .SingleAsync(item =>
+                item.TenantId == tenantId &&
+                item.Action == "GetDepartmentPatient" &&
+                item.ActorSubject == actorSubject);
+
+        Assert.Equal(tenantId, auditEvent.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
+        Assert.Equal(requestedPatientId, auditEvent.ResourceId);
+        Assert.Equal("Rejected", auditEvent.Outcome);
+        Assert.Equal((int)HttpStatusCode.NotFound, auditEvent.StatusCode);
+    }
+
     private async Task<(Guid HospitalId, Guid DepartmentId)> SeedHospitalAndDepartmentAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
