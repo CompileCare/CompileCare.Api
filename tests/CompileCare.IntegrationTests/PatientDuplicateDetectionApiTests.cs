@@ -6,6 +6,7 @@ using CompileCare.Application.Patients;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
@@ -236,6 +237,90 @@ public sealed class PatientDuplicateDetectionApiTests
         Assert.Empty(differentDobResult!.Candidates);
     }
 
+    [Fact]
+    public async Task DuplicateCheck_CannotDiscoverCandidatesOwnedByAnotherTenant_AndDenialIsAudited()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        const string tenantASubject = "duplicate-tenant-a-registrar";
+        const string tenantBSubject = "duplicate-tenant-b-registrar";
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantA, TenantRoles.PatientRegistrar, subject: tenantASubject);
+        await _factory.SeedTenantMembershipAsync(
+            tenantB, TenantRoles.PatientRegistrar, subject: tenantBSubject);
+
+        var hospitalA = await SeedHospitalAsync(tenantA, "Tenant A Duplicate Hospital");
+        var hospitalB = await SeedHospitalAsync(tenantB, "Tenant B Duplicate Hospital");
+
+        using var registrarA = CreateClient(tenantA, tenantASubject);
+        using var registrarB = CreateClient(tenantB, tenantBSubject);
+
+        _ = await RegisterPatientAsync(
+            registrarA, hospitalA, "Asha", "R.", "Patil", new DateOnly(1990, 4, 12));
+
+        // Capture the tenant-B audit watermark after fixture setup and before the requests under test.
+        using var auditBaselineScope = _factory.Services.CreateScope();
+        auditBaselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
+        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var existingAuditIds = await auditBaselineDb.AuditEvents.AsNoTracking()
+            .Where(audit => audit.ActorSubject == tenantBSubject)
+            .Select(audit => audit.Id)
+            .ToListAsync();
+
+        // A same-name/DOB patient exists only in tenant A. Searching tenant B must not disclose it.
+        var tenantBSearch = await registrarB.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Asha", "R.", "Patil", new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.OK, tenantBSearch.StatusCode);
+        var tenantBResult = await tenantBSearch.Content.ReadFromJsonAsync<PatientDuplicateCheckDto>();
+        Assert.NotNull(tenantBResult);
+        Assert.True(tenantBResult!.Evaluated);
+        Assert.Empty(tenantBResult.Candidates);
+        Assert.False(tenantBResult.HasMoreCandidates);
+        var tenantBBody = await tenantBSearch.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Asha", tenantBBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("Patil", tenantBBody, StringComparison.Ordinal);
+
+        // A tenant-B member cannot run the same operation against tenant A's hospital at all.
+        var crossTenantAttempt = await registrarB.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Asha", "R.", "Patil", new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.NotFound, crossTenantAttempt.StatusCode);
+        var deniedBody = await crossTenantAttempt.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Asha", deniedBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("Patil", deniedBody, StringComparison.Ordinal);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvents = await auditDb.AuditEvents.AsNoTracking()
+            .Where(audit => audit.ActorSubject == tenantBSubject &&
+                            !existingAuditIds.Contains(audit.Id))
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, auditEvents.Count);
+        Assert.Equal(
+            new[] { (int)HttpStatusCode.OK, (int)HttpStatusCode.NotFound },
+            auditEvents.Select(audit => audit.StatusCode).ToArray());
+        Assert.Equal(
+            new[] { "Succeeded", "Rejected" },
+            auditEvents.Select(audit => audit.Outcome).ToArray());
+        Assert.All(auditEvents, audit =>
+        {
+            Assert.Equal(tenantB, audit.TenantId);
+            Assert.Equal(tenantB, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal(tenantBSubject, audit.ActorSubject);
+            Assert.Equal("FindPatientDuplicateCandidates", audit.Action);
+        });
+        Assert.Equal(hospitalB, auditEvents[0].ResourceId);
+        Assert.Equal(hospitalA, auditEvents[1].ResourceId);
+    }
+
     private async Task<PatientDto> RegisterPatientAsync(
         HttpClient client,
         Guid hospitalId,
@@ -313,11 +398,11 @@ public sealed class PatientDuplicateDetectionApiTests
         return (authorized.Id, other.Id);
     }
 
-    private HttpClient CreateClient(Guid tenantId)
+    private HttpClient CreateClient(Guid tenantId, string? subject = TestJwtTokenFactory.Subject)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(subject: subject));
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
