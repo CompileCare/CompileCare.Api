@@ -47,4 +47,5 @@ public interface IPatientService
     Task<PatientResult<PatientDto>> RegisterAsync(Guid hospitalId, PatientRegistrationInput input, CancellationToken cancellationToken);
     Task<PatientResult<PatientDto>> GetAsync(Guid hospitalId, Guid patientId, CancellationToken cancellationToken);
     Task<PatientResult<PatientPage>> SearchAsync(Guid hospitalId, PatientSearchRequest request, CancellationToken cancellationToken);
+    Task<PatientResult<PatientPage>> SearchDepartmentAsync(Guid hospitalId, Guid departmentId, PatientSearchRequest request, CancellationToken cancellationToken);
 }
