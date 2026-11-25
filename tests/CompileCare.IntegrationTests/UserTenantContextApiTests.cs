@@ -50,6 +50,12 @@ public sealed class UserTenantContextApiTests
         Assert.DoesNotContain(page.Items, value => value.TenantId == inactiveTenantId);
         Assert.All(page.Items, value =>
             Assert.Contains(value.Scopes, scope => scope.ScopeType == OrganizationScopeTypes.Tenant));
+        var administrator = Assert.Single(page.Items, value => value.TenantId == firstTenantId);
+        Assert.Contains("billing.catalogue.manage", administrator.Permissions);
+        Assert.Contains("patient.identity.read", administrator.Permissions);
+        var registrar = Assert.Single(page.Items, value => value.TenantId == secondTenantId);
+        Assert.Contains("patient.register", registrar.Permissions);
+        Assert.DoesNotContain("billing.catalogue.manage", registrar.Permissions);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
@@ -109,5 +115,6 @@ public sealed class UserTenantContextApiTests
         string TenantName,
         string TenantSlug,
         string Role,
-        IReadOnlyList<OrganizationScope> Scopes);
+        IReadOnlyList<OrganizationScope> Scopes,
+        IReadOnlyList<string> Permissions);
 }
