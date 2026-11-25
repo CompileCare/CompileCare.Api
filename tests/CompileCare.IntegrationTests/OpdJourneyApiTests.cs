@@ -180,6 +180,12 @@ public sealed class OpdJourneyApiTests
         Assert.Equal(InvoiceStatuses.Paid, settledInvoice!.Status);
         Assert.Equal(0m, settledInvoice.BalanceDue);
 
+        var paymentHistory = await reception.GetFromJsonAsync<List<PaymentDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments");
+        Assert.NotNull(paymentHistory);
+        Assert.Single(paymentHistory!);
+        Assert.Equal(payment.Id, paymentHistory[0].Id);
+
         var receipt = await reception.GetFromJsonAsync<ReceiptDto>(
             $"/api/v1/hospitals/{hospitalId:D}/billing/payments/{payment!.Id:D}/receipt");
         Assert.NotNull(receipt);
