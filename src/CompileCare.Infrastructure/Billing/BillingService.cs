@@ -209,6 +209,25 @@ public sealed class BillingService(
         return BillingResult<PaymentDto>.Success(ToDto(payment));
     }
 
+    public async Task<BillingResult<IReadOnlyList<PaymentDto>>> ListPaymentsAsync(
+        Guid hospitalId, Guid invoiceId, CancellationToken ct)
+    {
+        var invoice = await db.BillingInvoices.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == invoiceId && x.HospitalId == hospitalId, ct);
+        if (invoice is null || !organizationScope.CanManageDepartment(hospitalId, invoice.DepartmentId))
+            return BillingResult<IReadOnlyList<PaymentDto>>.Failure("Invoice not found.", 404);
+
+        var payments = await db.BillingPayments.AsNoTracking()
+            .Where(x => x.InvoiceId == invoice.Id && x.HospitalId == hospitalId)
+            .OrderBy(x => x.PaidAtUtc)
+            .ThenBy(x => x.Id)
+            .Select(x => new PaymentDto(
+                x.Id, x.InvoiceId, x.ReceiptNumber, x.Amount, x.Method, x.Reference, x.PaidAtUtc))
+            .ToListAsync(ct);
+
+        return BillingResult<IReadOnlyList<PaymentDto>>.Success(payments);
+    }
+
     public async Task<BillingResult<ReceiptDto>> GetReceiptAsync(
         Guid hospitalId, Guid paymentId, CancellationToken ct)
     {
