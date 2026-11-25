@@ -42,23 +42,12 @@ if (-not (Test-Path $CredentialFile)) {
   $username = Read-Host "GitHub username [Shatru-compile]"
   if ([string]::IsNullOrWhiteSpace($username)) { $username = "Shatru-compile" }
   $secure = Read-Host "GitHub Personal Access Token (read:packages)" -AsSecureString
-  $token = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+  $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+  try { $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
   if ([string]::IsNullOrWhiteSpace($token)) { throw "GitHub Packages token is required." }
   Set-Content -Path $CredentialFile -Value "Username=$username;Password=$token;ValidAuthenticationTypes=Basic" -NoNewline
   $token = $null
-}
-$WebEnv = Join-Path $Web ".env.local"
-if (-not (Test-Path $WebEnv)) {
-  $values = @{}
-  Get-Content $EnvFile | ForEach-Object { if ($_ -match '^([^#=]+)=(.*)$') { $values[$matches[1]] = $matches[2] } }
-  @"
-VITE_OIDC_AUTHORITY=$($values.OIDC_AUTHORITY)
-VITE_OIDC_CLIENT_ID=$($values.OIDC_CLIENT_ID)
-VITE_OIDC_REDIRECT_URI=http://localhost:8080/auth/callback
-VITE_OIDC_POST_LOGOUT_REDIRECT_URI=http://localhost:8080
-VITE_OIDC_SCOPE=$($values.OIDC_SCOPE)
-VITE_API_BASE_URL=http://localhost:8081
-"@ | Set-Content $WebEnv
 }
 docker compose --env-file $EnvFile -f (Join-Path $Local "docker-compose.yml") up --build -d
 if ($LASTEXITCODE -ne 0) { throw "Docker Compose failed. Inspect logs with docker compose --env-file local/.env -f local/docker-compose.yml logs" }
