@@ -6,6 +6,7 @@ using CompileCare.Application.Appointments;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
@@ -260,6 +261,109 @@ public sealed class AppointmentSchedulingApiTests
         Assert.NotNull(secondEntry);
         Assert.Equal(firstEntry!.Id, secondEntry!.Id);
         Assert.Equal(firstEntry.TokenNumber, secondEntry.TokenNumber);
+    }
+
+    [Fact]
+    public async Task CrossTenantHospitalAdminCannotReadBookOrMutateAppointmentsAndQueueOperationsAreAudited()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var (hospitalA, departmentA, providerA, patientA) = await SeedSchedulingDataAsync(tenantA);
+        var (hospitalB, _, _, _) = await SeedSchedulingDataAsync(tenantB);
+
+        const string registrarA = "cross-tenant-appointment-registrar-a";
+        const string adminB = "cross-tenant-appointment-admin-b";
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantA, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantA, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)],
+            subject: registrarA);
+        await _factory.SeedTenantMembershipAsync(
+            tenantB, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalB)],
+            subject: adminB);
+
+        using var hospitalAdminA = CreateClient(tenantA, TestJwtTokenFactory.Subject);
+        using var registrarAClient = CreateClient(tenantA, registrarA);
+        using var hospitalAdminB = CreateClient(tenantB, adminB);
+
+        var date = new DateOnly(2026, 12, 10);
+        var sessionResponse = await hospitalAdminA.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentA, providerA, date,
+                new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await registrarAClient.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalA:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        Assert.Equal(2, slots!.Count);
+
+        var bookingResponse = await registrarAClient.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalA:D}/appointments",
+            new AppointmentBookInput(session.Id, patientA, slots[0].StartsAtUtc, "Tenant A appointment"));
+        Assert.Equal(HttpStatusCode.Created, bookingResponse.StatusCode);
+        var appointment = await bookingResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(appointment);
+
+        var attempts = new[]
+        {
+            await hospitalAdminB.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/availability-sessions",
+                new AvailabilitySessionCreateInput(
+                    departmentA, providerA, date.AddDays(1),
+                    new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata")),
+            await hospitalAdminB.GetAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/availability-sessions?date={date:yyyy-MM-dd}&page=1&pageSize=10"),
+            await hospitalAdminB.GetAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/availability-sessions/{session.Id:D}/slots"),
+            await hospitalAdminB.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/appointments",
+                new AppointmentBookInput(session.Id, patientA, slots[1].StartsAtUtc, "Tenant B attempt")),
+            await hospitalAdminB.GetAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/appointments/{appointment!.Id:D}"),
+            await hospitalAdminB.PostAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/appointments/{appointment.Id:D}/cancel", null),
+            await hospitalAdminB.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/appointments/{appointment.Id:D}/reschedule",
+                new AppointmentBookInput(session.Id, patientA, slots[1].StartsAtUtc, "Tenant B attempt")),
+            await hospitalAdminB.PostAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/appointments/{appointment.Id:D}/check-in", null),
+            await hospitalAdminB.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalA:D}/queue/walk-ins",
+                new WalkInCreateInput(departmentA, patientA, "Asia/Kolkata"))
+        };
+
+        Assert.All(attempts, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvents = await db.AuditEvents.AsNoTracking()
+            .Where(audit => audit.ActorSubject == adminB)
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(attempts.Length, auditEvents.Count);
+        Assert.All(auditEvents, audit =>
+        {
+            Assert.Equal(tenantB, audit.TenantId);
+            Assert.Equal(tenantB, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal(adminB, audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+            Assert.Equal("Rejected", audit.Outcome);
+        });
+
+        Assert.Contains(auditEvents, audit => audit.ResourceId == hospitalA);
+        Assert.Contains(auditEvents, audit => audit.ResourceId == session.Id);
+        Assert.Contains(auditEvents, audit => audit.ResourceId == appointment.Id);
     }
 
     private async Task<(Guid HospitalId, Guid DepartmentId, Guid ProviderId, Guid PatientId)> SeedSchedulingDataAsync(Guid tenantId)
