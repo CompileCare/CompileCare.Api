@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +17,20 @@ public sealed class PlatformOperatorBootstrapTests
     {
         _factory = factory;
         _factory.ResetDatabase();
+    }
+
+    [Fact]
+    public async Task BootstrapEndpoint_IsNotMappedOutsideDevelopment()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/platform/bootstrap/operator",
+            new { bootstrapSecret = "test-secret" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
