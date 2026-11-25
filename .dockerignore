@@ -4,5 +4,3 @@
 .vs
 .vscode
 TestResults
-local/.env
-local/.secrets/
