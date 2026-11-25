@@ -157,7 +157,7 @@ public sealed class TenantRegistryApiTests
                             value.Action == "ClosePlatformTenant")
             .ToListAsync();
 
-        Assert.Equal(4, lifecycleAudits.Count);
+        Assert.Equal(5, lifecycleAudits.Count);
         Assert.All(lifecycleAudits, value =>
         {
             Assert.Equal(tenant.Id, value.ResourceId);
@@ -167,6 +167,8 @@ public sealed class TenantRegistryApiTests
         });
         Assert.Contains(lifecycleAudits, value => value.Action == "ClosePlatformTenant" &&
             value.Outcome == "Succeeded" && value.StatusCode == (int)HttpStatusCode.OK);
+        Assert.Contains(lifecycleAudits, value => value.Action == "ActivatePlatformTenant" &&
+            value.Outcome != "Succeeded" && value.StatusCode == (int)HttpStatusCode.Conflict);
     }
 
     [Fact]
