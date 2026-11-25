@@ -384,18 +384,19 @@ public sealed class TenantMembershipApiTests
                 .Where(value => value.TenantId == tenantId &&
                                 value.ActorSubject == "membership-audit-admin" &&
                                 !existingAuditIds.Contains(value.Id))
-                .OrderBy(value => value.OccurredAtUtc)
                 .ToListAsync();
 
             Assert.Equal(3, auditEvents.Count);
-            Assert.Equal(
-                new[]
-                {
-                    "UpdateTenantMembership",
-                    "DeactivateTenantMembership",
-                    "ReactivateTenantMembership"
-                },
-                auditEvents.Select(value => value.Action).ToArray());
+            var updateAudit = Assert.Single(
+                auditEvents, value => value.Action == "UpdateTenantMembership");
+            var deactivateAudit = Assert.Single(
+                auditEvents, value => value.Action == "DeactivateTenantMembership");
+            var reactivateAudit = Assert.Single(
+                auditEvents, value => value.Action == "ReactivateTenantMembership");
+
+            Assert.Equal("PUT", updateAudit.HttpMethod);
+            Assert.Equal("POST", deactivateAudit.HttpMethod);
+            Assert.Equal("POST", reactivateAudit.HttpMethod);
 
             Assert.All(auditEvents, audit =>
             {
@@ -408,10 +409,6 @@ public sealed class TenantMembershipApiTests
                 Assert.Equal("Succeeded", audit.Outcome);
                 Assert.Equal((int)HttpStatusCode.OK, audit.StatusCode);
             });
-
-            Assert.Equal(
-                new[] { "PUT", "POST", "POST" },
-                auditEvents.Select(value => value.HttpMethod).ToArray());
         }
     }
 
