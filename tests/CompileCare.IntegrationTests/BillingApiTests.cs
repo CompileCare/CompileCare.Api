@@ -87,6 +87,13 @@ public sealed class BillingApiTests
             new PaymentCreateInput(1m, PaymentMethods.Cash, null));
         Assert.Equal(HttpStatusCode.Conflict, overpayment.StatusCode);
 
+        var paymentHistory = await registrar.GetFromJsonAsync<List<PaymentDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments");
+        Assert.NotNull(paymentHistory);
+        Assert.Equal(2, paymentHistory!.Count);
+        Assert.Contains(paymentHistory, payment => payment.Amount == 200m);
+        Assert.Contains(paymentHistory, payment => payment.Amount == 300m);
+
         var refreshedInvoice = await registrar.GetFromJsonAsync<InvoiceDto>(
             $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}");
         Assert.NotNull(refreshedInvoice);
@@ -150,6 +157,8 @@ public sealed class BillingApiTests
             $"/api/v1/hospitals/{hospitalId:D}/billing/invoices",
             new InvoiceCreateInput(queueEntryId, [new InvoiceLineInput(service!.Id, 1)]));
         Assert.Equal(HttpStatusCode.Created, invoiceResponse.StatusCode);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<InvoiceDto>();
+        Assert.NotNull(invoice);
 
         Guid unrelatedDepartmentId;
         using (var scope = _factory.Services.CreateScope())
@@ -171,8 +180,11 @@ public sealed class BillingApiTests
         using var otherDepartmentRegistrar = CreateClient(tenantId, "billing-other-department");
         var response = await otherDepartmentRegistrar.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/billing/visits/{queueEntryId:D}/invoice");
+        var paymentHistoryResponse = await otherDepartmentRegistrar.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice!.Id:D}/payments");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, paymentHistoryResponse.StatusCode);
     }
 
     [Fact]
