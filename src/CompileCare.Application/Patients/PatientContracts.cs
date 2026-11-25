@@ -3,6 +3,7 @@ namespace CompileCare.Application.Patients;
 public static class PatientPermissions
 {
     public const string Read = "patient.read";
+    public const string IdentityRead = "patient.identity.read";
     public const string Register = "patient.register";
     public const string SearchAcrossHospitals = "patient.search.cross-hospital";
 }

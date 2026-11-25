@@ -44,6 +44,7 @@ internal static class TenantRolePermissions
             TenantRoles.PatientRegistrar =>
             [
                 PatientPermissions.Read,
+                PatientPermissions.IdentityRead,
                 PatientPermissions.Register,
                 PatientDuplicatePermissions.Review,
                 PatientIdentifierPermissions.Read,
@@ -60,6 +61,9 @@ internal static class TenantRolePermissions
             ],
             TenantRoles.ClinicalUser =>
             [
+                PatientPermissions.IdentityRead,
+                TenantPermissions.FacilityRead,
+                QueuePermissions.Read,
                 OpdEncounterPermissions.Read,
                 OpdEncounterPermissions.Manage,
                 OpdEncounterPermissions.Sign,

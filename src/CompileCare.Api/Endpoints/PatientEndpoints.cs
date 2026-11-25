@@ -68,7 +68,7 @@ public static class PatientEndpoints
                 : Results.Problem(title: "Patient not found", detail: result.Error, statusCode: result.StatusCode);
         })
         .WithName("GetHospitalPatient")
-        .RequireAuthorization(AuthorizationPolicies.PatientRead);
+        .RequireAuthorization(AuthorizationPolicies.PatientIdentityRead);
 
         return endpoints;
     }

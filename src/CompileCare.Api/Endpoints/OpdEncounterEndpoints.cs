@@ -28,6 +28,20 @@ public static class OpdEncounterEndpoints
         .WithName("CreateOpdEncounterFromQueue")
         .RequireAuthorization(AuthorizationPolicies.EncounterManage);
 
+        group.MapGet("/queue/{queueEntryId:guid}/encounter", async (
+            Guid hospitalId,
+            Guid queueEntryId,
+            IOpdEncounterService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.GetByQueueEntryAsync(hospitalId, queueEntryId, ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.Problem(title: "OPD encounter not found", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("GetOpdEncounterByQueueEntry")
+        .RequireAuthorization(AuthorizationPolicies.EncounterRead);
+
         group.MapGet("/encounters/{encounterId:guid}", async (
             Guid hospitalId,
             Guid encounterId,
