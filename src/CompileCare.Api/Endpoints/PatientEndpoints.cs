@@ -70,6 +70,24 @@ public static class PatientEndpoints
         .WithName("GetHospitalPatient")
         .RequireAuthorization(AuthorizationPolicies.PatientIdentityRead);
 
+        group.MapGet("/departments/{departmentId:guid}/patients", async (
+            Guid hospitalId,
+            Guid departmentId,
+            IPatientService service,
+            CancellationToken ct,
+            string? query = null,
+            int page = 1,
+            int pageSize = 25) =>
+        {
+            var result = await service.SearchDepartmentAsync(
+                hospitalId, departmentId, new(query, page, pageSize), ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.Problem(title: "Department patient search failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("SearchDepartmentPatients")
+        .RequireAuthorization(AuthorizationPolicies.PatientIdentityRead);
+
         return endpoints;
     }
 }
