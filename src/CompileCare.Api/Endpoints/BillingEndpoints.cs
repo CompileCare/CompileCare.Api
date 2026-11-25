@@ -42,6 +42,13 @@ public static class BillingEndpoints
                 : Results.Problem(title: "Invoice creation failed", detail: result.Error, statusCode: result.StatusCode);
         }).WithName("CreateBillingInvoice").RequireAuthorization(AuthorizationPolicies.BillingInvoiceManage);
 
+        group.MapGet("/visits/{queueEntryId:guid}/invoice", async (Guid hospitalId, Guid queueEntryId, IBillingService service, CancellationToken ct) =>
+        {
+            var result = await service.GetInvoiceForVisitAsync(hospitalId, queueEntryId, ct);
+            return result.IsSuccess ? Results.Ok(result.Value) :
+                Results.Problem(title: "Visit invoice not found", detail: result.Error, statusCode: result.StatusCode);
+        }).WithName("GetBillingInvoiceForVisit").RequireAuthorization(AuthorizationPolicies.BillingInvoiceRead);
+
         group.MapGet("/invoices/{invoiceId:guid}", async (Guid hospitalId, Guid invoiceId, IBillingService service, CancellationToken ct) =>
         {
             var result = await service.GetInvoiceAsync(hospitalId, invoiceId, ct);
