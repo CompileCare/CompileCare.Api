@@ -55,7 +55,7 @@ public sealed class PlatformOperatorBootstrapService(CompileCareDbContext db) : 
             return new(true, false, false);
         }
         catch (DbUpdateException exception) when
-            (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.SerializationFailure })
         {
             await transaction.RollbackAsync(cancellationToken);
             return new(false, true, false);
