@@ -56,6 +56,14 @@ public static class BillingEndpoints
                 Results.Problem(title: "Invoice not found", detail: result.Error, statusCode: result.StatusCode);
         }).WithName("GetBillingInvoice").RequireAuthorization(AuthorizationPolicies.BillingInvoiceRead);
 
+        group.MapGet("/invoices/{invoiceId:guid}/payments", async (
+            Guid hospitalId, Guid invoiceId, IBillingService service, CancellationToken ct) =>
+        {
+            var result = await service.ListPaymentsAsync(hospitalId, invoiceId, ct);
+            return result.IsSuccess ? Results.Ok(result.Value) :
+                Results.Problem(title: "Invoice payment history not found", detail: result.Error, statusCode: result.StatusCode);
+        }).WithName("ListBillingInvoicePayments").RequireAuthorization(AuthorizationPolicies.BillingInvoiceRead);
+
         group.MapPost("/invoices/{invoiceId:guid}/payments", async (Guid hospitalId, Guid invoiceId, PaymentCreateInput request, IBillingService service, CancellationToken ct) =>
         {
             var result = await service.RecordPaymentAsync(hospitalId, invoiceId, request, ct);
