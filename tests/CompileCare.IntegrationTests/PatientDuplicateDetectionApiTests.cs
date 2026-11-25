@@ -398,7 +398,7 @@ public sealed class PatientDuplicateDetectionApiTests
         return (authorized.Id, other.Id);
     }
 
-    private HttpClient CreateClient(Guid tenantId, string? subject = null)
+    private HttpClient CreateClient(Guid tenantId, string? subject = TestJwtTokenFactory.Subject)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
