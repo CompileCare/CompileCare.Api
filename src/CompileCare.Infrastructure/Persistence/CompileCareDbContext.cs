@@ -182,9 +182,32 @@ public sealed class CompileCareDbContext(
 
         foreach (var entry in ChangeTracker.Entries<BillingInvoice>())
         {
-            if (entry.State == EntityState.Modified &&
-                entry.Properties.Any(property => property.IsModified && property.Metadata.Name != nameof(BillingInvoice.PaymentSequence)))
-                throw new InvalidOperationException("Issued invoices are immutable except for the internal payment concurrency sequence.");
+            if (entry.State != EntityState.Modified) continue;
+
+            var sequence = entry.Property(nameof(BillingInvoice.PaymentSequence));
+            var status = entry.Property(nameof(BillingInvoice.Status));
+            if (entry.Properties.Any(property => property.IsModified &&
+                property.Metadata.Name is not nameof(BillingInvoice.PaymentSequence) and not nameof(BillingInvoice.Status)))
+                throw new InvalidOperationException("Issued invoice details are immutable after issue.");
+
+            if (status.IsModified != sequence.IsModified)
+                throw new InvalidOperationException("Invoice settlement status and payment sequence must change together.");
+
+            if (sequence.IsModified && sequence.CurrentValue is int currentSequence &&
+                sequence.OriginalValue is int originalSequence && currentSequence != originalSequence + 1)
+                throw new InvalidOperationException("Invoice payment sequence must advance exactly once per payment.");
+
+            if (status.IsModified)
+            {
+                var previousStatus = status.OriginalValue as string;
+                var currentStatus = status.CurrentValue as string;
+                var validTransition =
+                    previousStatus == InvoiceStatuses.Issued &&
+                        (currentStatus == InvoiceStatuses.PartiallyPaid || currentStatus == InvoiceStatuses.Paid) ||
+                    previousStatus == InvoiceStatuses.PartiallyPaid && currentStatus == InvoiceStatuses.Paid;
+                if (!validTransition)
+                    throw new InvalidOperationException("Invoice settlement status transition is invalid.");
+            }
         }
 
         foreach (var entry in ChangeTracker.Entries<PatientIdentifier>())
