@@ -70,6 +70,21 @@ public static class PatientEndpoints
         .WithName("GetHospitalPatient")
         .RequireAuthorization(AuthorizationPolicies.PatientIdentityRead);
 
+        group.MapGet("/departments/{departmentId:guid}/patients/{patientId:guid}", async (
+            Guid hospitalId,
+            Guid departmentId,
+            Guid patientId,
+            IPatientService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.GetDepartmentAsync(hospitalId, departmentId, patientId, ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.Problem(title: "Department patient not found", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("GetDepartmentPatient")
+        .RequireAuthorization(AuthorizationPolicies.PatientIdentityRead);
+
         group.MapGet("/departments/{departmentId:guid}/patients", async (
             Guid hospitalId,
             Guid departmentId,
