@@ -58,6 +58,12 @@ public sealed class BillingApiTests
         Assert.Equal(HttpStatusCode.Created, partialPaymentResponse.StatusCode);
         var partialPayment = await partialPaymentResponse.Content.ReadFromJsonAsync<PaymentDto>();
         Assert.NotNull(partialPayment);
+        var partiallySettledInvoice = await registrar.GetFromJsonAsync<InvoiceDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}");
+        Assert.NotNull(partiallySettledInvoice);
+        Assert.Equal(InvoiceStatuses.PartiallyPaid, partiallySettledInvoice!.Status);
+        Assert.Equal(200m, partiallySettledInvoice.AmountPaid);
+        Assert.Equal(300m, partiallySettledInvoice.BalanceDue);
 
         var finalPaymentResponse = await registrar.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments",
@@ -76,6 +82,7 @@ public sealed class BillingApiTests
         Assert.NotNull(refreshedInvoice);
         Assert.Equal(500m, refreshedInvoice!.AmountPaid);
         Assert.Equal(0m, refreshedInvoice.BalanceDue);
+        Assert.Equal(InvoiceStatuses.Paid, refreshedInvoice.Status);
 
         var receipt = await registrar.GetFromJsonAsync<ReceiptDto>(
             $"/api/v1/hospitals/{hospitalId:D}/billing/payments/{finalPayment!.Id:D}/receipt");
