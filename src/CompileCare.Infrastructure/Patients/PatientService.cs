@@ -124,6 +124,31 @@ public sealed class PatientService(
         return PatientResult<PatientPage>.Success(new(items, page, pageSize, total));
     }
 
+    public async Task<PatientResult<PatientDto>> GetDepartmentAsync(
+        Guid hospitalId,
+        Guid departmentId,
+        Guid patientId,
+        CancellationToken cancellationToken)
+    {
+        if (hospitalId == Guid.Empty || departmentId == Guid.Empty || patientId == Guid.Empty ||
+            !organizationScope.CanAccessDepartment(hospitalId, departmentId))
+            return PatientResult<PatientDto>.Failure("Patient not found.", 404);
+
+        var result = await db.HospitalPatientRegistrations
+            .Where(registration => registration.HospitalId == hospitalId && registration.PatientId == patientId &&
+                db.QueueEntries.Any(queue => queue.HospitalId == hospitalId &&
+                    queue.DepartmentId == departmentId && queue.PatientId == registration.PatientId))
+            .Select(registration => new PatientDto(
+                registration.Patient.Id, registration.Patient.GivenName, registration.Patient.MiddleName,
+                registration.Patient.FamilyName, registration.Patient.DateOfBirth,
+                registration.HospitalId, registration.RegisteredAtUtc))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return result is null
+            ? PatientResult<PatientDto>.Failure("Patient not found.", 404)
+            : PatientResult<PatientDto>.Success(result);
+    }
+
     public async Task<PatientResult<PatientPage>> SearchDepartmentAsync(
         Guid hospitalId,
         Guid departmentId,
