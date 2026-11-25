@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using CompileCare.Api.Middleware;
 using CompileCare.Application.Appointments;
 using CompileCare.Application.Billing;
@@ -8,6 +9,7 @@ using CompileCare.Application.Clinical;
 using CompileCare.Application.Patients;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -198,6 +200,46 @@ public sealed class OpdJourneyApiTests
         Assert.NotNull(report);
         Assert.Equal(500m, report!.TotalCollected);
         Assert.Equal(1, report.PaymentCount);
+
+        // Sensitive clinical actions and payment capture must be auditable without
+        // copying clinical note text or payment reference data into the audit record.
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvents = await auditDb.AuditEvents
+            .AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
+            .ToListAsync();
+
+        Assert.Contains(auditEvents, item =>
+            item.Action == "GetDepartmentPatient" &&
+            item.ResourceId == patient.Id &&
+            item.Outcome == "Succeeded");
+        Assert.Contains(auditEvents, item =>
+            item.Action == "CreateOpdEncounterFromQueue" &&
+            item.ResourceId == queueEntry.Id &&
+            item.Outcome == "Succeeded");
+        Assert.Contains(auditEvents, item =>
+            item.Action == "UpdateOpdEncounterNote" &&
+            item.ResourceId == encounter.Id &&
+            item.Outcome == "Succeeded");
+        Assert.Contains(auditEvents, item =>
+            item.Action == "SignOpdEncounter" &&
+            item.ResourceId == encounter.Id &&
+            item.Outcome == "Succeeded");
+        Assert.Contains(auditEvents, item =>
+            item.Action == "CloseOpdEncounter" &&
+            item.ResourceId == encounter.Id &&
+            item.Outcome == "Succeeded");
+        Assert.Contains(auditEvents, item =>
+            item.Action == "RecordBillingPayment" &&
+            item.ResourceId == invoice.Id &&
+            item.Outcome == "Succeeded");
+
+        var auditJson = JsonSerializer.Serialize(auditEvents);
+        Assert.DoesNotContain("Intermittent headache", auditJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Clinical assessment documented", auditJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("JOURNEY-UPI-001", auditJson, StringComparison.Ordinal);
     }
 
     private async Task<(Guid HospitalId, Guid DepartmentId)> SeedHospitalAndDepartmentAsync(Guid tenantId)
