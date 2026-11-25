@@ -38,10 +38,27 @@ public static class UserContextEndpoints
                     new TenantMembershipPageRequest(page, pageSize),
                     cancellationToken);
 
-                return Results.Ok(result);
+                var items = result.Items.Select(item => new CurrentUserTenantContextDto(
+                    item.TenantId,
+                    item.TenantName,
+                    item.TenantSlug,
+                    item.Role,
+                    item.Scopes,
+                    TenantRolePermissions.GetPermissions(item.Role))).ToArray();
+
+                return Results.Ok(new TenantMembershipPage<CurrentUserTenantContextDto>(
+                    items, result.Page, result.PageSize, result.TotalCount));
             })
             .WithName("ListCurrentUserTenantContexts");
 
         return endpoints;
     }
 }
+
+public sealed record CurrentUserTenantContextDto(
+    Guid TenantId,
+    string TenantName,
+    string TenantSlug,
+    string Role,
+    IReadOnlyList<OrganizationScope> Scopes,
+    IReadOnlyList<string> Permissions);
