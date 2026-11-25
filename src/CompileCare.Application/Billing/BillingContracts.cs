@@ -54,6 +54,7 @@ public interface IBillingService
     Task<BillingResult<IReadOnlyList<BillingServiceItemDto>>> ListServiceItemsAsync(Guid hospitalId, bool includeInactive, CancellationToken ct);
     Task<BillingResult<InvoiceDto>> CreateInvoiceAsync(Guid hospitalId, InvoiceCreateInput input, CancellationToken ct);
     Task<BillingResult<InvoiceDto>> GetInvoiceAsync(Guid hospitalId, Guid invoiceId, CancellationToken ct);
+    Task<BillingResult<InvoiceDto>> GetInvoiceForVisitAsync(Guid hospitalId, Guid queueEntryId, CancellationToken ct);
     Task<BillingResult<PaymentDto>> RecordPaymentAsync(Guid hospitalId, Guid invoiceId, PaymentCreateInput input, CancellationToken ct);
     Task<BillingResult<ReceiptDto>> GetReceiptAsync(Guid hospitalId, Guid paymentId, CancellationToken ct);
     Task<BillingResult<DailyCollectionReportDto>> GetDailyCollectionAsync(Guid hospitalId, DateOnly businessDate, string timeZoneId, CancellationToken ct);
