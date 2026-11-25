@@ -52,3 +52,12 @@ jobs:
           printf 'Username=%s;Password=%s;ValidAuthenticationTypes=Basic' "$GITHUB_ACTOR" "$GITHUB_TOKEN" > "$RUNNER_TEMP/nuget-source-credentials"
           docker build --secret id=nuget_credentials,src="$RUNNER_TEMP/nuget-source-credentials" --tag compilecare-api:ci .
           rm -f "$RUNNER_TEMP/nuget-source-credentials"
+      - name: Validate local launcher scripts and Compose configuration
+        shell: bash
+        run: |
+          bash -n local/scripts/start-macos.sh
+          pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile("local/scripts/start-windows.ps1", [ref]$tokens, [ref]$errors) > $null; if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }'
+          mkdir -p local/.secrets "$RUNNER_TEMP/CompileCare.Web"
+          printf 'Username=ci;Password=placeholder;ValidAuthenticationTypes=Basic' > local/.secrets/nuget-source-credentials
+          COMPILECARE_WEB_PATH="$RUNNER_TEMP/CompileCare.Web" docker compose --env-file local/.env.example -f local/docker-compose.yml config --quiet
+          rm -rf local/.secrets
