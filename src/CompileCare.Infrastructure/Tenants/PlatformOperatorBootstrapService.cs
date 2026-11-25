@@ -4,6 +4,7 @@ using System.Text;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CompileCare.Infrastructure.Tenants;
 
@@ -53,7 +54,14 @@ public sealed class PlatformOperatorBootstrapService(CompileCareDbContext db) : 
             await transaction.CommitAsync(cancellationToken);
             return new(true, false, false);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when
+            (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new(false, true, false);
+        }
+        catch (PostgresException exception) when
+            (exception.SqlState == PostgresErrorCodes.SerializationFailure)
         {
             await transaction.RollbackAsync(cancellationToken);
             return new(false, true, false);
