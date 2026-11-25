@@ -65,4 +65,29 @@ public sealed class PlatformOperatorBootstrapTests
         Assert.Equal(TestJwtTokenFactory.Subject, platformOperator.Subject);
         Assert.True(platformOperator.IsActive);
     }
+
+    [Fact]
+    public async Task Bootstrap_ParticipatesInAmbientTransaction_AndRollsBackWithOwner()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var service = scope.ServiceProvider.GetRequiredService<IPlatformOperatorBootstrapService>();
+
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
+        var result = await service.BootstrapAsync(
+            TestJwtTokenFactory.Issuer,
+            TestJwtTokenFactory.Subject,
+            "expected-secret",
+            "expected-secret",
+            CancellationToken.None);
+
+        Assert.True(result.Created);
+        Assert.NotNull(db.Database.CurrentTransaction);
+
+        await transaction.RollbackAsync();
+        db.ChangeTracker.Clear();
+
+        Assert.Empty(await db.PlatformOperators.ToListAsync());
+    }
 }

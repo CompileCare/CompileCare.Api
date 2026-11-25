@@ -4,7 +4,7 @@ using System.Text;
 using CompileCare.Application.Tenancy;
 using CompileCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CompileCare.Infrastructure.Tenants;
 
@@ -14,6 +14,10 @@ namespace CompileCare.Infrastructure.Tenants;
 /// </summary>
 public sealed class PlatformOperatorBootstrapService(CompileCareDbContext db) : IPlatformOperatorBootstrapService
 {
+    // Stable, application-specific PostgreSQL advisory-lock key. This is a
+    // transaction-scoped lock, so PostgreSQL releases it on commit or rollback.
+    private const long BootstrapAdvisoryLockKey = 0x43434F5045524154;
+
     public async Task<PlatformOperatorBootstrapResult> BootstrapAsync(
         string issuer,
         string subject,
@@ -32,39 +36,60 @@ public sealed class PlatformOperatorBootstrapService(CompileCareDbContext db) : 
             string.IsNullOrWhiteSpace(subject) || subject.Length > 255)
             return new(false, false, false);
 
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
-
-        if (await db.PlatformOperators.AnyAsync(cancellationToken))
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return new(false, true, false);
-        }
-
-        db.PlatformOperators.Add(new PlatformOperator
-        {
-            Issuer = issuer,
-            Subject = subject,
-            IsActive = true
-        });
+        // AuditEventMiddleware owns the request transaction for this endpoint.
+        // Direct service callers (for example, integration tests or other
+        // application entry points) still get a transaction owned by this service.
+        IDbContextTransaction? ownedTransaction = null;
 
         try
         {
+            if (db.Database.CurrentTransaction is null)
+            {
+                ownedTransaction = await db.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable,
+                    cancellationToken);
+            }
+
+            // Serialize bootstrap attempts even when participating in the
+            // middleware's existing transaction, whose isolation level is not
+            // controlled by this service. The lock is released with that transaction.
+            await db.Database.ExecuteSqlRawAsync(
+                $"SELECT pg_advisory_xact_lock({BootstrapAdvisoryLockKey})",
+                cancellationToken);
+
+            if (await db.PlatformOperators.AnyAsync(cancellationToken))
+            {
+                if (ownedTransaction is not null)
+                    await ownedTransaction.CommitAsync(cancellationToken);
+
+                return new(false, true, false);
+            }
+
+            db.PlatformOperators.Add(new PlatformOperator
+            {
+                Issuer = issuer,
+                Subject = subject,
+                IsActive = true
+            });
+
             await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+
+            if (ownedTransaction is not null)
+                await ownedTransaction.CommitAsync(cancellationToken);
+
             return new(true, false, false);
         }
-        catch (DbUpdateException exception) when
-            (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.SerializationFailure })
+        catch
         {
-            await transaction.RollbackAsync(cancellationToken);
-            return new(false, true, false);
+            if (ownedTransaction is not null)
+                await ownedTransaction.RollbackAsync(CancellationToken.None);
+
+            throw;
         }
-        catch (PostgresException exception) when
-            (exception.SqlState == PostgresErrorCodes.SerializationFailure)
+        finally
         {
-            await transaction.RollbackAsync(cancellationToken);
-            return new(false, true, false);
+            if (ownedTransaction is not null)
+                await ownedTransaction.DisposeAsync();
         }
     }
 }

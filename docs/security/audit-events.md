@@ -16,7 +16,11 @@ The target resource ID is resolved from the final GUID route parameter. This cap
 
 ## Transaction and failure behavior
 
-For audited requests, the business operation and its success audit event share the same database transaction. If the audit record cannot be committed, the business transaction is rolled back and the API returns an audit-unavailable response rather than reporting an unrecorded success. Failed endpoint execution is rolled back and a separate failure audit attempt is made.
+For audited requests, the business operation and its success audit event share the same database transaction. The audit middleware owns that request transaction; application services participating in an audited request must use the current EF Core transaction and must not independently begin, commit, roll back or dispose a nested transaction. Services may own a transaction only when no ambient transaction exists.
+
+The one-time platform-operator bootstrap uses a PostgreSQL transaction-scoped advisory lock before checking whether an operator already exists. This serializes concurrent bootstrap attempts while allowing the service to participate in the audit middleware's transaction. PostgreSQL releases the lock automatically when the owning transaction commits or rolls back.
+
+If the audit record cannot be committed, the business transaction is rolled back and the API returns an audit-unavailable response rather than reporting an unrecorded success. Failed endpoint execution is rolled back and a separate failure audit attempt is made.
 
 Audit events are append-only. Application-level change tracking rejects updates/deletes, and PostgreSQL protections prevent direct update or truncate operations. Access to audit records must remain restricted to explicitly authorized administrative or compliance workflows; no general patient-facing audit browsing endpoint is implied by this storage capability.
 
