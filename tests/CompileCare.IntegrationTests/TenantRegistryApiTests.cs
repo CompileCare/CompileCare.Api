@@ -39,6 +39,24 @@ public sealed class TenantRegistryApiTests
             ]);
         var deniedResponse = await authenticatedNonOperator.GetAsync("/api/v1/platform/tenants");
         Assert.Equal(HttpStatusCode.Forbidden, deniedResponse.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var deniedEvents = await db.AuditEvents
+            .Where(value => value.Action == "ListPlatformTenants")
+            .OrderBy(value => value.StatusCode)
+            .ToListAsync();
+
+        Assert.Equal(2, deniedEvents.Count);
+        Assert.All(deniedEvents, value =>
+        {
+            Assert.Null(value.TenantId);
+            Assert.Null(value.ResourceId);
+            Assert.Equal("Denied", value.Outcome);
+        });
+        Assert.Null(deniedEvents.Single(value => value.StatusCode == (int)HttpStatusCode.Unauthorized).ActorSubject);
+        Assert.Equal(TestJwtTokenFactory.Subject,
+            deniedEvents.Single(value => value.StatusCode == (int)HttpStatusCode.Forbidden).ActorSubject);
     }
 
     [Fact]
@@ -77,6 +95,12 @@ public sealed class TenantRegistryApiTests
         Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
         Assert.Equal(TestJwtTokenFactory.Subject, audit.ActorSubject);
         Assert.Equal("Succeeded", audit.Outcome);
+
+        var readAudit = await db.AuditEvents.SingleAsync(value =>
+            value.Action == "GetPlatformTenant");
+        Assert.Equal(created.Id, readAudit.ResourceId);
+        Assert.Null(readAudit.TenantId);
+        Assert.Equal(TestJwtTokenFactory.Subject, readAudit.ActorSubject);
     }
 
     [Fact]
@@ -124,6 +148,25 @@ public sealed class TenantRegistryApiTests
         var reopen = await platformClient.PostAsync(
             $"/api/v1/platform/tenants/{tenant.Id:D}/activate", content: null);
         Assert.Equal(HttpStatusCode.Conflict, reopen.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var lifecycleAudits = await db.AuditEvents
+            .Where(value => value.Action == "ActivatePlatformTenant" ||
+                            value.Action == "SuspendPlatformTenant" ||
+                            value.Action == "ClosePlatformTenant")
+            .ToListAsync();
+
+        Assert.Equal(4, lifecycleAudits.Count);
+        Assert.All(lifecycleAudits, value =>
+        {
+            Assert.Equal(tenant.Id, value.ResourceId);
+            Assert.Null(value.TenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, value.ActorIssuer);
+            Assert.Equal(TestJwtTokenFactory.Subject, value.ActorSubject);
+        });
+        Assert.Contains(lifecycleAudits, value => value.Action == "ClosePlatformTenant" &&
+            value.Outcome == "Succeeded" && value.StatusCode == (int)HttpStatusCode.OK);
     }
 
     [Fact]
@@ -180,6 +223,7 @@ public sealed class TenantRegistryApiTests
         Assert.Equal("Platform tenant memberships", audit.ResourceType);
         Assert.Equal("Succeeded", audit.Outcome);
         Assert.Equal((int)HttpStatusCode.Created, audit.StatusCode);
+        Assert.Equal(tenant.Id, audit.ResourceId);
     }
 
     private HttpClient CreateAuthenticatedClient(
