@@ -55,7 +55,8 @@ public sealed class BillingApiTests
         var partialPaymentResponse = await registrar.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments",
             new PaymentCreateInput(200m, PaymentMethods.Cash, null));
-        Assert.Equal(HttpStatusCode.Created, partialPaymentResponse.StatusCode);
+        Assert.True(partialPaymentResponse.StatusCode == HttpStatusCode.Created,
+            $"Partial payment failed: {(int)partialPaymentResponse.StatusCode} {await partialPaymentResponse.Content.ReadAsStringAsync()}");
         var partialPayment = await partialPaymentResponse.Content.ReadFromJsonAsync<PaymentDto>();
         Assert.NotNull(partialPayment);
         var partiallySettledInvoice = await registrar.GetFromJsonAsync<InvoiceDto>(
