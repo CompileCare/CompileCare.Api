@@ -25,7 +25,7 @@ public sealed class BillingApiTests
     public async Task HospitalAdminCanManageCatalogueAndRegistrarCanIssueInvoiceTakePartialPaymentsAndReadReceipt()
     {
         var tenantId = Guid.NewGuid();
-        var (hospitalId, queueEntryId, patientId) = await SeedVisitAsync(tenantId);
+        var (hospitalId, _, queueEntryId, patientId) = await SeedVisitAsync(tenantId);
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin,
             scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar,
@@ -55,6 +55,11 @@ public sealed class BillingApiTests
             $"/api/v1/hospitals/{hospitalId:D}/billing/visits/{queueEntryId:D}/invoice");
         Assert.NotNull(invoiceByVisit);
         Assert.Equal(invoice.Id, invoiceByVisit!.Id);
+
+        var duplicateInvoiceResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices",
+            new InvoiceCreateInput(queueEntryId, [new InvoiceLineInput(service.Id, 1)]));
+        Assert.Equal(HttpStatusCode.Conflict, duplicateInvoiceResponse.StatusCode);
 
         var partialPaymentResponse = await registrar.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments",
@@ -111,7 +116,7 @@ public sealed class BillingApiTests
     public async Task FacilityManagerCannotReadOrManageBilling()
     {
         var tenantId = Guid.NewGuid();
-        var (hospitalId, queueEntryId, _) = await SeedVisitAsync(tenantId);
+        var (hospitalId, _, queueEntryId, _) = await SeedVisitAsync(tenantId);
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.FacilityManager,
             scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
         using var manager = CreateClient(tenantId, TestJwtTokenFactory.Subject);
@@ -126,7 +131,99 @@ public sealed class BillingApiTests
         Assert.Equal(HttpStatusCode.Forbidden, catalogue.StatusCode);
     }
 
-    private async Task<(Guid HospitalId, Guid QueueEntryId, Guid PatientId)> SeedVisitAsync(Guid tenantId)
+    [Fact]
+    public async Task DepartmentScopedRegistrarCannotReadInvoiceForAnotherDepartment()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, queueEntryId, _) = await SeedVisitAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        var serviceResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/service-items",
+            new BillingServiceItemInput("CONSULT", "OPD Consultation", "Consultation", 500m));
+        Assert.Equal(HttpStatusCode.Created, serviceResponse.StatusCode);
+        var service = await serviceResponse.Content.ReadFromJsonAsync<BillingServiceItemDto>();
+        Assert.NotNull(service);
+        var invoiceResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices",
+            new InvoiceCreateInput(queueEntryId, [new InvoiceLineInput(service!.Id, 1)]));
+        Assert.Equal(HttpStatusCode.Created, invoiceResponse.StatusCode);
+
+        Guid unrelatedDepartmentId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var unrelatedDepartment = new Department
+            {
+                HospitalId = hospitalId, Name = "Neurology", Code = "NEUR"
+            };
+            db.Departments.Add(unrelatedDepartment);
+            await db.SaveChangesAsync();
+            unrelatedDepartmentId = unrelatedDepartment.Id;
+        }
+
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, unrelatedDepartmentId)],
+            subject: "billing-other-department");
+        using var otherDepartmentRegistrar = CreateClient(tenantId, "billing-other-department");
+        var response = await otherDepartmentRegistrar.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/visits/{queueEntryId:D}/invoice");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConcurrentPaymentsCannotOverpayAnInvoice()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, _, queueEntryId, _) = await SeedVisitAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "billing-cashier-one");
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "billing-cashier-two");
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        using var cashierOne = CreateClient(tenantId, "billing-cashier-one");
+        using var cashierTwo = CreateClient(tenantId, "billing-cashier-two");
+        var serviceResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/service-items",
+            new BillingServiceItemInput("CONSULT", "OPD Consultation", "Consultation", 500m));
+        Assert.Equal(HttpStatusCode.Created, serviceResponse.StatusCode);
+        var service = await serviceResponse.Content.ReadFromJsonAsync<BillingServiceItemDto>();
+        Assert.NotNull(service);
+        var invoiceResponse = await cashierOne.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices",
+            new InvoiceCreateInput(queueEntryId, [new InvoiceLineInput(service!.Id, 1)]));
+        Assert.Equal(HttpStatusCode.Created, invoiceResponse.StatusCode);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<InvoiceDto>();
+        Assert.NotNull(invoice);
+
+        var firstPayment = cashierOne.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice!.Id:D}/payments",
+            new PaymentCreateInput(300m, PaymentMethods.Cash, "CASHIER-ONE"));
+        var secondPayment = cashierTwo.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments",
+            new PaymentCreateInput(300m, PaymentMethods.Upi, "CASHIER-TWO"));
+        var responses = await Task.WhenAll(firstPayment, secondPayment);
+
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Created);
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
+        var refreshed = await cashierOne.GetFromJsonAsync<InvoiceDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}");
+        Assert.NotNull(refreshed);
+        Assert.Equal(300m, refreshed!.AmountPaid);
+        Assert.Equal(200m, refreshed.BalanceDue);
+        Assert.Equal(InvoiceStatuses.PartiallyPaid, refreshed.Status);
+    }
+
+    private async Task<(Guid HospitalId, Guid DepartmentId, Guid QueueEntryId, Guid PatientId)> SeedVisitAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
@@ -159,7 +256,7 @@ public sealed class BillingApiTests
         };
         db.QueueEntries.Add(queue);
         await db.SaveChangesAsync();
-        return (hospital.Id, queue.Id, patient.Id);
+        return (hospital.Id, department.Id, queue.Id, patient.Id);
     }
 
     private HttpClient CreateClient(Guid tenantId, string subject)
