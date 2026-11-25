@@ -378,6 +378,21 @@ public sealed class TenantMembershipApiTests
                 content: null);
             Assert.Equal(HttpStatusCode.OK, reactivate.StatusCode);
 
+            var adminMembership = await baselineDb.TenantMemberships.IgnoreQueryFilters()
+                .SingleAsync(value => value.TenantId == tenantId &&
+                                      value.Subject == "membership-audit-admin");
+            var deniedSelfUpdate = await adminClient.PutAsJsonAsync(
+                $"/api/v1/tenant/memberships/{adminMembership.Id:D}",
+                new
+                {
+                    role = TenantRoles.FacilityViewer,
+                    scopes = new[]
+                    {
+                        new { scopeType = OrganizationScopeTypes.Tenant }
+                    }
+                });
+            Assert.Equal(HttpStatusCode.Conflict, deniedSelfUpdate.StatusCode);
+
             // Read the audit rows in the same tenant context and exclude fixture
             // activity so this assertion is deterministic even as setup evolves.
             var auditEvents = await baselineDb.AuditEvents.IgnoreQueryFilters()
@@ -386,19 +401,24 @@ public sealed class TenantMembershipApiTests
                                 !existingAuditIds.Contains(value.Id))
                 .ToListAsync();
 
-            Assert.Equal(3, auditEvents.Count);
+            Assert.Equal(4, auditEvents.Count);
+            var targetAudits = auditEvents
+                .Where(value => value.ResourceId == targetMembership.Id)
+                .ToList();
+            Assert.Equal(3, targetAudits.Count);
+
             var updateAudit = Assert.Single(
-                auditEvents, value => value.Action == "UpdateTenantMembership");
+                targetAudits, value => value.Action == "UpdateTenantMembership");
             var deactivateAudit = Assert.Single(
-                auditEvents, value => value.Action == "DeactivateTenantMembership");
+                targetAudits, value => value.Action == "DeactivateTenantMembership");
             var reactivateAudit = Assert.Single(
-                auditEvents, value => value.Action == "ReactivateTenantMembership");
+                targetAudits, value => value.Action == "ReactivateTenantMembership");
 
             Assert.Equal("PUT", updateAudit.HttpMethod);
             Assert.Equal("POST", deactivateAudit.HttpMethod);
             Assert.Equal("POST", reactivateAudit.HttpMethod);
 
-            Assert.All(auditEvents, audit =>
+            Assert.All(targetAudits, audit =>
             {
                 Assert.Equal(tenantId, audit.TenantId);
                 Assert.Equal(tenantId, audit.RequestedTenantId);
@@ -409,6 +429,23 @@ public sealed class TenantMembershipApiTests
                 Assert.Equal("Succeeded", audit.Outcome);
                 Assert.Equal((int)HttpStatusCode.OK, audit.StatusCode);
             });
+
+            var selfUpdateAudit = Assert.Single(
+                auditEvents, value => value.ResourceId == adminMembership.Id);
+            Assert.Equal("UpdateTenantMembership", selfUpdateAudit.Action);
+            Assert.Equal("PUT", selfUpdateAudit.HttpMethod);
+            Assert.Equal(tenantId, selfUpdateAudit.TenantId);
+            Assert.Equal(tenantId, selfUpdateAudit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, selfUpdateAudit.ActorIssuer);
+            Assert.Equal("membership-audit-admin", selfUpdateAudit.ActorSubject);
+            Assert.Equal("Tenant memberships", selfUpdateAudit.ResourceType);
+            Assert.Equal("Rejected", selfUpdateAudit.Outcome);
+            Assert.Equal((int)HttpStatusCode.Conflict, selfUpdateAudit.StatusCode);
+
+            var persistedAdmin = await baselineDb.TenantMemberships.IgnoreQueryFilters()
+                .SingleAsync(value => value.Id == adminMembership.Id);
+            Assert.Equal(TenantRoles.HospitalAdmin, persistedAdmin.Role);
+            Assert.True(persistedAdmin.IsActive);
         }
     }
 
