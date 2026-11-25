@@ -100,7 +100,7 @@ public sealed class BillingService(
             HospitalId = hospitalId, DepartmentId = queue.DepartmentId,
             QueueEntryId = queue.Id, PatientId = queue.PatientId,
             InvoiceNumber = string.Empty, IssuedAtUtc = DateTimeOffset.UtcNow,
-            Status = "Issued"
+            Status = InvoiceStatuses.Issued
         };
         invoice.InvoiceNumber = $"INV-{invoice.IssuedAtUtc:yyyyMMdd}-{invoice.Id.ToString("N")[..8].ToUpperInvariant()}";
         var lines = input.Lines.Select(line =>
@@ -115,6 +115,7 @@ public sealed class BillingService(
             };
         }).ToArray();
         invoice.Subtotal = lines.Sum(x => x.LineTotal);
+        invoice.Status = invoice.Subtotal == 0m ? InvoiceStatuses.Paid : InvoiceStatuses.Issued;
         db.BillingInvoices.Add(invoice);
         db.BillingInvoiceLines.AddRange(lines);
         await db.SaveChangesAsync(ct);
@@ -165,6 +166,7 @@ public sealed class BillingService(
         // against this invoice. The payment and sequence update commit atomically
         // inside the request audit transaction.
         invoice.PaymentSequence = checked(invoice.PaymentSequence + 1);
+        invoice.Status = input.Amount == due ? InvoiceStatuses.Paid : InvoiceStatuses.PartiallyPaid;
         var payment = new BillingPayment
         {
             HospitalId = hospitalId, InvoiceId = invoice.Id,

@@ -20,6 +20,13 @@ public static class PaymentMethods
         value is Cash or Upi or Card or BankTransfer;
 }
 
+public static class InvoiceStatuses
+{
+    public const string Issued = "Issued";
+    public const string PartiallyPaid = "PartiallyPaid";
+    public const string Paid = "Paid";
+}
+
 public sealed record BillingServiceItemInput(string Code, string Name, string Category, decimal UnitPrice, bool IsActive = true);
 public sealed record BillingServiceItemDto(Guid Id, Guid HospitalId, string Code, string Name, string Category, decimal UnitPrice, bool IsActive);
 public sealed record InvoiceLineInput(Guid ServiceItemId, int Quantity);

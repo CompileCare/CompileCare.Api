@@ -281,7 +281,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_billing_invoices_payment_sequence", "\"PaymentSequence\" >= 0");
 
-                            t.HasCheckConstraint("CK_billing_invoices_status", "\"Status\" IN ('Issued')");
+                            t.HasCheckConstraint("CK_billing_invoices_status", "\"Status\" IN ('Issued', 'PartiallyPaid', 'Paid')");
 
                             t.HasCheckConstraint("CK_billing_invoices_subtotal", "\"Subtotal\" >= 0");
                         });
