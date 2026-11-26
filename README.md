@@ -72,6 +72,8 @@ Cors__AllowedOrigins__0=https://workspace.example.com
 
 In non-Development environments, every configured `Cors:AllowedOrigins` entry must be an explicit HTTPS origin (scheme, host and optional port only). Wildcards, credentials, paths, query strings, fragments and HTTP origins are rejected at startup. Omit the list for a same-origin Web/API deployment. Development may use explicit HTTP(S) loopback origins only (`localhost`, `*.localhost`, `127.0.0.1` or another loopback IP); remote hosts, wildcards, paths and credentials are rejected even in Development.
 
+The API's `/metrics` endpoint is intended for internal Prometheus scraping only. Outside Development and Testing, startup requires `Observability:Metrics:AllowedNetworks` with one or more explicit CIDRs (for example, `Observability__Metrics__AllowedNetworks__0=10.20.0.0/16`). Requests to `/metrics` from outside those networks receive 404. Configure the CIDR values to match the actual monitoring source network after the hosting topology is selected; do not use a broad public range. Forwarded client addresses are considered only from configured trusted proxies. Development and isolated Testing hosts do not require this setting.
+
 The API validates JWT signature, issuer, audience, lifetime, expiry and subject. The validated issuer and subject (`sub`) are matched against an active CompileCare tenant membership. Facility endpoints require exactly one `X-Tenant-ID` GUID; this header only selects the requested tenant and never grants access by itself.
 
 Tenant roles are stored in the CompileCare database. Current facility permissions are:
