@@ -71,6 +71,17 @@ public static class AppointmentEndpoints
         .WithName("BookAppointment")
         .RequireAuthorization(AuthorizationPolicies.AppointmentManage);
 
+        group.MapGet("/appointments", async (
+            Guid hospitalId, Guid departmentId, DateOnly date, IAppointmentSchedulingService service,
+            CancellationToken ct, string? status = null, int page = 1, int pageSize = 25) =>
+        {
+            var result = await service.ListAppointmentsAsync(hospitalId, departmentId, date, status, page, pageSize, ct);
+            return result.IsSuccess ? Results.Ok(result.Value) :
+                Results.Problem(title: "Appointment listing failed", detail: result.Error, statusCode: result.StatusCode);
+        })
+        .WithName("ListAppointments")
+        .RequireAuthorization(AuthorizationPolicies.AppointmentRead);
+
         group.MapGet("/appointments/{appointmentId:guid}", async (
             Guid hospitalId,
             Guid appointmentId,
