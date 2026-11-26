@@ -223,10 +223,13 @@ public sealed class AppointmentSchedulingService(
         if (!CanReadHospital(hospitalId, departmentId))
             return AppointmentResult<AppointmentPage>.Failure("Appointments not found.", 404);
 
-        if (!string.IsNullOrWhiteSpace(status) && !new[]
-            { AppointmentStatuses.Booked, AppointmentStatuses.Cancelled, AppointmentStatuses.Completed, AppointmentStatuses.NoShow }
-            .Contains(status, StringComparer.OrdinalIgnoreCase))
-            return AppointmentResult<AppointmentPage>.Failure("The appointment status filter is invalid.", 400);
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            status = new[] { AppointmentStatuses.Booked, AppointmentStatuses.Cancelled, AppointmentStatuses.Completed, AppointmentStatuses.NoShow }
+                .FirstOrDefault(value => string.Equals(value, status.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (status is null)
+                return AppointmentResult<AppointmentPage>.Failure("The appointment status filter is invalid.", 400);
+        }
 
         page = page < 1 ? 1 : Math.Min(page, 2_000_000);
         pageSize = pageSize < 1 ? 25 : Math.Min(pageSize, 100);
