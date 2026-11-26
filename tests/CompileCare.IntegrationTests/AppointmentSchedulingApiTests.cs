@@ -32,7 +32,7 @@ public sealed class AppointmentSchedulingApiTests
             scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
         await _factory.SeedTenantMembershipAsync(
             tenantId, TenantRoles.PatientRegistrar,
-            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentId)],
             subject: "appointment-list-registrar");
         using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
         using var registrar = CreateClient(tenantId, "appointment-list-registrar");
