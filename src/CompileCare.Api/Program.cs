@@ -58,6 +58,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var allowedOrigins = CorsOriginConfiguration.GetAllowedOrigins(builder.Configuration, builder.Environment);
+var metricsAllowedNetworks = MetricsEndpointNetworkConfiguration.GetAllowedNetworks(builder.Configuration, builder.Environment);
 if (allowedOrigins.Length > 0)
 {
     builder.Services.AddCors(options =>
@@ -78,6 +79,11 @@ if (app.Environment.IsDevelopment() &&
 // Forwarded headers must be applied before HSTS, authentication, rate limiting,
 // and any code that consumes the remote IP or request scheme.
 app.UseForwardedHeaders();
+if (metricsAllowedNetworks.Length > 0)
+{
+    app.UseMiddleware<MetricsEndpointAccessMiddleware>(metricsAllowedNetworks);
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
