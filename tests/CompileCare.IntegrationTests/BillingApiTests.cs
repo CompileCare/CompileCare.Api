@@ -186,6 +186,30 @@ public sealed class BillingApiTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, paymentHistoryResponse.StatusCode);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var deniedBillingAudits = await auditDb.AuditEvents.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ActorSubject == "billing-other-department" &&
+                item.ResourceType == "Billing" &&
+                item.Outcome == "Rejected")
+            .OrderBy(item => item.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, deniedBillingAudits.Count);
+        Assert.All(deniedBillingAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal("billing-other-department", audit.ActorSubject);
+            Assert.Equal("Rejected", audit.Outcome);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+        });
+        Assert.Contains(deniedBillingAudits, audit => audit.Action == "GetBillingInvoiceForVisit");
+        Assert.Contains(deniedBillingAudits, audit => audit.Action == "ListBillingInvoicePayments");
     }
 
     [Fact]
