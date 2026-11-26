@@ -3,6 +3,9 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.RateLimiting;
 using Xunit;
 
 namespace CompileCare.IntegrationTests;
@@ -13,6 +16,10 @@ public sealed class RateLimitingApiTests
     public async Task AnonymousRequestsAreThrottledWithProblemDetailsAndRetryAfter()
     {
         using var factory = new RateLimitedApiFactory();
+        var configuredLimit = factory.Services.GetRequiredService<IConfiguration>();
+        Assert.Equal("2", configuredLimit["RateLimiting:AnonymousPermitLimit"]);
+        Assert.NotNull(factory.Services.GetRequiredService<IOptions<RateLimiterOptions>>().Value.GlobalLimiter);
+
         using var client = factory.CreateClient();
 
         var first = await client.GetAsync("/");
