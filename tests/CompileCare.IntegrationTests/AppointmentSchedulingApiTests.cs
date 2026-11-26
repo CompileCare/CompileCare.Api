@@ -366,6 +366,140 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Contains(auditEvents, audit => audit.ResourceId == appointment.Id);
     }
 
+    [Fact]
+    public async Task DepartmentScopedRegistrarCannotReadBookOrMutateAppointmentsAndQueueOperationsAreAudited()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentA, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        Guid departmentB;
+        using (var seedScope = _factory.Services.CreateScope())
+        {
+            seedScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = seedScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var department = new Department
+            {
+                HospitalId = hospitalId,
+                Name = "Neurology",
+                Code = "NEUR"
+            };
+            db.Departments.Add(department);
+            await db.SaveChangesAsync();
+            departmentB = department.Id;
+        }
+
+        const string hospitalRegistrarSubject = "department-appointment-registrar-a";
+        const string otherDepartmentSubject = "department-appointment-registrar-b";
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: hospitalRegistrarSubject);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentB)],
+            subject: otherDepartmentSubject);
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        using var registrarA = CreateClient(tenantId, hospitalRegistrarSubject);
+        using var registrarB = CreateClient(tenantId, otherDepartmentSubject);
+
+        var date = new DateOnly(2026, 12, 10);
+        var sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentA, providerId, date,
+                new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await registrarA.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        Assert.Equal(2, slots!.Count);
+
+        var bookingResponse = await registrarA.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, patientId, slots[0].StartsAtUtc, "Department A appointment"));
+        Assert.Equal(HttpStatusCode.Created, bookingResponse.StatusCode);
+        var appointment = await bookingResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(appointment);
+
+        var walkInResponse = await registrarA.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins",
+            new WalkInCreateInput(departmentA, patientId, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, walkInResponse.StatusCode);
+        var queueEntry = await walkInResponse.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(queueEntry);
+
+        var attempts = new[]
+        {
+            await registrarB.GetAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/availability-sessions?date={date:yyyy-MM-dd}&departmentId={departmentA:D}&page=1&pageSize=10"),
+            await registrarB.GetAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session.Id:D}/slots"),
+            await registrarB.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/appointments",
+                new AppointmentBookInput(session.Id, patientId, slots[1].StartsAtUtc, "Department B attempt")),
+            await registrarB.GetAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment!.Id:D}"),
+            await registrarB.PostAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/cancel", null),
+            await registrarB.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/reschedule",
+                new AppointmentBookInput(session.Id, patientId, slots[1].StartsAtUtc, "Department B attempt")),
+            await registrarB.PostAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/check-in", null),
+            await registrarB.GetAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/queue?departmentId={departmentA:D}&date={date:yyyy-MM-dd}&page=1&pageSize=10"),
+            await registrarB.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/queue/{queueEntry!.Id:D}/call",
+                new QueueActionInput(null)),
+            await registrarB.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins",
+                new WalkInCreateInput(departmentA, patientId, "Asia/Kolkata"))
+        };
+
+        Assert.All(attempts, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var deniedAudits = await auditDb.AuditEvents.AsNoTracking()
+            .Where(audit =>
+                audit.TenantId == tenantId &&
+                audit.ActorSubject == otherDepartmentSubject &&
+                audit.ResourceType == "Appointments and scheduling" &&
+                audit.Outcome == "Rejected")
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(attempts.Length, deniedAudits.Count);
+        Assert.All(deniedAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal(otherDepartmentSubject, audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+        });
+        Assert.Contains(deniedAudits, audit => audit.Action == "ListProviderAvailabilitySessions");
+        Assert.Contains(deniedAudits, audit => audit.Action == "GetProviderAvailabilitySlots");
+        Assert.Contains(deniedAudits, audit => audit.Action == "BookAppointment");
+        Assert.Contains(deniedAudits, audit => audit.Action == "GetAppointment");
+        Assert.Contains(deniedAudits, audit => audit.Action == "CancelAppointment");
+        Assert.Contains(deniedAudits, audit => audit.Action == "RescheduleAppointment");
+        Assert.Contains(deniedAudits, audit => audit.Action == "CheckInAppointment");
+        Assert.Contains(deniedAudits, audit => audit.Action == "ListDepartmentQueue");
+        Assert.Contains(deniedAudits, audit => audit.Action == "TransitionQueueEntry");
+        Assert.Contains(deniedAudits, audit => audit.Action == "RegisterQueueWalkIn");
+        Assert.Contains(deniedAudits, audit => audit.ResourceId == hospitalId);
+        Assert.Contains(deniedAudits, audit => audit.ResourceId == session.Id);
+        Assert.Contains(deniedAudits, audit => audit.ResourceId == appointment.Id);
+        Assert.Contains(deniedAudits, audit => audit.ResourceId == queueEntry.Id);
+    }
+
     private async Task<(Guid HospitalId, Guid DepartmentId, Guid ProviderId, Guid PatientId)> SeedSchedulingDataAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
