@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -19,7 +21,7 @@ public sealed class CorsOriginConfigurationTests
             configuration,
             CreateEnvironment(Environments.Production));
 
-        Assert.Equal([expectedOrigin], origins);
+        Assert.Equal(new[] { expectedOrigin }, origins);
     }
 
     [Theory]
@@ -51,7 +53,7 @@ public sealed class CorsOriginConfigurationTests
             configuration,
             CreateEnvironment(Environments.Development));
 
-        Assert.Equal(["http://localhost:8080"], origins);
+        Assert.Equal(new[] { "http://localhost:8080" }, origins);
     }
 
     [Fact]
