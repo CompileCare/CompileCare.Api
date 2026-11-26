@@ -23,6 +23,62 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Fact]
+    public async Task AppointmentListIsPaginatedAndScopedToHospitalDepartmentAndLocalDate()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "appointment-list-registrar");
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        using var registrar = CreateClient(tenantId, "appointment-list-registrar");
+        var date = new DateOnly(2026, 12, 12);
+        var sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(departmentId, providerId, date,
+                new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+        var slots = await registrar.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        foreach (var slot in slots!)
+        {
+            var booking = await registrar.PostAsJsonAsync(
+                $"/api/v1/hospitals/{hospitalId:D}/appointments",
+                new AppointmentBookInput(session.Id, patientId, slot.StartsAtUtc, "Consultation"));
+            Assert.Equal(HttpStatusCode.Created, booking.StatusCode);
+        }
+
+        var firstPage = await registrar.GetFromJsonAsync<AppointmentPage>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments?departmentId={departmentId:D}&date={date:yyyy-MM-dd}&page=1&pageSize=1");
+        Assert.NotNull(firstPage);
+        Assert.Equal(2, firstPage!.TotalCount);
+        Assert.Equal(2, firstPage.TotalPages);
+        Assert.Single(firstPage.Items);
+
+        var bookedOnly = await registrar.GetFromJsonAsync<AppointmentPage>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments?departmentId={departmentId:D}&date={date:yyyy-MM-dd}&status=Booked");
+        Assert.NotNull(bookedOnly);
+        Assert.Equal(2, bookedOnly!.TotalCount);
+        Assert.All(bookedOnly.Items, item => Assert.Equal(AppointmentStatuses.Booked, item.Status));
+
+        var wrongDepartment = await registrar.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments?departmentId={Guid.NewGuid():D}&date={date:yyyy-MM-dd}");
+        Assert.Equal(HttpStatusCode.NotFound, wrongDepartment.StatusCode);
+
+        var wrongDate = await registrar.GetFromJsonAsync<AppointmentPage>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments?departmentId={departmentId:D}&date={date.AddDays(1):yyyy-MM-dd}");
+        Assert.NotNull(wrongDate);
+        Assert.Empty(wrongDate!.Items);
+    }
+
+    [Fact]
     public async Task HospitalAdminCanPublishAvailabilityAndRegistrarCanBookOnlyRegisteredPatient()
     {
         var tenantId = Guid.NewGuid();
