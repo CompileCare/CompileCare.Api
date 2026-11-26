@@ -1,0 +1,129 @@
+name: PostgreSQL Migration Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - "src/CompileCare.Infrastructure/**"
+      - "src/CompileCare.Api/**"
+      - ".github/workflows/migration-rehearsal.yml"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - "NuGet.Config"
+      - "global.json"
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: migration-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ConnectionStrings__CompileCareTests: Host=localhost;Port=5432;Database=compilecare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__CompileCare: Host=localhost;Port=5432;Database=compilecare_upgrade;Username=postgres;Password=postgres
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Configure GitHub Packages credentials
+        run: dotnet nuget update source github --username "$GITHUB_ACTOR" --password "$GITHUB_TOKEN" --store-password-in-clear-text
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare isolated PostgreSQL databases
+        run: |
+          set -euo pipefail
+          createdb --host=localhost --username=postgres compilecare_upgrade
+          createdb --host=localhost --username=postgres compilecare_fresh
+
+      - name: Check out the base migration model
+        run: |
+          set -euo pipefail
+          git fetch origin "$BASE_SHA"
+          git worktree add /tmp/compilecare-base "$BASE_SHA"
+
+      - name: Restore and build base revision
+        working-directory: /tmp/compilecare-base
+        run: |
+          dotnet restore CompileCare.Api.slnx
+          dotnet tool restore
+          dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+
+      - name: Apply base migrations to the upgrade database
+        working-directory: /tmp/compilecare-base
+        run: |
+          dotnet ef database update \
+            --project src/CompileCare.Infrastructure \
+            --startup-project src/CompileCare.Api \
+            --context CompileCareDbContext
+
+      - name: Restore and build pull request revision
+        run: |
+          dotnet restore CompileCare.Api.slnx
+          dotnet tool restore
+          dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+
+      - name: Generate idempotent migration script from pull request revision
+        run: |
+          dotnet ef migrations script --idempotent \
+            --project src/CompileCare.Infrastructure \
+            --startup-project src/CompileCare.Api \
+            --context CompileCareDbContext \
+            --output /tmp/compilecare-current-migrations.sql
+
+      - name: Rehearse upgrade and fresh-database installation
+        run: |
+          set -euo pipefail
+          for database in compilecare_upgrade compilecare_fresh; do
+            connection="postgresql://postgres:postgres@localhost:5432/$database"
+            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
+            # Reapply the idempotent script to prove it safely handles an already-current schema.
+            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
+          done
+          upgrade_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_upgrade" \
+            --command='SELECT string_agg("MigrationId", chr(44) ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
+          fresh_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_fresh" \
+            --command='SELECT string_agg("MigrationId", chr(44) ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
+          if [[ -z "$upgrade_ids" || -z "$fresh_ids" ]]; then
+            echo "::error::EF migration history was not populated in both rehearsal databases."
+            exit 1
+          fi
+          if [[ "$upgrade_ids" != "$fresh_ids" ]]; then
+            echo "::error::Upgrade and fresh databases have different migration histories."
+            echo "Upgrade: $upgrade_ids"
+            echo "Fresh:   $fresh_ids"
+            exit 1
+          fi
+          echo "Upgrade rehearsal and fresh install both applied the same migration history."
+
+      - name: Capture PostgreSQL logs on failure
+        if: failure()
+        run: |
+          docker ps -a
+          docker logs "$(docker ps -q --filter ancestor=postgres:16 | head -n 1)" || true
