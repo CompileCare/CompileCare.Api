@@ -25,7 +25,10 @@ public sealed class AuditEndpointCoverageTests
         var endpoints = _factory.Services
             .GetServices<EndpointDataSource>()
             .SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>();
+            .OfType<RouteEndpoint>()
+            .ToArray();
+
+        Assert.NotEmpty(endpoints);
 
         var unauditedRoutes = endpoints
             .Where(endpoint =>
