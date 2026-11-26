@@ -38,7 +38,7 @@ Example local connection string:
 Host=localhost;Database=compilecare;Username=compilecare;Password=replace-me
 ```
 
-Outside Development, the API requires `ConnectionStrings:CompileCare` and rejects startup unless PostgreSQL uses `SSL Mode=VerifyFull` with `Trust Server Certificate=false`. This verifies both the certificate chain and server hostname. If the selected provider uses a private CA, mount its CA certificate securely and configure Npgsql's `Root Certificate` connection-string option. Do not disable certificate validation to work around a provider certificate problem. Development may use the local plaintext PostgreSQL service.
+Outside Development and the isolated `Testing` host, the API requires `ConnectionStrings:CompileCare` and rejects startup unless PostgreSQL uses `SSL Mode=VerifyFull` with `Trust Server Certificate=false`. This verifies both the certificate chain and server hostname. If the selected provider uses a private CA, mount its CA certificate securely and configure Npgsql's `Root Certificate` connection-string option. Do not disable certificate validation to work around a provider certificate problem. Development may use the local plaintext PostgreSQL service.
 
 Example production connection-string shape (replace host/database/user and supply the password from a secret manager):
 
