@@ -68,8 +68,10 @@ public sealed class MetricsEndpointAccessTests
             CreateEnvironment(Environments.Testing)));
     }
 
-    [Fact]
-    public async Task Metrics_request_from_an_untrusted_address_is_hidden()
+    [Theory]
+    [InlineData("/metrics")]
+    [InlineData("/metrics/")]
+    public async Task Metrics_request_from_an_untrusted_address_is_hidden(string path)
     {
         var nextCalled = false;
         var middleware = new MetricsEndpointAccessMiddleware(
@@ -80,7 +82,7 @@ public sealed class MetricsEndpointAccessTests
             },
             new[] { IPNetwork.Parse("10.20.0.0/16") });
         var context = new DefaultHttpContext();
-        context.Request.Path = "/metrics";
+        context.Request.Path = path;
         context.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.10");
 
         await middleware.InvokeAsync(context);
