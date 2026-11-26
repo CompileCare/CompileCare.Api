@@ -44,6 +44,8 @@ public sealed class MetricsEndpointAccessTests
     [InlineData("10.20.0.0")]
     [InlineData("not-a-cidr")]
     [InlineData("10.20.0.0/99")]
+    [InlineData("0.0.0.0/0")]
+    [InlineData("::/0")]
     [InlineData(" 10.20.0.0/16 ")]
     public void Production_rejects_invalid_or_ambiguous_cidrs(string configuredNetwork)
     {
