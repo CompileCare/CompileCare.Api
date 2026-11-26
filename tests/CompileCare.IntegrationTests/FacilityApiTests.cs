@@ -279,6 +279,43 @@ public sealed class FacilityApiTests
             () => invalidDb.SaveChangesAsync());
     }
 
+    private async Task<(Guid FirstHospitalId, Guid SecondHospitalId)> SeedTenantAndTwoHospitalsAsync(Guid tenantId)
+    {
+        var firstHospitalId = Guid.NewGuid();
+        var secondHospitalId = Guid.NewGuid();
+
+        using var scope = _factory.Services.CreateScope();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        tenantContext.SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            Name = "Test tenant",
+            Slug = $"test-{tenantId:N}",
+            Status = TenantStatuses.Active
+        });
+        db.Hospitals.AddRange(
+            new Hospital
+            {
+                Id = firstHospitalId,
+                TenantId = tenantId,
+                Name = "Authorized hospital",
+                Code = $"AUTH-{tenantId:N}"[..13]
+            },
+            new Hospital
+            {
+                Id = secondHospitalId,
+                TenantId = tenantId,
+                Name = "Out-of-scope hospital",
+                Code = $"OTHER-{tenantId:N}"[..13]
+            });
+
+        await db.SaveChangesAsync();
+        return (firstHospitalId, secondHospitalId);
+    }
+
     private async Task<HttpClient> CreateTenantClientAsync(Guid tenantId)
     {
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin);
