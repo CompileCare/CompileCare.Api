@@ -163,6 +163,114 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Fact]
+    public async Task ConcurrentAppointmentBookingAllowsOnlyOneWinnerAcrossRepeatedWaves()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, firstPatientId) = await SeedSchedulingDataAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "appointment-race-stress-registrar");
+
+        // Use separate registered patients so each wave exercises only the
+        // competing-booking race for one slot, not patient-overlap validation.
+        var patientIds = new List<Guid> { firstPatientId };
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var additionalPatients = new[]
+            {
+                new Patient { GivenName = "Meera", FamilyName = "Kulkarni" },
+                new Patient { GivenName = "Nikhil", FamilyName = "Joshi" }
+            };
+            db.Patients.AddRange(additionalPatients);
+            db.HospitalPatientRegistrations.AddRange(additionalPatients.Select(patient =>
+                new HospitalPatientRegistration
+                {
+                    PatientId = patient.Id,
+                    HospitalId = hospitalId,
+                    RegisteredAtUtc = DateTimeOffset.UtcNow
+                }));
+            await db.SaveChangesAsync();
+            patientIds.AddRange(additionalPatients.Select(patient => patient.Id));
+        }
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        using var registrar = CreateClient(tenantId, "appointment-race-stress-registrar");
+        var date = new DateOnly(2026, 12, 14);
+        var sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentId, providerId, date,
+                new TimeOnly(9, 0), new TimeOnly(12, 0), 30, "Asia/Kolkata"));
+
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await registrar.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        Assert.Equal(6, slots!.Count);
+        Assert.All(slots, slot => Assert.True(slot.IsAvailable));
+
+        var bookedAppointments = new List<AppointmentDto>();
+        for (var wave = 0; wave < 3; wave++)
+        {
+            var slot = slots[wave];
+            var patientId = patientIds[wave];
+            var request = new AppointmentBookInput(
+                session.Id, patientId, slot.StartsAtUtc, $"Repeated race wave {wave + 1}");
+
+            var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+                registrar.PostAsJsonAsync(
+                    $"/api/v1/hospitals/{hospitalId:D}/appointments",
+                    request)));
+            var outcomes = await Task.WhenAll(responses.Select(async response => new
+            {
+                response.StatusCode,
+                Body = await response.Content.ReadAsStringAsync()
+            }));
+
+            var createdResponses = responses
+                .Where(response => response.StatusCode == HttpStatusCode.Created)
+                .ToArray();
+            Assert.True(
+                createdResponses.Length == 1,
+                $"Wave {wave + 1}: expected exactly one successful booking. Actual: {string.Join("; ", outcomes.Select(x => $"{(int)x.StatusCode} {x.Body}"))}");
+            Assert.True(
+                outcomes.Count(response => response.StatusCode == HttpStatusCode.Conflict) == 7,
+                $"Wave {wave + 1}: expected seven conflicts. Actual: {string.Join("; ", outcomes.Select(x => $"{(int)x.StatusCode} {x.Body}"))}");
+            Assert.All(outcomes, response =>
+                Assert.Contains(response.StatusCode, new[] { HttpStatusCode.Created, HttpStatusCode.Conflict }));
+
+            var appointment = await createdResponses[0].Content.ReadFromJsonAsync<AppointmentDto>();
+            Assert.NotNull(appointment);
+            Assert.Equal(AppointmentStatuses.Booked, appointment!.Status);
+            Assert.Equal(patientId, appointment.PatientId);
+            Assert.Equal(slot.StartsAtUtc, appointment.SlotStartsAtUtc);
+            bookedAppointments.Add(appointment);
+        }
+
+        var appointmentPage = await registrar.GetFromJsonAsync<AppointmentPage>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments?departmentId={departmentId:D}&date={date:yyyy-MM-dd}&page=1&pageSize=10");
+        Assert.NotNull(appointmentPage);
+        Assert.Equal(3, appointmentPage!.TotalCount);
+        Assert.Equal(3, appointmentPage.Items.Select(item => item.SlotStartsAtUtc).Distinct().Count());
+        Assert.Equal(
+            patientIds.Order().ToArray(),
+            appointmentPage.Items.Select(item => item.PatientId).Order().ToArray());
+        Assert.All(appointmentPage.Items, item => Assert.Equal(AppointmentStatuses.Booked, item.Status));
+        Assert.Equal(
+            bookedAppointments.Select(item => item.Id).Order().ToArray(),
+            appointmentPage.Items.Select(item => item.Id).Order().ToArray());
+    }
+
+    [Fact]
     public async Task ReschedulingPersistsTenantScopedAppointmentLineage()
     {
         var tenantId = Guid.NewGuid();
