@@ -71,6 +71,16 @@ public sealed record AvailabilitySessionPage(
     public int TotalPages => TotalCount == 0 ? 0 : (int)Math.Ceiling((double)TotalCount / PageSize);
 }
 
+
+public sealed record AppointmentPage(
+    IReadOnlyList<AppointmentDto> Items,
+    int Page,
+    int PageSize,
+    int TotalCount)
+{
+    public int TotalPages => TotalCount == 0 ? 0 : (int)Math.Ceiling((double)TotalCount / PageSize);
+}
+
 public sealed record AppointmentResult<T>(T? Value, string? Error, int StatusCode)
 {
     public bool IsSuccess => Error is null;
@@ -89,6 +99,8 @@ public interface IAppointmentSchedulingService
     Task<AppointmentResult<AppointmentDto>> BookAsync(
         Guid hospitalId, AppointmentBookInput input, CancellationToken cancellationToken,
         Guid? rescheduledFromAppointmentId = null);
+    Task<AppointmentResult<AppointmentPage>> ListAppointmentsAsync(
+        Guid hospitalId, Guid departmentId, DateOnly localDate, string? status, int page, int pageSize, CancellationToken cancellationToken);
     Task<AppointmentResult<AppointmentDto>> GetAppointmentAsync(
         Guid hospitalId, Guid appointmentId, CancellationToken cancellationToken);
     Task<AppointmentResult<AppointmentDto>> CancelAsync(
