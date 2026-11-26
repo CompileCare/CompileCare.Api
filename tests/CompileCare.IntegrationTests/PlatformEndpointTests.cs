@@ -38,6 +38,43 @@ public sealed class PlatformEndpointTests
     }
 
     [Fact]
+    public async Task PlatformOperatorStatus_ReturnsFalseForAnAuthenticatedTenantUser()
+    {
+        using var client = CreateAuthenticatedClient();
+
+        var response = await client.GetAsync("/api/v1/platform/operator/status");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = System.Text.Json.JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+        Assert.False(document.RootElement.GetProperty("isPlatformOperator").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PlatformOperatorStatus_UsesThePersistedValidatedIdentity()
+    {
+        await _factory.SeedPlatformOperatorAsync();
+        using var client = CreateAuthenticatedClient();
+
+        var response = await client.GetAsync("/api/v1/platform/operator/status");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = System.Text.Json.JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+        Assert.True(document.RootElement.GetProperty("isPlatformOperator").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PlatformOperatorStatus_RequiresAuthentication()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/v1/platform/operator/status");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task CorrelationIdMiddleware_PreservesValidOpaqueCorrelationIds()
     {
         using var client = _factory.CreateClient();
