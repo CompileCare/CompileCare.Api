@@ -44,16 +44,37 @@ public sealed class CorsOriginConfigurationTests
                 CreateEnvironment(Environments.Production)));
     }
 
-    [Fact]
-    public void Development_allows_local_http_origins()
+    [Theory]
+    [InlineData("http://localhost:8080", "http://localhost:8080")]
+    [InlineData("http://127.0.0.1:8080", "http://127.0.0.1:8080")]
+    [InlineData("http://keycloak.localhost:8082", "http://keycloak.localhost:8082")]
+    [InlineData("https://[::1]:8443", "https://[::1]:8443")]
+    public void Development_allows_only_explicit_loopback_origins(string configuredOrigin, string expectedOrigin)
     {
-        var configuration = CreateConfiguration("http://localhost:8080");
+        var configuration = CreateConfiguration(configuredOrigin);
 
         var origins = CorsOriginConfiguration.GetAllowedOrigins(
             configuration,
             CreateEnvironment(Environments.Development));
 
-        Assert.Equal(new[] { "http://localhost:8080" }, origins);
+        Assert.Equal(new[] { expectedOrigin }, origins);
+    }
+
+    [Theory]
+    [InlineData("http://hospital.example.com")]
+    [InlineData("https://*.localhost")]
+    [InlineData("http://localhost/path")]
+    [InlineData("http://localhost?tenant=all")]
+    [InlineData("http://user@localhost")]
+    [InlineData("http://localhost:8080 ")]
+    public void Development_rejects_remote_or_non_origin_cors_entries(string configuredOrigin)
+    {
+        var configuration = CreateConfiguration(configuredOrigin);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            CorsOriginConfiguration.GetAllowedOrigins(
+                configuration,
+                CreateEnvironment(Environments.Development)));
     }
 
     [Fact]
