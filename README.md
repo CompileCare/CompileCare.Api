@@ -59,7 +59,10 @@ Set the following environment variables in each deployed environment:
 Authentication__Authority=https://identity.example.com/
 Authentication__Audience=compilecare-api
 Authentication__RequireHttpsMetadata=true
+Cors__AllowedOrigins__0=https://workspace.example.com
 ```
+
+In non-Development environments, every configured `Cors:AllowedOrigins` entry must be an explicit HTTPS origin (scheme, host and optional port only). Wildcards, credentials, paths, query strings, fragments and HTTP origins are rejected at startup. Omit the list for a same-origin Web/API deployment. Development may use the local loopback HTTP origin.
 
 The API validates JWT signature, issuer, audience, lifetime, expiry and subject. The validated issuer and subject (`sub`) are matched against an active CompileCare tenant membership. Facility endpoints require exactly one `X-Tenant-ID` GUID; this header only selects the requested tenant and never grants access by itself.
 
