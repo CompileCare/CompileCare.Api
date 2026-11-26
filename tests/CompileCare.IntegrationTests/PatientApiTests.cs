@@ -147,6 +147,22 @@ public sealed class PatientApiTests
         var response = await client.GetAsync($"/api/v1/hospitals/{hospitalId:D}/patients");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditEvent = await auditDb.AuditEvents.AsNoTracking()
+            .SingleAsync(item =>
+                item.TenantId == tenantId &&
+                item.ActorSubject == TestJwtTokenFactory.Subject &&
+                item.Action == "SearchHospitalPatients");
+
+        Assert.Equal(tenantId, auditEvent.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
+        Assert.Equal(TestJwtTokenFactory.Subject, auditEvent.ActorSubject);
+        Assert.Equal("Patients", auditEvent.ResourceType);
+        Assert.Equal("Rejected", auditEvent.Outcome);
+        Assert.Equal((int)HttpStatusCode.NotFound, auditEvent.StatusCode);
     }
 
 
@@ -259,6 +275,29 @@ public sealed class PatientApiTests
             $"/api/v1/hospitals/{hospitalId:D}/patients/departments/{otherDepartmentId:D}/patients");
         Assert.Equal(HttpStatusCode.NotFound, outsideDepartment.StatusCode);
         Assert.NotEqual(departmentPatientId, otherDepartmentPatientId);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var deniedPatientAudits = await auditDb.AuditEvents.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ActorSubject == TestJwtTokenFactory.Subject &&
+                item.ResourceType == "Patients" &&
+                item.Outcome == "Rejected")
+            .OrderBy(item => item.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, deniedPatientAudits.Count);
+        Assert.All(deniedPatientAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal(TestJwtTokenFactory.Subject, audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+        });
+        Assert.Contains(deniedPatientAudits, audit => audit.Action == "GetDepartmentPatient");
+        Assert.Contains(deniedPatientAudits, audit => audit.Action == "SearchDepartmentPatients");
     }
 
     private async Task<(Guid AuthorizedHospitalId, Guid OtherHospitalId)> SeedTenantAndTwoHospitalsAsync(Guid tenantId)
