@@ -120,6 +120,67 @@ public sealed class BillingApiTests
         Assert.Equal(300m, report.ByMethod[PaymentMethods.Upi]);
     }
 
+    [Theory]
+    [InlineData(TenantRoles.FacilityViewer)]
+    [InlineData(TenantRoles.ClinicalUser)]
+    public async Task RolesWithoutBillingGrants_CannotReadOrMutateBilling(
+        string role)
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, _, queueEntryId, _) = await SeedVisitAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "billing-role-admin");
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, role,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "billing-role-restricted");
+
+        using var admin = CreateClient(tenantId, "billing-role-admin");
+        using var restricted = CreateClient(tenantId, "billing-role-restricted");
+
+        var serviceResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/service-items",
+            new BillingServiceItemInput("CONSULT", "OPD Consultation", "Consultation", 500m));
+        Assert.Equal(HttpStatusCode.Created, serviceResponse.StatusCode);
+        var service = await serviceResponse.Content.ReadFromJsonAsync<BillingServiceItemDto>();
+        Assert.NotNull(service);
+
+        var invoiceResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices",
+            new InvoiceCreateInput(queueEntryId, [new InvoiceLineInput(service!.Id, 1)]));
+        Assert.Equal(HttpStatusCode.Created, invoiceResponse.StatusCode);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<InvoiceDto>();
+        Assert.NotNull(invoice);
+
+        var catalogueRead = await restricted.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/service-items");
+        var invoiceRead = await restricted.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice!.Id:D}");
+        var invoiceCreate = await restricted.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices",
+            new InvoiceCreateInput(queueEntryId, [new InvoiceLineInput(service.Id, 1)]));
+        var paymentCreate = await restricted.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}/payments",
+            new PaymentCreateInput(100m, PaymentMethods.Cash, null));
+        var reportRead = await restricted.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/reports/daily-collection?businessDate=2026-11-24&timeZoneId=Asia%2FKolkata");
+
+        Assert.Equal(HttpStatusCode.Forbidden, catalogueRead.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, invoiceRead.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, invoiceCreate.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, paymentCreate.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, reportRead.StatusCode);
+
+        var unchanged = await admin.GetFromJsonAsync<InvoiceDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/billing/invoices/{invoice.Id:D}");
+        Assert.NotNull(unchanged);
+        Assert.Equal(0m, unchanged!.AmountPaid);
+        Assert.Equal(500m, unchanged.BalanceDue);
+        Assert.Equal(InvoiceStatuses.Open, unchanged.Status);
+    }
+
     [Fact]
     public async Task FacilityManagerCannotReadOrManageBilling()
     {
