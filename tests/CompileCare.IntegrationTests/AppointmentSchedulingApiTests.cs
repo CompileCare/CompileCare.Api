@@ -78,6 +78,60 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Empty(wrongDate!.Items);
     }
 
+    [Theory]
+    [InlineData(TenantRoles.FacilityViewer)]
+    [InlineData(TenantRoles.ClinicalUser)]
+    public async Task RolesWithoutSchedulingGrants_CannotReadAvailabilityOrBookAppointments(
+        string role)
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "scheduling-role-admin");
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, role,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "scheduling-role-restricted");
+
+        using var admin = CreateClient(tenantId, "scheduling-role-admin");
+        using var restricted = CreateClient(tenantId, "scheduling-role-restricted");
+
+        var date = new DateOnly(2026, 12, 20);
+        var createSession = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentId, providerId, date,
+                new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, createSession.StatusCode);
+        var session = await createSession.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await admin.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        var slot = Assert.Single(slots!);
+
+        var availabilityRead = await restricted.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions?date={date:yyyy-MM-dd}&departmentId={departmentId:D}");
+        var slotRead = await restricted.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session.Id:D}/slots");
+        var booking = await restricted.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, patientId, slot.StartsAtUtc, "Consultation"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, availabilityRead.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, slotRead.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, booking.StatusCode);
+
+        var appointments = await admin.GetFromJsonAsync<AppointmentPage>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments?departmentId={departmentId:D}&date={date:yyyy-MM-dd}");
+        Assert.NotNull(appointments);
+        Assert.Equal(0, appointments!.TotalCount);
+        Assert.Empty(appointments.Items);
+    }
+
     [Fact]
     public async Task HospitalAdminCanPublishAvailabilityAndRegistrarCanBookOnlyRegisteredPatient()
     {
