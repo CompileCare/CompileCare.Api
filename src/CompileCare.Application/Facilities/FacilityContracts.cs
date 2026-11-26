@@ -38,7 +38,7 @@ public interface IHospitalService
 }
 public interface IDepartmentService
 {
-    Task<PagedResult<DepartmentDto>> ListDepartments(Guid hospitalId, PageRequest page, CancellationToken ct);
+    Task<FacilityResult<PagedResult<DepartmentDto>>> ListDepartments(Guid hospitalId, PageRequest page, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> GetDepartment(Guid hospitalId, Guid id, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> CreateDepartment(Guid hospitalId, DepartmentInput input, CancellationToken ct);
     Task<FacilityResult<DepartmentDto>> UpdateDepartment(Guid hospitalId, Guid id, DepartmentInput input, CancellationToken ct);

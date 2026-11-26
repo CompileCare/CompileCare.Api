@@ -6,11 +6,14 @@ namespace CompileCare.Infrastructure.Facilities;
 
 public sealed partial class FacilityService
 {
-    public async Task<PagedResult<DepartmentDto>> ListDepartments(
+    public async Task<FacilityResult<PagedResult<DepartmentDto>>> ListDepartments(
         Guid hospitalId,
         PageRequest page,
         CancellationToken ct)
     {
+        if (!await ScopedHospitals().AnyAsync(hospital => hospital.Id == hospitalId, ct))
+            return NotFound<PagedResult<DepartmentDto>>();
+
         var query = ScopedDepartments()
             .AsNoTracking()
             .Where(department => department.HospitalId == hospitalId);
@@ -28,7 +31,8 @@ public sealed partial class FacilityService
                 department.Code))
             .ToListAsync(ct);
 
-        return new(items, page.SafePage, page.SafePageSize, total);
+        return FacilityResult<PagedResult<DepartmentDto>>.Success(
+            new(items, page.SafePage, page.SafePageSize, total));
     }
 
     public async Task<FacilityResult<DepartmentDto>> GetDepartment(

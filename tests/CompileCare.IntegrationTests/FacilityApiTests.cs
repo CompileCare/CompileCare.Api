@@ -202,6 +202,34 @@ public sealed class FacilityApiTests
     }
 
     [Fact]
+    public async Task DepartmentList_ReturnsNotFoundForHospitalsOutsideTenantOrMembershipScope()
+    {
+        var tenantId = Guid.NewGuid();
+        var (authorizedHospitalId, otherHospitalId) = await SeedTenantAndTwoHospitalsAsync(tenantId);
+        var foreignTenantId = Guid.NewGuid();
+        var (foreignHospitalId, _) = await SeedTenantAndTwoHospitalsAsync(foreignTenantId);
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, authorizedHospitalId)]);
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer", TestJwtTokenFactory.CreateToken());
+        client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
+
+        var authorized = await client.GetAsync($"/api/v1/hospitals/{authorizedHospitalId:D}/departments");
+        Assert.Equal(HttpStatusCode.OK, authorized.StatusCode);
+
+        var outOfScope = await client.GetAsync($"/api/v1/hospitals/{otherHospitalId:D}/departments");
+        await AssertProblemDetailsAsync(outOfScope, HttpStatusCode.NotFound, "Resource not found");
+
+        var foreignTenant = await client.GetAsync($"/api/v1/hospitals/{foreignHospitalId:D}/departments");
+        await AssertProblemDetailsAsync(foreignTenant, HttpStatusCode.NotFound, "Resource not found");
+    }
+
+    [Fact]
     public async Task TenantOwnedPersistence_RejectsStaleUpdatesAndCrossTenantAssignments()
     {
         var tenantId = Guid.NewGuid();
@@ -249,6 +277,43 @@ public sealed class FacilityApiTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => invalidDb.SaveChangesAsync());
+    }
+
+    private async Task<(Guid FirstHospitalId, Guid SecondHospitalId)> SeedTenantAndTwoHospitalsAsync(Guid tenantId)
+    {
+        var firstHospitalId = Guid.NewGuid();
+        var secondHospitalId = Guid.NewGuid();
+
+        using var scope = _factory.Services.CreateScope();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        tenantContext.SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            Name = "Test tenant",
+            Slug = $"test-{tenantId:N}",
+            Status = TenantStatuses.Active
+        });
+        db.Hospitals.AddRange(
+            new Hospital
+            {
+                Id = firstHospitalId,
+                TenantId = tenantId,
+                Name = "Authorized hospital",
+                Code = $"AUTH-{tenantId:N}"[..13]
+            },
+            new Hospital
+            {
+                Id = secondHospitalId,
+                TenantId = tenantId,
+                Name = "Out-of-scope hospital",
+                Code = $"OTHER-{tenantId:N}"[..13]
+            });
+
+        await db.SaveChangesAsync();
+        return (firstHospitalId, secondHospitalId);
     }
 
     private async Task<HttpClient> CreateTenantClientAsync(Guid tenantId)

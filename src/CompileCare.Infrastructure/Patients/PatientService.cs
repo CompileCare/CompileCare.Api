@@ -89,6 +89,11 @@ public sealed class PatientService(
         if (hospitalId == Guid.Empty || !HasHospitalWidePatientScope(hospitalId))
             return PatientResult<PatientPage>.Failure("Hospital not found.", 404);
 
+        var hospitalExists = await db.Hospitals.AnyAsync(
+            hospital => hospital.Id == hospitalId, cancellationToken);
+        if (!hospitalExists)
+            return PatientResult<PatientPage>.Failure("Hospital not found.", 404);
+
         var query = db.HospitalPatientRegistrations
             .Where(x => x.HospitalId == hospitalId);
 
