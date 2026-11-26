@@ -57,6 +57,28 @@ public sealed class AuditQueryApiTests
     }
 
     [Fact]
+    public async Task InvalidHttpBindingsReturnClientErrorsInsteadOfInternalServerErrors()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin);
+        using var client = CreateAuthenticatedClient(tenantId);
+
+        var missingQueryParameter = await client.GetAsync(
+            $"/api/v1/audit/events?toUtc={Uri.EscapeDataString(DateTimeOffset.UtcNow.ToString("O"))}");
+        Assert.Equal(HttpStatusCode.BadRequest, missingQueryParameter.StatusCode);
+
+        using var emptyBodyRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/v1/hospitals/{Guid.NewGuid():D}/queue/{Guid.NewGuid():D}/call")
+        {
+            Content = new StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json")
+        };
+
+        var emptyBodyResponse = await client.SendAsync(emptyBodyRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, emptyBodyResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task HospitalScopedAdministratorCannotReadTenantWideAuditEvents()
     {
         var tenantId = Guid.NewGuid();
