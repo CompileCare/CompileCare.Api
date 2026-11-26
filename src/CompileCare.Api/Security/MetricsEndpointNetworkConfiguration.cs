@@ -24,7 +24,8 @@ public static class MetricsEndpointNetworkConfiguration
             if (string.IsNullOrWhiteSpace(configuredNetwork) ||
                 !string.Equals(configuredNetwork, configuredNetwork.Trim(), StringComparison.Ordinal) ||
                 !configuredNetwork.Contains('/') ||
-                !IPNetwork.TryParse(configuredNetwork, out var network))
+                !IPNetwork.TryParse(configuredNetwork, out var network) ||
+                network.PrefixLength == 0)
             {
                 throw new InvalidOperationException(
                     $"Observability:Metrics:AllowedNetworks contains an invalid CIDR: '{configuredNetwork}'.");
