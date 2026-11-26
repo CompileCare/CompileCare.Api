@@ -91,7 +91,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
     [Fact]
     public async Task TrustedIngressForwardedHttpsResponsesIncludeHsts()
     {
-        using var factory = new ProductionApiFactory(IPAddress.Parse("192.0.2.10"));
+        using var factory = new NonDevelopmentApiFactory(IPAddress.Parse("192.0.2.10"));
         using var client = factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/");
         // HSTS middleware intentionally skips localhost; simulate the production
@@ -110,7 +110,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
     [Fact]
     public async Task UntrustedForwardedProtoDoesNotEnableHsts()
     {
-        using var factory = new ProductionApiFactory(IPAddress.Loopback);
+        using var factory = new NonDevelopmentApiFactory(IPAddress.Loopback);
         using var client = factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/");
         // HSTS middleware intentionally skips localhost; simulate the production
@@ -128,7 +128,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
     [Fact]
     public void ForwardedHeadersAreRestrictedToConfiguredProxiesAndOneHop()
     {
-        using var factory = new ProductionApiFactory(IPAddress.Loopback);
+        using var factory = new NonDevelopmentApiFactory(IPAddress.Loopback);
         var options = factory.Services.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
 
         Assert.Equal(
@@ -140,11 +140,13 @@ public sealed class ForwardedHeadersAndHstsApiTests
         Assert.DoesNotContain(IPAddress.Loopback, options.KnownProxies);
     }
 
-    private sealed class ProductionApiFactory(IPAddress remoteAddress) : WebApplicationFactory<Program>
+    private sealed class NonDevelopmentApiFactory(IPAddress remoteAddress) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseEnvironment("Production");
+            // HSTS and forwarded-header middleware are enabled for every non-Development environment.
+            // Use the isolated Testing environment so these middleware tests do not need a real production DB endpoint.
+            builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
