@@ -151,6 +151,10 @@ public sealed class ForwardedHeadersAndHstsApiTests
                     ["Authentication:Authority"] = "https://identity.compilecare.test/",
                     ["Authentication:Audience"] = "compilecare-api",
                     ["Authentication:RequireHttpsMetadata"] = "true",
+                    // These HSTS/proxy tests do not open a database connection;
+                    // supply a valid production-shaped connection string so
+                    // startup configuration validation remains exercised.
+                    ["ConnectionStrings:CompileCare"] = "Host=database.compilecare.test;Database=compilecare;Username=compilecare;Password=test-only;SSL Mode=VerifyFull",
                     ["ReverseProxy:KnownProxies:0"] = "192.0.2.10"
                 }));
             builder.ConfigureTestServices(services =>
