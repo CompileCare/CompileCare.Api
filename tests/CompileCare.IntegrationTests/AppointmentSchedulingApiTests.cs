@@ -132,11 +132,21 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Equal(HttpStatusCode.Conflict, unregistered.StatusCode);
 
         var request = new AppointmentBookInput(session.Id, patientId, slots[0].StartsAtUtc, "Follow-up");
-        var attempts = await Task.WhenAll(
-            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/appointments", request),
-            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/appointments", request));
-        Assert.Single(attempts, response => response.StatusCode == HttpStatusCode.Created);
-        Assert.Single(attempts, response => response.StatusCode == HttpStatusCode.Conflict);
+        var attempts = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+            registrar.PostAsJsonAsync($"/api/v1/hospitals/{hospitalId:D}/appointments", request)));
+        var outcomes = await Task.WhenAll(attempts.Select(async response => new
+        {
+            response.StatusCode,
+            Body = await response.Content.ReadAsStringAsync()
+        }));
+        Assert.True(
+            outcomes.Count(response => response.StatusCode == HttpStatusCode.Created) == 1,
+            $"Expected one successful booking. Actual: {string.Join("; ", outcomes.Select(x => $"{(int)x.StatusCode} {x.Body}"))}");
+        Assert.True(
+            outcomes.Count(response => response.StatusCode == HttpStatusCode.Conflict) == 7,
+            $"All competing requests must return 409. Actual: {string.Join("; ", outcomes.Select(x => $"{(int)x.StatusCode} {x.Body}"))}");
+        Assert.All(outcomes, response =>
+            Assert.Contains(response.StatusCode, new[] { HttpStatusCode.Created, HttpStatusCode.Conflict }));
         var booked = attempts.Single(response => response.StatusCode == HttpStatusCode.Created);
         var appointment = await booked.Content.ReadFromJsonAsync<AppointmentDto>();
         Assert.NotNull(appointment);
