@@ -56,7 +56,7 @@ public sealed class StaffManagementService(
         {
             return StaffResult<StaffProfileDto>.Failure("A staff profile with this staff code already exists in the tenant.", 409);
         }
-        return StaffResult<StaffProfileDto>.Success(ToDto(profile, [assignment]));
+        return StaffResult<StaffProfileDto>.Success(ToDto(profile, [assignment], canManageWithinScope: true));
     }
 
     public async Task<StaffResult<StaffProfileDto>> GetAsync(Guid staffId, CancellationToken cancellationToken)
@@ -66,11 +66,13 @@ public sealed class StaffManagementService(
             .FirstOrDefaultAsync(x => x.Id == staffId, cancellationToken);
         if (profile is null)
             return StaffResult<StaffProfileDto>.Failure("Staff profile not found.", 404);
-        var assignments = await ReadableAssignments()
+        var allAssignments = await db.StaffAssignments.AsNoTracking()
             .Where(x => x.StaffProfileId == staffId)
             .OrderBy(x => x.EffectiveFrom)
             .ToListAsync(cancellationToken);
-        return StaffResult<StaffProfileDto>.Success(ToDto(profile, assignments));
+        var readableAssignments = allAssignments.Where(IsReadableAssignment).ToArray();
+        return StaffResult<StaffProfileDto>.Success(
+            ToDto(profile, readableAssignments, CanManageWithinScope(allAssignments)));
     }
 
     public async Task<StaffResult<StaffPage>> ListAsync(StaffSearchRequest request, CancellationToken cancellationToken)
@@ -93,13 +95,19 @@ public sealed class StaffManagementService(
         var profiles = await query.OrderBy(x => x.StaffCode).ThenBy(x => x.Id)
             .Skip(request.Skip).Take(pageSize).ToListAsync(cancellationToken);
         var ids = profiles.Select(x => x.Id).ToArray();
-        var assignments = await ReadableAssignments()
+        var allAssignments = await db.StaffAssignments.AsNoTracking()
             .Where(x => ids.Contains(x.StaffProfileId))
             .OrderBy(x => x.EffectiveFrom)
             .ToListAsync(cancellationToken);
-        var assignmentMap = assignments.GroupBy(x => x.StaffProfileId)
+        var assignmentMap = allAssignments.Where(IsReadableAssignment)
+            .GroupBy(x => x.StaffProfileId)
             .ToDictionary(x => x.Key, x => (IReadOnlyList<StaffAssignment>)x.ToArray());
-        var items = profiles.Select(x => ToDto(x, assignmentMap.GetValueOrDefault(x.Id, Array.Empty<StaffAssignment>()))).ToArray();
+        var manageabilityMap = allAssignments.GroupBy(x => x.StaffProfileId)
+            .ToDictionary(x => x.Key, x => CanManageWithinScope(x));
+        var items = profiles.Select(x => ToDto(
+            x,
+            assignmentMap.GetValueOrDefault(x.Id, Array.Empty<StaffAssignment>()),
+            manageabilityMap.GetValueOrDefault(x.Id))).ToArray();
         return StaffResult<StaffPage>.Success(new(items, page, pageSize, total));
     }
 
@@ -218,14 +226,23 @@ public sealed class StaffManagementService(
              (assignment.DepartmentId.HasValue && departmentIds.Contains(assignment.DepartmentId.Value)))));
     }
 
-    private IQueryable<StaffAssignment> ReadableAssignments()
+    private bool IsReadableAssignment(StaffAssignment assignment) =>
+        organizationScope.IsTenantWide ||
+        organizationScope.HospitalIds.Contains(assignment.HospitalId) ||
+        (assignment.DepartmentId.HasValue &&
+         organizationScope.DepartmentIds.Contains(assignment.DepartmentId.Value));
+
+    private bool CanManageWithinScope(IEnumerable<StaffAssignment> assignments)
     {
-        IQueryable<StaffAssignment> query = db.StaffAssignments;
-        if (organizationScope.IsTenantWide) return query;
-        var hospitalIds = organizationScope.HospitalIds.ToArray();
-        var departmentIds = organizationScope.DepartmentIds.ToArray();
-        return query.Where(x => hospitalIds.Contains(x.HospitalId) ||
-            (x.DepartmentId.HasValue && departmentIds.Contains(x.DepartmentId.Value)));
+        var values = assignments.ToArray();
+        if (values.Length == 0) return false;
+        if (organizationScope.IsTenantWide) return true;
+
+        var hospitalIds = organizationScope.HospitalIds.ToHashSet();
+        var departmentIds = organizationScope.DepartmentIds.ToHashSet();
+        return values.All(assignment =>
+            hospitalIds.Contains(assignment.HospitalId) ||
+            (assignment.DepartmentId.HasValue && departmentIds.Contains(assignment.DepartmentId.Value)));
     }
 
     private IQueryable<StaffProfile> ManageableProfiles()
@@ -252,12 +269,15 @@ public sealed class StaffManagementService(
                organizationScope.CanManageDepartment(hospitalId, departmentId.Value);
     }
 
-    private static StaffProfileDto ToDto(StaffProfile profile, IReadOnlyList<StaffAssignment>? profileAssignments)
+    private static StaffProfileDto ToDto(
+        StaffProfile profile,
+        IReadOnlyList<StaffAssignment>? profileAssignments,
+        bool canManageWithinScope)
     {
         var assignments = profileAssignments?.Select(ToDto).ToArray() ?? [];
         return new StaffProfileDto(profile.Id, profile.StaffCode, profile.GivenName, profile.MiddleName,
             profile.FamilyName, profile.ProviderDesignation, profile.IsActive,
-            profile.CreatedAtUtc, profile.UpdatedAtUtc, assignments);
+            profile.CreatedAtUtc, profile.UpdatedAtUtc, assignments, canManageWithinScope);
     }
 
     private static StaffAssignmentDto ToDto(StaffAssignment assignment) =>
