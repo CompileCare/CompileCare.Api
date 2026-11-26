@@ -1,4 +1,5 @@
 using CompileCare.Api;
+using CompileCare.Api.Endpoints;
 using CompileCare.Api.Middleware;
 using CompileCare.Api.Security;
 using CompileCare.Application;
