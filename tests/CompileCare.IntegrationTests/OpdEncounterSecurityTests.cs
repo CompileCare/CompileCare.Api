@@ -203,6 +203,29 @@ public sealed class OpdEncounterSecurityTests
         var crossHospitalCreate = await clinicianA.PostAsync(
             $"/api/v1/hospitals/{hospitalB:D}/opd/queue/{queueEntry.Id:D}/encounter", null);
         Assert.Equal(HttpStatusCode.NotFound, crossHospitalCreate.StatusCode);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var deniedEncounterAudits = await auditDb.AuditEvents.AsNoTracking()
+            .Where(audit =>
+                audit.TenantId == tenantId &&
+                audit.ActorSubject == "scope-clinician-a" &&
+                audit.ResourceType == "OPD encounters")
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, deniedEncounterAudits.Count);
+        Assert.All(deniedEncounterAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal("scope-clinician-a", audit.ActorSubject);
+            Assert.Equal("Rejected", audit.Outcome);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+        });
+        Assert.Contains(deniedEncounterAudits, audit => audit.Action == "GetOpdEncounter");
+        Assert.Contains(deniedEncounterAudits, audit => audit.Action == "CreateOpdEncounterFromQueue");
     }
 
     [Fact]
