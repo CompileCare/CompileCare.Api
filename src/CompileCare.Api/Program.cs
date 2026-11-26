@@ -48,7 +48,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var allowedOrigins = CorsOriginConfiguration.GetAllowedOrigins(builder.Configuration, builder.Environment);
 if (allowedOrigins.Length > 0)
 {
     builder.Services.AddCors(options =>
