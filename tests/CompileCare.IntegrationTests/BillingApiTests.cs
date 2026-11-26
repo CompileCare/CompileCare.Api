@@ -178,7 +178,7 @@ public sealed class BillingApiTests
         Assert.NotNull(unchanged);
         Assert.Equal(0m, unchanged!.AmountPaid);
         Assert.Equal(500m, unchanged.BalanceDue);
-        Assert.Equal(InvoiceStatuses.Open, unchanged.Status);
+        Assert.Equal(InvoiceStatuses.Issued, unchanged.Status);
     }
 
     [Fact]
