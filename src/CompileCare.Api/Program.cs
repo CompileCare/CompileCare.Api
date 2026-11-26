@@ -1,3 +1,4 @@
+using System.Net;
 using CompileCare.Api;
 using CompileCare.Api.Endpoints;
 using CompileCare.Api.Middleware;
@@ -7,14 +8,15 @@ using CompileCare.Infrastructure;
 using CompileCare.Infrastructure.Persistence;
 using CompileCare.Observability.Extensions;
 using CompileCare.Observability.AspNetCore.Extensions;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 builder.Host.UseCompileCareObservability();
 builder.Services.AddObservability(builder.Configuration);
-// PostgreSQL data-access spans join the same trace provider/export pipeline.
 builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddNpgsql());
 builder.Services.AddObservabilityHealthChecks();
 builder.Services.AddProblemDetails();
@@ -23,6 +25,28 @@ builder.Services.AddOpenApi();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddCompileCareSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCompileCareRateLimiting(builder.Configuration);
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.RequireHeaderSymmetry = true;
+
+    // Do not trust arbitrary X-Forwarded-* headers. Operators must explicitly
+    // list the IP addresses of their ingress/load-balancer proxies.
+    var trustedProxies = builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [];
+    foreach (var proxy in trustedProxies)
+    {
+        if (!IPAddress.TryParse(proxy, out var address))
+        {
+            throw new InvalidOperationException(
+                $"ReverseProxy:KnownProxies contains an invalid IP address: '{proxy}'.");
+        }
+
+        options.KnownProxies.Add(address);
+    }
+});
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (allowedOrigins.Length > 0)
@@ -34,8 +58,6 @@ if (allowedOrigins.Length > 0)
 
 var app = builder.Build();
 
-// Local development can opt into migrations explicitly. This is deliberately
-// disabled by default and never runs in Staging or Production.
 if (app.Environment.IsDevelopment() &&
     builder.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
@@ -44,11 +66,20 @@ if (app.Environment.IsDevelopment() &&
     await database.Database.MigrateAsync();
 }
 
+// Forwarded headers must be applied before HSTS, authentication, rate limiting,
+// and any code that consumes the remote IP or request scheme.
+app.UseForwardedHeaders();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 app.UseExceptionHandler();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseRouting();
 if (allowedOrigins.Length > 0) app.UseCors("CompileCareWeb");
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseMiddleware<AuditEventMiddleware>();
 app.UseMiddleware<TenantContextMiddleware>();
 app.UseAuthorization();
