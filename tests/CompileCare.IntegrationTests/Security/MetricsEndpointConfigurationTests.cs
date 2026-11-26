@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using CompileCare.Api.Security;
 using Microsoft.Extensions.Configuration;
