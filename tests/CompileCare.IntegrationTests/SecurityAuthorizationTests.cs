@@ -233,7 +233,10 @@ public sealed class SecurityAuthorizationTests
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
         var remainingHospitals = await db.Hospitals.AsNoTracking().CountAsync();
-        Assert.Equal(1, remainingHospitals);
+        var expectedRemaining = 1
+            + (expectedCreateStatus == HttpStatusCode.Created ? 1 : 0)
+            - (expectedDeleteStatus == HttpStatusCode.NoContent ? 1 : 0);
+        Assert.Equal(expectedRemaining, remainingHospitals);
     }
 
     private HttpClient CreateAuthenticatedClient(Guid? tenantId, string subject)
