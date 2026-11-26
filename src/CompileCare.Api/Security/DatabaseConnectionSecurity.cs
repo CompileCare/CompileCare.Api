@@ -31,10 +31,10 @@ public static class DatabaseConnectionSecurity
                 "ConnectionStrings:CompileCare must be a valid PostgreSQL connection string.");
         }
 
-        if (connection.SslMode != SslMode.VerifyFull || connection.TrustServerCertificate)
+        if (connection.SslMode != SslMode.VerifyFull)
         {
             throw new InvalidOperationException(
-                "Production PostgreSQL connections must use SSL Mode=VerifyFull with Trust Server Certificate=false.");
+                "Production PostgreSQL connections must use SSL Mode=VerifyFull.");
         }
     }
 }
