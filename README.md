@@ -43,7 +43,7 @@ Outside Development, the API requires `ConnectionStrings:CompileCare` and reject
 Example production connection-string shape (replace host/database/user and supply the password from a secret manager):
 
 ```text
-Host=postgres.example.com;Database=compilecare;Username=compilecare_app;Password=<secret>;SSL Mode=VerifyFull;Trust Server Certificate=false
+Host=postgres.example.com;Database=compilecare;Username=compilecare_app;Password=<secret>;SSL Mode=VerifyFull
 ```
 
 Infrastructure registers EF Core/Npgsql and database readiness only when the connection string is configured. Migrations are created with the EF Core CLI from the Infrastructure project.
