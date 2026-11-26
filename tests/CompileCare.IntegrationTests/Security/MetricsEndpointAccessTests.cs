@@ -67,7 +67,7 @@ public sealed class MetricsEndpointAccessTests
             CreateEnvironment(Environments.Development)));
         Assert.Empty(MetricsEndpointNetworkConfiguration.GetAllowedNetworks(
             configuration,
-            CreateEnvironment(Environments.Testing)));
+            CreateEnvironment("Testing")));
     }
 
     [Theory]
