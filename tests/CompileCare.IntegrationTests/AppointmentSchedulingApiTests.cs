@@ -131,6 +131,30 @@ public sealed class AppointmentSchedulingApiTests
         Assert.NotNull(appointments);
         Assert.Equal(0, appointments!.TotalCount);
         Assert.Empty(appointments.Items);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var deniedAudits = await auditDb.AuditEvents.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ActorSubject == "scheduling-role-restricted" &&
+                item.ResourceType == "Appointments and scheduling" &&
+                item.Outcome == "Denied")
+            .OrderBy(item => item.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(3, deniedAudits.Count);
+        Assert.All(deniedAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal("scheduling-role-restricted", audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.Forbidden, audit.StatusCode);
+        });
+        Assert.Contains(deniedAudits, audit => audit.Action == "ListProviderAvailabilitySessions");
+        Assert.Contains(deniedAudits, audit => audit.Action == "GetProviderAvailabilitySlots");
+        Assert.Contains(deniedAudits, audit => audit.Action == "BookAppointment");
     }
 
     [Fact]
