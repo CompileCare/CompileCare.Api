@@ -129,6 +129,8 @@ public sealed class AuditEventQueryService(
     private static string Csv(string? value)
     {
         var safe = value ?? string.Empty;
+        if (safe.Length > 0 && (safe[0] == '=' || safe[0] == '+' || safe[0] == '-' || safe[0] == '@' || safe[0] == '\\t' || safe[0] == '\\r'))
+            safe = $"'{safe}";
         return $"\"{safe.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }
 }
