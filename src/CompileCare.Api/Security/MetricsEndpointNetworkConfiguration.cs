@@ -23,6 +23,7 @@ public static class MetricsEndpointNetworkConfiguration
         {
             if (string.IsNullOrWhiteSpace(configuredNetwork) ||
                 !string.Equals(configuredNetwork, configuredNetwork.Trim(), StringComparison.Ordinal) ||
+                !configuredNetwork.Contains('/') ||
                 !IPNetwork.TryParse(configuredNetwork, out var network))
             {
                 throw new InvalidOperationException(
