@@ -120,6 +120,51 @@ public sealed class StaffManagementApiTests
     }
 
     [Fact]
+    public async Task HospitalScopedAdmin_CanReadButCannotManageProfileWithAssignmentsOutsideScope()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalA, departmentA) = await SeedHospitalAndDepartmentAsync(tenantId);
+        var (hospitalB, _) = await SeedHospitalAndDepartmentAsync(tenantId);
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
+            subject: "tenant-wide-staff-admin");
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalA)],
+            subject: "hospital-a-staff-admin");
+
+        using var tenantAdmin = CreateClient(tenantId, "tenant-wide-staff-admin");
+        using var hospitalAdmin = CreateClient(tenantId, "hospital-a-staff-admin");
+
+        var create = await tenantAdmin.PostAsJsonAsync("/api/v1/staff", new StaffProfileCreateInput(
+            "MULTI-001", "Mira", null, "Shah", "Consultant", hospitalA, departmentA,
+            new DateOnly(2026, 1, 1)));
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var profile = await create.Content.ReadFromJsonAsync<StaffProfileDto>();
+        Assert.NotNull(profile);
+
+        var secondAssignment = await tenantAdmin.PostAsJsonAsync(
+            $"/api/v1/staff/{profile!.Id:D}/assignments",
+            new StaffAssignmentInput(hospitalB, null, new DateOnly(2026, 2, 1)));
+        Assert.Equal(HttpStatusCode.Created, secondAssignment.StatusCode);
+
+        var visiblePage = await hospitalAdmin.GetFromJsonAsync<StaffPage>("/api/v1/staff?page=1&pageSize=10");
+        Assert.NotNull(visiblePage);
+        var visibleProfile = Assert.Single(visiblePage!.Items);
+        Assert.Equal(profile.Id, visibleProfile.Id);
+        Assert.False(visibleProfile.CanManageWithinScope);
+        Assert.Single(visibleProfile.Assignments);
+        Assert.Equal(hospitalA, visibleProfile.Assignments[0].HospitalId);
+
+        var update = await hospitalAdmin.PutAsJsonAsync(
+            $"/api/v1/staff/{profile.Id:D}",
+            new StaffProfileUpdateInput("Mira", null, "Shah", "Unauthorized update"));
+        Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
+    }
+
+    [Fact]
     public async Task CrossTenantAdminCannotDiscoverReadOrMutateStaffProfilesAndAssignments()
     {
         var tenantA = Guid.NewGuid();
@@ -234,11 +279,11 @@ public sealed class StaffManagementApiTests
         return (hospital.Id, department.Id);
     }
 
-    private HttpClient CreateClient(Guid tenantId)
+    private HttpClient CreateClient(Guid tenantId, string? subject = null)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(subject: subject));
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
