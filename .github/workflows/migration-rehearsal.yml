@@ -10,7 +10,6 @@ on:
       - "Directory.Packages.props"
       - "NuGet.Config"
       - "global.json"
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -40,7 +39,8 @@ jobs:
           --health-retries 20
     env:
       ConnectionStrings__CompileCareTests: Host=localhost;Port=5432;Database=compilecare_upgrade;Username=postgres;Password=postgres
-      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
         with:
