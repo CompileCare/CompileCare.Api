@@ -104,7 +104,10 @@ public sealed class ForwardedHeadersAndHstsApiTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(response.Headers.TryGetValues("Strict-Transport-Security", out var values));
-        Assert.Contains("max-age=", Assert.Single(values!));
+        var hsts = Assert.Single(values!);
+        Assert.Contains("max-age=31536000", hsts, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("includesubdomains", hsts, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("preload", hsts, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

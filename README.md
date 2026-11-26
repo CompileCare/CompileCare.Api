@@ -196,3 +196,9 @@ The tenant header is request context only. It is **not authentication** and does
 ## Pull request workflow
 
 Use a short-lived branch from `main`; open a focused PR; review the diff and passing CI; squash merge; delete the merged head branch and verify cleanup. No direct feature commits to `main`.
+
+## Trusted ingress and HSTS
+
+The API trusts forwarded client IP/scheme headers only from the explicit `ReverseProxy:KnownProxies` IP allowlist, with a one-hop limit and symmetric-header validation. Configure the exact ingress/load-balancer source IPs for the deployment; never trust arbitrary forwarded headers from the public internet.
+
+For non-Development requests that are HTTPS after trusted forwarded-header processing, the API emits HSTS with a one-year `max-age`. `includeSubDomains` and `preload` remain disabled until the organization has verified HTTPS across every affected subdomain and approved the preload commitment. The API does not terminate TLS: configure certificates, HTTPS redirects and edge HSTS at the selected ingress as well.

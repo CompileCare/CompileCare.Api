@@ -27,6 +27,14 @@ DatabaseConnectionSecurity.Validate(builder.Configuration, builder.Environment);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddCompileCareSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddCompileCareRateLimiting(builder.Configuration);
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    // Do not opt the entire parent domain into HSTS until every subdomain
+    // and the preload commitment have been reviewed for the selected host.
+    options.IncludeSubDomains = false;
+    options.Preload = false;
+});
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
