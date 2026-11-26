@@ -94,6 +94,9 @@ public sealed class ForwardedHeadersAndHstsApiTests
         using var factory = new ProductionApiFactory(IPAddress.Parse("192.0.2.10"));
         using var client = factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/");
+        // HSTS middleware intentionally skips localhost; simulate the production
+        // public host while retaining TestServer's loopback transport.
+        request.Headers.Host = "hospital.compilecare.test";
         request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
 
         using var response = await client.SendAsync(request);
@@ -109,6 +112,9 @@ public sealed class ForwardedHeadersAndHstsApiTests
         using var factory = new ProductionApiFactory(IPAddress.Loopback);
         using var client = factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/");
+        // HSTS middleware intentionally skips localhost; simulate the production
+        // public host while retaining TestServer's loopback transport.
+        request.Headers.Host = "hospital.compilecare.test";
         request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
 
         using var response = await client.SendAsync(request);
