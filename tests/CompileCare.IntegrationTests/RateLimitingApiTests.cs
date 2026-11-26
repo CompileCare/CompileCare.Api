@@ -1,6 +1,7 @@
-using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,27 @@ namespace CompileCare.IntegrationTests;
 
 public sealed class RateLimitingApiTests
 {
+    [Fact]
+    public async Task GlobalLimiterUsesTheConfiguredAnonymousPartition()
+    {
+        using var factory = new RateLimitedApiFactory();
+        var limiter = factory.Services
+            .GetRequiredService<IOptions<RateLimiterOptions>>()
+            .Value.GlobalLimiter;
+        Assert.NotNull(limiter);
+
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Loopback;
+
+        using var first = await limiter!.AcquireAsync(context, 1);
+        using var second = await limiter.AcquireAsync(context, 1);
+        using var third = await limiter.AcquireAsync(context, 1);
+
+        Assert.True(first.IsAcquired);
+        Assert.True(second.IsAcquired);
+        Assert.False(third.IsAcquired);
+    }
+
     [Fact]
     public async Task AnonymousRequestsAreThrottledWithProblemDetailsAndRetryAfter()
     {
