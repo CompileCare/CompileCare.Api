@@ -202,6 +202,34 @@ public sealed class FacilityApiTests
     }
 
     [Fact]
+    public async Task DepartmentList_ReturnsNotFoundForHospitalsOutsideTenantOrMembershipScope()
+    {
+        var tenantId = Guid.NewGuid();
+        var (authorizedHospitalId, otherHospitalId) = await SeedTenantAndTwoHospitalsAsync(tenantId);
+        var foreignTenantId = Guid.NewGuid();
+        var (foreignHospitalId, _) = await SeedTenantAndTwoHospitalsAsync(foreignTenantId);
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, authorizedHospitalId)]);
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer", TestJwtTokenFactory.CreateToken());
+        client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
+
+        var authorized = await client.GetAsync($"/api/v1/hospitals/{authorizedHospitalId:D}/departments");
+        Assert.Equal(HttpStatusCode.OK, authorized.StatusCode);
+
+        var outOfScope = await client.GetAsync($"/api/v1/hospitals/{otherHospitalId:D}/departments");
+        await AssertProblemDetailsAsync(outOfScope, HttpStatusCode.NotFound, "Resource not found");
+
+        var foreignTenant = await client.GetAsync($"/api/v1/hospitals/{foreignHospitalId:D}/departments");
+        await AssertProblemDetailsAsync(foreignTenant, HttpStatusCode.NotFound, "Resource not found");
+    }
+
+    [Fact]
     public async Task TenantOwnedPersistence_RejectsStaleUpdatesAndCrossTenantAssignments()
     {
         var tenantId = Guid.NewGuid();
