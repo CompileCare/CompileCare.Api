@@ -97,6 +97,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
         // HSTS middleware intentionally skips localhost; simulate the production
         // public host while retaining TestServer's loopback transport.
         request.Headers.Host = "hospital.compilecare.test";
+        request.Headers.TryAddWithoutValidation("X-Forwarded-For", "203.0.113.42");
         request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
 
         using var response = await client.SendAsync(request);
@@ -115,6 +116,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
         // HSTS middleware intentionally skips localhost; simulate the production
         // public host while retaining TestServer's loopback transport.
         request.Headers.Host = "hospital.compilecare.test";
+        request.Headers.TryAddWithoutValidation("X-Forwarded-For", "203.0.113.42");
         request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
 
         using var response = await client.SendAsync(request);
