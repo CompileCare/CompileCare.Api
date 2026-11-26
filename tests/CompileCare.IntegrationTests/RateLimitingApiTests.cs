@@ -120,7 +120,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
     [Fact]
     public void ForwardedHeadersAreRestrictedToConfiguredProxiesAndOneHop()
     {
-        using var factory = new ProductionApiFactory();
+        using var factory = new ProductionApiFactory(IPAddress.Loopback);
         var options = factory.Services.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
 
         Assert.Equal(
