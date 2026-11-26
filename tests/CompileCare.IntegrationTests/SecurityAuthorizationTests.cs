@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using CompileCare.Api.Middleware;
 using CompileCare.Api.Security;
 using CompileCare.Application.Tenancy;
+using CompileCare.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -187,6 +189,71 @@ public sealed class SecurityAuthorizationTests
         var deleteResponse = await client.DeleteAsync($"/api/v1/hospitals/{created!.Id:D}");
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(TenantRoles.HospitalAdmin, HttpStatusCode.Created, HttpStatusCode.NoContent)]
+    [InlineData(TenantRoles.FacilityManager, HttpStatusCode.Created, HttpStatusCode.Forbidden)]
+    [InlineData(TenantRoles.FacilityViewer, HttpStatusCode.Forbidden, HttpStatusCode.Forbidden)]
+    [InlineData(TenantRoles.PatientRegistrar, HttpStatusCode.Forbidden, HttpStatusCode.Forbidden)]
+    [InlineData(TenantRoles.ClinicalUser, HttpStatusCode.Forbidden, HttpStatusCode.Forbidden)]
+    public async Task PersistedRole_EnforcesFacilityReadWriteDeleteMatrixWithoutDeniedMutations(
+        string role,
+        HttpStatusCode expectedCreateStatus,
+        HttpStatusCode expectedDeleteStatus)
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin, subject: "facility-matrix-admin");
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, role, subject: "facility-matrix-member");
+
+        using var administrator = CreateAuthenticatedClient(tenantId, "facility-matrix-admin");
+        using var member = CreateAuthenticatedClient(tenantId, "facility-matrix-member");
+
+        var baselineCreate = await administrator.PostAsJsonAsync(
+            "/api/v1/hospitals",
+            new { name = "Baseline Hospital", code = "BASELINE" });
+        Assert.Equal(HttpStatusCode.Created, baselineCreate.StatusCode);
+        var baseline = await baselineCreate.Content.ReadFromJsonAsync<HospitalResponse>();
+        Assert.NotNull(baseline);
+
+        var read = await member.GetAsync("/api/v1/hospitals");
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+
+        var create = await member.PostAsJsonAsync(
+            "/api/v1/hospitals",
+            new { name = "Role Matrix Hospital", code = "ROLE-MATRIX" });
+        Assert.Equal(expectedCreateStatus, create.StatusCode);
+
+        var delete = await member.DeleteAsync($"/api/v1/hospitals/{baseline!.Id:D}");
+        Assert.Equal(expectedDeleteStatus, delete.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var remainingHospitals = await db.Hospitals.AsNoTracking().CountAsync();
+        var expectedRemaining = 1
+            + (expectedCreateStatus == HttpStatusCode.Created ? 1 : 0)
+            - (expectedDeleteStatus == HttpStatusCode.NoContent ? 1 : 0);
+        Assert.Equal(expectedRemaining, remainingHospitals);
+    }
+
+    private HttpClient CreateAuthenticatedClient(Guid? tenantId, string subject)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.CreateToken(subject: subject));
+        if (tenantId.HasValue)
+        {
+            client.DefaultRequestHeaders.Add(
+                TenantContextMiddleware.HeaderName,
+                tenantId.Value.ToString("D"));
+        }
+
+        return client;
     }
 
     [Fact]
