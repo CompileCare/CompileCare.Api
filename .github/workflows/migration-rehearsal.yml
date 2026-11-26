@@ -108,7 +108,7 @@ jobs:
           upgrade_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_upgrade" \
             --command='SELECT string_agg("MigrationId", chr(44) ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
           fresh_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_fresh" \
-            --command='SELECT string_agg("MigrationId", '','' ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
+            --command='SELECT string_agg("MigrationId", chr(44) ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
           if [[ -z "$upgrade_ids" || -z "$fresh_ids" ]]; then
             echo "::error::EF migration history was not populated in both rehearsal databases."
             exit 1
