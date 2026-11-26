@@ -78,6 +78,85 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Empty(wrongDate!.Items);
     }
 
+    [Theory]
+    [InlineData(TenantRoles.FacilityViewer)]
+    [InlineData(TenantRoles.ClinicalUser)]
+    public async Task RolesWithoutSchedulingGrants_CannotReadAvailabilityOrBookAppointments(
+        string role)
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "scheduling-role-admin");
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, role,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "scheduling-role-restricted");
+
+        using var admin = CreateClient(tenantId, "scheduling-role-admin");
+        using var restricted = CreateClient(tenantId, "scheduling-role-restricted");
+
+        var date = new DateOnly(2026, 12, 20);
+        var createSession = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentId, providerId, date,
+                new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, createSession.StatusCode);
+        var session = await createSession.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await admin.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        Assert.NotEmpty(slots!);
+        var slot = slots![0];
+
+        var availabilityRead = await restricted.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions?date={date:yyyy-MM-dd}&departmentId={departmentId:D}");
+        var slotRead = await restricted.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session.Id:D}/slots");
+        var booking = await restricted.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, patientId, slot.StartsAtUtc, "Consultation"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, availabilityRead.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, slotRead.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, booking.StatusCode);
+
+        var appointments = await admin.GetFromJsonAsync<AppointmentPage>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments?departmentId={departmentId:D}&date={date:yyyy-MM-dd}");
+        Assert.NotNull(appointments);
+        Assert.Equal(0, appointments!.TotalCount);
+        Assert.Empty(appointments.Items);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var deniedAudits = await auditDb.AuditEvents.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ActorSubject == "scheduling-role-restricted" &&
+                item.ResourceType == "Appointments and scheduling" &&
+                item.Outcome == "Denied")
+            .OrderBy(item => item.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(3, deniedAudits.Count);
+        Assert.All(deniedAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal("scheduling-role-restricted", audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.Forbidden, audit.StatusCode);
+        });
+        Assert.Contains(deniedAudits, audit => audit.Action == "ListProviderAvailabilitySessions");
+        Assert.Contains(deniedAudits, audit => audit.Action == "GetProviderAvailabilitySlots");
+        Assert.Contains(deniedAudits, audit => audit.Action == "BookAppointment");
+    }
+
     [Fact]
     public async Task HospitalAdminCanPublishAvailabilityAndRegistrarCanBookOnlyRegisteredPatient()
     {
