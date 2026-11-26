@@ -106,11 +106,28 @@ public sealed class AuditQueryApiTests
         Assert.DoesNotContain(page.Items, item => item.TenantId == secondTenantId);
     }
 
-    private HttpClient CreateAuthenticatedClient(Guid tenantId)
+    [Fact]
+    public async Task CsvExportNeutralizesSpreadsheetFormulaValues()
+    {
+        const string subject = "=HYPERLINK(\"https://example.invalid\",\"open\")";
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin, subject: subject);
+        using var client = CreateAuthenticatedClient(tenantId, subject);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/hospitals")).StatusCode);
+        var query = BuildQuery(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(1));
+        var response = await client.GetAsync($"/api/v1/audit/events/export?{query}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var csv = await response.Content.ReadAsStringAsync();
+        Assert.Contains("\"'=HYPERLINK", csv, StringComparison.Ordinal);
+    }
+
+    private HttpClient CreateAuthenticatedClient(Guid tenantId, string? subject = null)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(subject));
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
