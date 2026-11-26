@@ -79,6 +79,21 @@ public sealed class TenantRegistryService(CompileCareDbContext db) : ITenantRegi
         if (!TenantStatuses.CanTransition(tenant.Status, targetStatus))
             return Failure<TenantDto>($"Tenant status cannot transition from '{tenant.Status}' to '{targetStatus}'.", 409);
 
+        if (tenant.Status == TenantStatuses.Provisioning && targetStatus == TenantStatuses.Active)
+        {
+            var hasInitialAdministrator = await db.TenantMemberships.IgnoreQueryFilters()
+                .AnyAsync(value =>
+                    value.TenantId == id &&
+                    value.Role == TenantRoles.HospitalAdmin &&
+                    value.IsActive &&
+                    value.Scopes.Any(scope => scope.ScopeType == OrganizationScopeTypes.Tenant),
+                    cancellationToken);
+            if (!hasInitialAdministrator)
+                return Failure<TenantDto>(
+                    "A tenant-wide HospitalAdmin must be provisioned before the tenant can be activated.",
+                    409);
+        }
+
         tenant.Status = targetStatus;
         try
         {
