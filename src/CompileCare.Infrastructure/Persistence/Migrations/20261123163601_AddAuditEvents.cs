@@ -56,7 +56,7 @@ namespace CompileCare.Infrastructure.Persistence.Migrations
                   AS 'BEGIN
                       RAISE EXCEPTION ''audit_events is append-only''
                           USING ERRCODE = ''55000'';
-                  END;'");
+                  END;';");
 
             migrationBuilder.Sql(
                 """
