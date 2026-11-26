@@ -129,7 +129,7 @@ public sealed class AuditEventQueryService(
     private static string Csv(string? value)
     {
         var safe = value ?? string.Empty;
-        if (safe.Length > 0 && safe[0] is '=' or '+' or '-' or '@')
+        if (safe.Length > 0 && (safe[0] is '=' or '+' or '-' or '@'))
             safe = $"'{safe}";
         return $"\"{safe.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }
