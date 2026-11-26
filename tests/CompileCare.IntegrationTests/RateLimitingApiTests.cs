@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -77,6 +78,78 @@ public sealed class RateLimitingApiTests
                     ["RateLimiting:WindowSeconds"] = "60",
                     ["RateLimiting:AnonymousPermitLimit"] = "2",
                     ["RateLimiting:AuthenticatedPermitLimit"] = "2"
+                }));
+        }
+    }
+}
+
+
+public sealed class ForwardedHeadersAndHstsApiTests
+{
+    [Fact]
+    public async Task ProductionHttpsResponsesIncludeHsts()
+    {
+        using var factory = new ProductionApiFactory();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("https://localhost/");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.TryGetValues("Strict-Transport-Security", out var values));
+        Assert.Contains("max-age=", Assert.Single(values!));
+    }
+
+    [Fact]
+    public async Task UntrustedForwardedProtoDoesNotEnableHsts()
+    {
+        using var factory = new ProductionApiFactory();
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/");
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(response.Headers.Contains("Strict-Transport-Security"));
+    }
+
+    [Fact]
+    public void ForwardedHeadersAreRestrictedToConfiguredProxiesAndOneHop()
+    {
+        using var factory = new ProductionApiFactory();
+        var options = factory.Services.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
+
+        Assert.Equal(
+            ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+            options.ForwardedHeaders);
+        Assert.Equal(1, options.ForwardLimit);
+        Assert.True(options.RequireHeaderSymmetry);
+        Assert.Contains(IPAddress.Parse("192.0.2.10"), options.KnownProxies);
+        Assert.DoesNotContain(IPAddress.Loopback, options.KnownProxies);
+    }
+
+    private sealed class ProductionApiFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Production");
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Authentication:Authority"] = "https://identity.compilecare.test/",
+                    ["Authentication:Audience"] = "compilecare-api",
+                    ["Authentication:RequireHttpsMetadata"] = "true",
+                    ["ReverseProxy:KnownProxies:0"] = "192.0.2.10"
+                }));
+            builder.ConfigureTestServices(services =>
+                services.PostConfigure<ForwardedHeadersOptions>(options =>
+                {
+                    // Remove framework loopback defaults so this test can prove that
+                    // a caller's X-Forwarded-Proto header is ignored unless the
+                    // immediate peer matches an explicitly configured proxy.
+                    options.KnownProxies.Clear();
+                    options.KnownNetworks.Clear();
+                    options.KnownProxies.Add(IPAddress.Parse("192.0.2.10"));
                 }));
         }
     }
