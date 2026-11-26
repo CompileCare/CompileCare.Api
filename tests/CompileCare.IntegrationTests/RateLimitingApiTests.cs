@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -149,7 +150,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
                     // a caller's X-Forwarded-Proto header is ignored unless the
                     // immediate peer matches an explicitly configured proxy.
                     options.KnownProxies.Clear();
-                    options.KnownNetworks.Clear();
+                    options.KnownIPNetworks.Clear();
                     options.KnownProxies.Add(IPAddress.Parse("192.0.2.10"));
                 }));
         }
