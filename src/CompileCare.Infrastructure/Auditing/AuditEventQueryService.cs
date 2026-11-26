@@ -129,7 +129,12 @@ public sealed class AuditEventQueryService(
     private static string Csv(string? value)
     {
         var safe = value ?? string.Empty;
-        if (safe.Length > 0 && (safe[0] is '=' or '+' or '-' or '@'))
+        var firstNonWhitespace = safe.AsSpan().TrimStart();
+        var beginsWithFormula = firstNonWhitespace.Length > 0 &&
+            (firstNonWhitespace[0] is '=' or '+' or '-' or '@');
+        var beginsWithControlCharacter = safe.Length > 0 &&
+            (safe[0] is '\t' or '\r' or '\n');
+        if (beginsWithFormula || beginsWithControlCharacter)
             safe = $"'{safe}";
         return $"\"{safe.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }
