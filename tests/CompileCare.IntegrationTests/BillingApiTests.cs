@@ -179,6 +179,32 @@ public sealed class BillingApiTests
         Assert.Equal(0m, unchanged!.AmountPaid);
         Assert.Equal(500m, unchanged.BalanceDue);
         Assert.Equal(InvoiceStatuses.Issued, unchanged.Status);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var deniedAudits = await auditDb.AuditEvents.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ActorSubject == "billing-role-restricted" &&
+                item.ResourceType == "Billing" &&
+                item.Outcome == "Denied")
+            .OrderBy(item => item.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(5, deniedAudits.Count);
+        Assert.All(deniedAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal("billing-role-restricted", audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.Forbidden, audit.StatusCode);
+        });
+        Assert.Contains(deniedAudits, audit => audit.Action == "ListBillingServiceItems");
+        Assert.Contains(deniedAudits, audit => audit.Action == "GetBillingInvoice");
+        Assert.Contains(deniedAudits, audit => audit.Action == "CreateBillingInvoice");
+        Assert.Contains(deniedAudits, audit => audit.Action == "RecordBillingPayment");
+        Assert.Contains(deniedAudits, audit => audit.Action == "GetDailyBillingCollection");
     }
 
     [Fact]
