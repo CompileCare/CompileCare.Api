@@ -47,7 +47,8 @@ public sealed record StaffProfileDto(
     bool IsActive,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
-    IReadOnlyList<StaffAssignmentDto> Assignments);
+    IReadOnlyList<StaffAssignmentDto> Assignments,
+    bool CanManageWithinScope);
 
 public sealed record StaffSearchRequest(string? Query = null, int Page = 1, int PageSize = 50)
 {
