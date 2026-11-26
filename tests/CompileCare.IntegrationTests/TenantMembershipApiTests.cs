@@ -198,9 +198,12 @@ public sealed class TenantMembershipApiTests
             departmentA,
             ownDepartments.GetProperty("items")[0].GetProperty("id").GetGuid());
 
-        var foreignDepartments = await managerClient.GetFromJsonAsync<JsonElement>(
+        var foreignDepartments = await managerClient.GetAsync(
             $"/api/v1/hospitals/{hospitalB:D}/departments");
-        Assert.Equal(0, foreignDepartments.GetProperty("totalCount").GetInt32());
+        await AssertProblemDetailsAsync(
+            foreignDepartments,
+            HttpStatusCode.NotFound,
+            "Resource not found");
 
         var createWard = await managerClient.PostAsJsonAsync(
             $"/api/v1/departments/{departmentA:D}/wards",
