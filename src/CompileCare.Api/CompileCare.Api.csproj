@@ -5,6 +5,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="CompileCare.Observability" />
     <PackageReference Include="CompileCare.Observability.AspNetCore" />
+    <PackageReference Include="Npgsql.OpenTelemetry" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../CompileCare.Application/CompileCare.Application.csproj" />
