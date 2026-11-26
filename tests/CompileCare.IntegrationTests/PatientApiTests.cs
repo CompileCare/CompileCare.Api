@@ -334,6 +334,18 @@ public sealed class PatientApiTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
+        // Tenant-wide membership must also reject a hospital identifier owned by another tenant.
+        await _factory.SeedTenantMembershipAsync(tenantA, TenantRoles.HospitalAdmin, subject: "tenant-a-admin");
+        using var tenantWideClient = _factory.CreateClient();
+        tenantWideClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer", TestJwtTokenFactory.CreateToken("tenant-a-admin"));
+        tenantWideClient.DefaultRequestHeaders.Add(
+            TenantContextMiddleware.HeaderName, tenantA.ToString("D"));
+        var foreignHospitalSearch = await tenantWideClient.GetAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/patients?query=Synthetic");
+        Assert.Equal(HttpStatusCode.NotFound, foreignHospitalSearch.StatusCode);
+
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantA);
         var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
