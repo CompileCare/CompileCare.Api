@@ -312,11 +312,11 @@ public sealed class StaffManagementApiTests
         return (hospital.Id, department.Id);
     }
 
-    private HttpClient CreateClient(Guid tenantId)
+    private HttpClient CreateClient(Guid tenantId, string subject = TestJwtTokenFactory.Subject)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(subject));
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
