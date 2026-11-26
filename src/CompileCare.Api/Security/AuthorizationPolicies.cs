@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CompileCare.Application.Appointments;
+using CompileCare.Application.Auditing;
 using CompileCare.Application.Billing;
 using CompileCare.Application.Clinical;
 using CompileCare.Application.Patients;
@@ -41,6 +42,7 @@ public static class AuthorizationPolicies
     public const string BillingInvoiceManage = "BillingInvoiceManage";
     public const string BillingPaymentManage = "BillingPaymentManage";
     public const string BillingReportRead = "BillingReportRead";
+    public const string AuditRead = "AuditRead";
 
     public const string TenantIdClaim = "compilecare:tenant_id";
     public const string TenantRoleClaim = "compilecare:tenant_role";
@@ -127,6 +129,9 @@ public static class AuthorizationPolicies
             policy.RequireAuthenticatedUser().RequireAssertion(context => HasMembershipPermission(context.User, BillingPermissions.InvoiceManage)));
         options.AddPolicy(BillingPaymentManage, policy =>
             policy.RequireAuthenticatedUser().RequireAssertion(context => HasMembershipPermission(context.User, BillingPermissions.PaymentManage)));
+        options.AddPolicy(AuditRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, AuditPermissions.Read)));
         options.AddPolicy(BillingReportRead, policy =>
             policy.RequireAuthenticatedUser().RequireAssertion(context => HasMembershipPermission(context.User, BillingPermissions.ReportRead)));
         options.AddPolicy(EncounterAmend, policy =>
