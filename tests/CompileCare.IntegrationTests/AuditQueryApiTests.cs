@@ -4,6 +4,8 @@ using System.Net.Http.Json;
 using CompileCare.Api.Middleware;
 using CompileCare.Application.Auditing;
 using CompileCare.Application.Tenancy;
+using CompileCare.Infrastructure.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CompileCare.IntegrationTests;
 
@@ -52,10 +54,13 @@ public sealed class AuditQueryApiTests
     {
         var tenantId = Guid.NewGuid();
         var hospitalId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin, subject: "audit-tenant-seed");
+        await SeedHospitalAsync(tenantId, hospitalId);
         await _factory.SeedTenantMembershipAsync(
             tenantId,
             TenantRoles.HospitalAdmin,
-            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: TestJwtTokenFactory.Subject);
         using var client = CreateAuthenticatedClient(tenantId);
 
         var fromUtc = DateTimeOffset.UtcNow.AddDays(-1);
@@ -123,11 +128,27 @@ public sealed class AuditQueryApiTests
         Assert.Contains("\"'=HYPERLINK", csv, StringComparison.Ordinal);
     }
 
+    private async Task SeedHospitalAsync(Guid tenantId, Guid hospitalId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        tenantContext.SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        db.Hospitals.Add(new Hospital
+        {
+            Id = hospitalId,
+            TenantId = tenantId,
+            Name = "Audit scope test hospital",
+            Code = $"AUD-{hospitalId:N}"[..12]
+        });
+        await db.SaveChangesAsync();
+    }
+
     private HttpClient CreateAuthenticatedClient(Guid tenantId, string? subject = null)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(subject));
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(subject ?? TestJwtTokenFactory.Subject));
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
