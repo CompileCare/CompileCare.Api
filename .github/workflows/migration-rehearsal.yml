@@ -99,23 +99,27 @@ jobs:
       - name: Rehearse upgrade and fresh-database installation
         run: |
           set -euo pipefail
-          psql "postgresql://postgres:postgres@localhost:5432/compilecare_upgrade" \
-            --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
-          psql "postgresql://postgres:postgres@localhost:5432/compilecare_fresh" \
-            --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
-          upgrade_count=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_upgrade" \
-            --command='SELECT count(*) FROM "__EFMigrationsHistory";')
-          fresh_count=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_fresh" \
-            --command='SELECT count(*) FROM "__EFMigrationsHistory";')
-          if [[ "$upgrade_count" -le 0 || "$fresh_count" -le 0 ]]; then
+          for database in compilecare_upgrade compilecare_fresh; do
+            connection="postgresql://postgres:postgres@localhost:5432/$database"
+            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
+            # Reapply the idempotent script to prove it safely handles an already-current schema.
+            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
+          done
+          upgrade_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_upgrade" \
+            --command='SELECT string_agg("MigrationId", '','' ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
+          fresh_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_fresh" \
+            --command='SELECT string_agg("MigrationId", '','' ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
+          if [[ -z "$upgrade_ids" || -z "$fresh_ids" ]]; then
             echo "::error::EF migration history was not populated in both rehearsal databases."
             exit 1
           fi
-          if [[ "$upgrade_count" != "$fresh_count" ]]; then
-            echo "::error::Upgrade and fresh databases have different migration counts."
+          if [[ "$upgrade_ids" != "$fresh_ids" ]]; then
+            echo "::error::Upgrade and fresh databases have different migration histories."
+            echo "Upgrade: $upgrade_ids"
+            echo "Fresh:   $fresh_ids"
             exit 1
           fi
-          echo "Upgrade rehearsal and fresh install both applied $fresh_count migrations."
+          echo "Upgrade rehearsal and fresh install both applied the same migration history."
 
       - name: Capture PostgreSQL logs on failure
         if: failure()
