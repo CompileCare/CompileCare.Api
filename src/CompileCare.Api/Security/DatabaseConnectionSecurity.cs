@@ -8,7 +8,7 @@ public static class DatabaseConnectionSecurity
 {
     public static void Validate(IConfiguration configuration, IHostEnvironment environment)
     {
-        if (environment.IsDevelopment())
+        if (environment.IsDevelopment() || environment.IsEnvironment("Testing"))
             return;
 
         var connectionString = configuration.GetConnectionString("CompileCare");
