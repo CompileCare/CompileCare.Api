@@ -1,4 +1,5 @@
 using CompileCare.Application.Appointments;
+using CompileCare.Application.Auditing;
 using CompileCare.Application.Billing;
 using CompileCare.Application.Clinical;
 using CompileCare.Application.Patients;
@@ -18,6 +19,7 @@ internal static class TenantRolePermissions
                 TenantPermissions.FacilityWrite,
                 TenantPermissions.FacilityDelete,
                 TenantPermissions.MembershipManage,
+                AuditPermissions.Read,
                 PatientPermissions.Read,
                 PatientPermissions.IdentityRead,
                 PatientPermissions.Register,

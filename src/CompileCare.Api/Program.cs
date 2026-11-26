@@ -1,4 +1,5 @@
 using CompileCare.Api;
+using CompileCare.Api.Endpoints;
 using CompileCare.Api.Middleware;
 using CompileCare.Api.Security;
 using CompileCare.Application;
@@ -53,6 +54,7 @@ app.MapPrometheusScrapingEndpoint();
 app.MapGet("/", () => Results.Ok(new { service = "CompileCare.Api", status = "ready" }));
 app.MapHealthEndpoints();
 app.MapPlatformEndpoints();
+app.MapAuditEndpoints();
 app.MapPlatformBootstrapEndpoints(app.Environment);
 app.MapPlatformTenantEndpoints();
 app.MapTenantMembershipEndpoints();
