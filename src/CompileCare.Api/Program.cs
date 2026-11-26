@@ -94,7 +94,10 @@ app.UseMiddleware<TenantContextMiddleware>();
 app.UseAuthorization();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
-app.MapPrometheusScrapingEndpoint();
+if (MetricsEndpointConfiguration.IsEnabled(builder.Configuration, builder.Environment))
+{
+    app.MapPrometheusScrapingEndpoint();
+}
 app.MapGet("/", () => Results.Ok(new { service = "CompileCare.Api", status = "ready" }));
 app.MapHealthEndpoints();
 app.MapPlatformEndpoints();
