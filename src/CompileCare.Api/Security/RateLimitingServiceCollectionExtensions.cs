@@ -10,18 +10,21 @@ public static class RateLimitingServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var windowSeconds = configuration.GetValue("RateLimiting:WindowSeconds", 60);
-        var anonymousPermitLimit = configuration.GetValue("RateLimiting:AnonymousPermitLimit", 120);
-        var authenticatedPermitLimit = configuration.GetValue("RateLimiting:AuthenticatedPermitLimit", 600);
-
-        if (windowSeconds <= 0 || anonymousPermitLimit <= 0 || authenticatedPermitLimit <= 0)
-        {
-            throw new InvalidOperationException(
-                "RateLimiting:WindowSeconds, AnonymousPermitLimit and AuthenticatedPermitLimit must all be positive.");
-        }
-
         services.AddRateLimiter(options =>
         {
+            // Resolve values when options are materialized, not during service
+            // registration. This ensures environment/test-host configuration
+            // providers added later in host construction are honoured.
+            var windowSeconds = configuration.GetValue("RateLimiting:WindowSeconds", 60);
+            var anonymousPermitLimit = configuration.GetValue("RateLimiting:AnonymousPermitLimit", 120);
+            var authenticatedPermitLimit = configuration.GetValue("RateLimiting:AuthenticatedPermitLimit", 600);
+
+            if (windowSeconds <= 0 || anonymousPermitLimit <= 0 || authenticatedPermitLimit <= 0)
+            {
+                throw new InvalidOperationException(
+                    "RateLimiting:WindowSeconds, AnonymousPermitLimit and AuthenticatedPermitLimit must all be positive.");
+            }
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
