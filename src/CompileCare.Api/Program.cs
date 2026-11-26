@@ -8,6 +8,7 @@ using CompileCare.Infrastructure.Persistence;
 using CompileCare.Observability.Extensions;
 using CompileCare.Observability.AspNetCore.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
