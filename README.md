@@ -38,6 +38,14 @@ Example local connection string:
 Host=localhost;Database=compilecare;Username=compilecare;Password=replace-me
 ```
 
+Outside Development, the API requires `ConnectionStrings:CompileCare` and rejects startup unless PostgreSQL uses `SSL Mode=VerifyFull` with `Trust Server Certificate=false`. This verifies both the certificate chain and server hostname. If the selected provider uses a private CA, mount its CA certificate securely and configure Npgsql's `Root Certificate` connection-string option. Do not disable certificate validation to work around a provider certificate problem. Development may use the local plaintext PostgreSQL service.
+
+Example production connection-string shape (replace host/database/user and supply the password from a secret manager):
+
+```text
+Host=postgres.example.com;Database=compilecare;Username=compilecare_app;Password=<secret>;SSL Mode=VerifyFull;Trust Server Certificate=false
+```
+
 Infrastructure registers EF Core/Npgsql and database readiness only when the connection string is configured. Migrations are created with the EF Core CLI from the Infrastructure project.
 
 ```bash
