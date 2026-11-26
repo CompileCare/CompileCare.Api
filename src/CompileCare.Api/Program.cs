@@ -23,6 +23,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddOpenApi();
 builder.Services.AddApplication();
+DatabaseConnectionSecurity.Validate(builder.Configuration, builder.Environment);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddCompileCareSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddCompileCareRateLimiting(builder.Configuration);
