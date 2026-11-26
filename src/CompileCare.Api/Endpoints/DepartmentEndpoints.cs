@@ -15,7 +15,7 @@ public static class DepartmentEndpoints
             int page = 1,
             int pageSize = 50,
             CancellationToken ct = default) =>
-                Results.Ok(await service.ListDepartments(hospitalId, new(page, pageSize), ct)))
+                FacilityHttp.From(await service.ListDepartments(hospitalId, new(page, pageSize), ct)))
             .WithName("ListDepartments").RequireAuthorization(AuthorizationPolicies.FacilityRead);
 
         group.MapGet("/{id:guid}", async (
