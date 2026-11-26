@@ -94,6 +94,47 @@ public sealed class MetricsEndpointAccessTests
     }
 
     [Fact]
+    public async Task Metrics_request_from_an_ipv4_mapped_ipv6_address_matches_ipv4_cidr()
+    {
+        var nextCalled = false;
+        var middleware = new MetricsEndpointAccessMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            new[] { IPNetwork.Parse("10.20.0.0/16") });
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/metrics";
+        context.Connection.RemoteIpAddress = IPAddress.Parse("::ffff:10.20.5.8");
+
+        await middleware.InvokeAsync(context);
+
+        Assert.True(nextCalled);
+    }
+
+    [Fact]
+    public async Task Metrics_request_without_a_remote_address_is_hidden()
+    {
+        var nextCalled = false;
+        var middleware = new MetricsEndpointAccessMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            new[] { IPNetwork.Parse("10.20.0.0/16") });
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/metrics";
+        context.Connection.RemoteIpAddress = null;
+
+        await middleware.InvokeAsync(context);
+
+        Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+        Assert.False(nextCalled);
+    }
+
+    [Fact]
     public async Task Metrics_request_from_an_allowed_monitoring_network_reaches_scraper()
     {
         var nextCalled = false;

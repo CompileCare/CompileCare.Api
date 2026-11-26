@@ -15,6 +15,13 @@ public sealed class MetricsEndpointAccessMiddleware(
         }
 
         var remoteAddress = context.Connection.RemoteIpAddress;
+        if (remoteAddress?.IsIPv4MappedToIPv6 == true)
+        {
+            // Dual-mode sockets may represent an IPv4 peer as ::ffff:a.b.c.d.
+            // Normalize it so IPv4 CIDR entries behave consistently across hosts.
+            remoteAddress = remoteAddress.MapToIPv4();
+        }
+
         if (remoteAddress is null || !allowedNetworks.Any(network => network.Contains(remoteAddress)))
         {
             // Hide the scrape endpoint from clients outside the monitoring network.
