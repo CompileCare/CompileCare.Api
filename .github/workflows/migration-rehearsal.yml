@@ -97,9 +97,6 @@ jobs:
             --context CompileCareDbContext \
             --output /tmp/compilecare-current-migrations.sql
 
-      - name: Inspect generated migration SQL around the rehearsal boundary
-        run: sed -n '230,255p' /tmp/compilecare-current-migrations.sql
-
       - name: Rehearse upgrade and fresh-database installation
         run: |
           set -euo pipefail
