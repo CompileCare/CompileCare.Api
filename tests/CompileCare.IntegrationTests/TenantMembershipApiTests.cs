@@ -200,10 +200,16 @@ public sealed class TenantMembershipApiTests
 
         var foreignDepartments = await managerClient.GetAsync(
             $"/api/v1/hospitals/{hospitalB:D}/departments");
-        await AssertProblemDetailsAsync(
-            foreignDepartments,
-            HttpStatusCode.NotFound,
-            "Resource not found");
+        Assert.Equal(HttpStatusCode.NotFound, foreignDepartments.StatusCode);
+        Assert.Equal(
+            "application/problem+json",
+            foreignDepartments.Content.Headers.ContentType?.MediaType);
+        using var foreignDepartmentProblem =
+            JsonDocument.Parse(await foreignDepartments.Content.ReadAsStringAsync());
+        Assert.Equal(404, foreignDepartmentProblem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal(
+            "Resource not found",
+            foreignDepartmentProblem.RootElement.GetProperty("title").GetString());
 
         var createWard = await managerClient.PostAsJsonAsync(
             $"/api/v1/departments/{departmentA:D}/wards",
