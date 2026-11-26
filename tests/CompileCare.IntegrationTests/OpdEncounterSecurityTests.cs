@@ -129,7 +129,7 @@ public sealed class OpdEncounterSecurityTests
     }
 
     [Fact]
-    public async Task ClinicalUserCannotReadOrCreateEncountersOutsideAssignedHospitalScope()
+    public async Task ClinicalUserCannotReadCreateOrModifyEncountersOutsideAssignedHospitalScope()
     {
         var tenantId = Guid.NewGuid();
         var (hospitalA, _, patientId) = await SeedPatientAsync(tenantId);
@@ -193,16 +193,47 @@ public sealed class OpdEncounterSecurityTests
         var encounter = await create.Content.ReadFromJsonAsync<OpdEncounterDto>();
         Assert.NotNull(encounter);
 
+        const string originalClinicalText = "HospitalB-Private-Clinical-Note";
+        var originalNote = new OpdEncounterNoteInput(
+            originalClinicalText,
+            "Hospital B private history",
+            "Hospital B private examination",
+            "Hospital B private assessment",
+            "Hospital B private plan");
+        var ownerUpdate = await clinicianB.PutAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/opd/encounters/{encounter!.Id:D}/note",
+            originalNote);
+        Assert.Equal(HttpStatusCode.OK, ownerUpdate.StatusCode);
+
         var crossHospitalPatientRead = await clinicianA.GetAsync(
             $"/api/v1/hospitals/{hospitalB:D}/patients/{patientId:D}");
         Assert.Equal(HttpStatusCode.NotFound, crossHospitalPatientRead.StatusCode);
 
         var crossHospitalRead = await clinicianA.GetAsync(
-            $"/api/v1/hospitals/{hospitalB:D}/opd/encounters/{encounter!.Id:D}");
+            $"/api/v1/hospitals/{hospitalB:D}/opd/encounters/{encounter.Id:D}");
         Assert.Equal(HttpStatusCode.NotFound, crossHospitalRead.StatusCode);
+        var crossHospitalQueueRead = await clinicianA.GetAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/opd/queue/{queueEntry.Id:D}/encounter");
+        Assert.Equal(HttpStatusCode.NotFound, crossHospitalQueueRead.StatusCode);
+        var crossHospitalUpdate = await clinicianA.PutAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/opd/encounters/{encounter.Id:D}/note",
+            originalNote with { Assessment = "Unauthorized Hospital A modification" });
+        Assert.Equal(HttpStatusCode.NotFound, crossHospitalUpdate.StatusCode);
+        var crossHospitalSign = await clinicianA.PostAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/opd/encounters/{encounter.Id:D}/sign", null);
+        Assert.Equal(HttpStatusCode.NotFound, crossHospitalSign.StatusCode);
         var crossHospitalCreate = await clinicianA.PostAsync(
             $"/api/v1/hospitals/{hospitalB:D}/opd/queue/{queueEntry.Id:D}/encounter", null);
         Assert.Equal(HttpStatusCode.NotFound, crossHospitalCreate.StatusCode);
+
+        var ownerRead = await clinicianB.GetAsync(
+            $"/api/v1/hospitals/{hospitalB:D}/opd/encounters/{encounter.Id:D}");
+        Assert.Equal(HttpStatusCode.OK, ownerRead.StatusCode);
+        var unchanged = await ownerRead.Content.ReadFromJsonAsync<OpdEncounterDto>();
+        Assert.NotNull(unchanged);
+        Assert.Equal(originalClinicalText, unchanged!.ChiefComplaint);
+        Assert.Equal("Hospital B private assessment", unchanged.Assessment);
+        Assert.Null(unchanged.SignedAtUtc);
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
@@ -215,7 +246,7 @@ public sealed class OpdEncounterSecurityTests
             .OrderBy(audit => audit.OccurredAtUtc)
             .ToListAsync();
 
-        Assert.Equal(2, deniedEncounterAudits.Count);
+        Assert.Equal(5, deniedEncounterAudits.Count);
         Assert.All(deniedEncounterAudits, audit =>
         {
             Assert.Equal(tenantId, audit.RequestedTenantId);
@@ -225,6 +256,9 @@ public sealed class OpdEncounterSecurityTests
             Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
         });
         Assert.Contains(deniedEncounterAudits, audit => audit.Action == "GetOpdEncounter");
+        Assert.Contains(deniedEncounterAudits, audit => audit.Action == "GetOpdEncounterByQueueEntry");
+        Assert.Contains(deniedEncounterAudits, audit => audit.Action == "UpdateOpdEncounterNote");
+        Assert.Contains(deniedEncounterAudits, audit => audit.Action == "SignOpdEncounter");
         Assert.Contains(deniedEncounterAudits, audit => audit.Action == "CreateOpdEncounterFromQueue");
     }
 
