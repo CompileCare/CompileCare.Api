@@ -89,12 +89,14 @@ public sealed class RateLimitingApiTests
 public sealed class ForwardedHeadersAndHstsApiTests
 {
     [Fact]
-    public async Task ProductionHttpsResponsesIncludeHsts()
+    public async Task TrustedIngressForwardedHttpsResponsesIncludeHsts()
     {
-        using var factory = new ProductionApiFactory();
+        using var factory = new ProductionApiFactory(IPAddress.Parse("192.0.2.10"));
         using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/");
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
 
-        using var response = await client.GetAsync("https://localhost/");
+        using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(response.Headers.TryGetValues("Strict-Transport-Security", out var values));
@@ -104,7 +106,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
     [Fact]
     public async Task UntrustedForwardedProtoDoesNotEnableHsts()
     {
-        using var factory = new ProductionApiFactory();
+        using var factory = new ProductionApiFactory(IPAddress.Loopback);
         using var client = factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/");
         request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
@@ -130,7 +132,7 @@ public sealed class ForwardedHeadersAndHstsApiTests
         Assert.DoesNotContain(IPAddress.Loopback, options.KnownProxies);
     }
 
-    private sealed class ProductionApiFactory : WebApplicationFactory<Program>
+    private sealed class ProductionApiFactory(IPAddress remoteAddress) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -144,15 +146,30 @@ public sealed class ForwardedHeadersAndHstsApiTests
                     ["ReverseProxy:KnownProxies:0"] = "192.0.2.10"
                 }));
             builder.ConfigureTestServices(services =>
+            {
                 services.PostConfigure<ForwardedHeadersOptions>(options =>
                 {
-                    // Remove framework loopback defaults so this test can prove that
-                    // a caller's X-Forwarded-Proto header is ignored unless the
-                    // immediate peer matches an explicitly configured proxy.
+                    // Keep only the explicitly trusted ingress address so a
+                    // client-controlled forwarded scheme cannot enable HSTS.
                     options.KnownProxies.Clear();
                     options.KnownIPNetworks.Clear();
                     options.KnownProxies.Add(IPAddress.Parse("192.0.2.10"));
-                }));
+                });
+                services.AddSingleton<IStartupFilter>(new RemoteAddressStartupFilter(remoteAddress));
+            });
         }
+    }
+
+    private sealed class RemoteAddressStartupFilter(IPAddress remoteAddress) : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, nextRequest) =>
+            {
+                context.Connection.RemoteIpAddress = remoteAddress;
+                await nextRequest();
+            });
+            next(app);
+        };
     }
 }
