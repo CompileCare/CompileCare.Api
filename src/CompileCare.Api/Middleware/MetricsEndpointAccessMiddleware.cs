@@ -8,7 +8,7 @@ public sealed class MetricsEndpointAccessMiddleware(
 {
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!string.Equals(context.Request.Path.Value, "/metrics", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(context.Request.Path.Value?.TrimEnd('/'), "/metrics", StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
             return;
