@@ -183,6 +183,23 @@ public sealed class AppointmentSchedulingService(
             return AppointmentResult<AppointmentDto>.Failure(
                 "The patient must have an active registration at this hospital before booking.", 409);
 
+        // Booking requests for the same tenant/patient must not race through the
+        // overlap check. PostgreSQL's exclusion constraint remains the final
+        // integrity guard, but concurrent checks against that constraint can
+        // deadlock when both transactions insert overlapping ranges at once.
+        // The middleware normally owns the audited request transaction; create
+        // one here only when this service is invoked outside that HTTP pipeline.
+        await using var bookingTransaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        var tenantId = db.CurrentTenantId
+            ?? throw new InvalidOperationException("A tenant context is required to book an appointment.");
+        var bookingLockKey = $"compilecare:appointment-booking:{tenantId:N}:{input.PatientId:N}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({bookingLockKey}, 0))",
+            cancellationToken);
+
         var patientOverlap = await db.Appointments.AnyAsync(x =>
             x.PatientId == input.PatientId && x.Status == AppointmentStatuses.Booked &&
             x.SlotStartsAtUtc < slotEnd && x.SlotEndsAtUtc > slotStart, cancellationToken);
@@ -212,6 +229,9 @@ public sealed class AppointmentSchedulingService(
         {
             return AppointmentResult<AppointmentDto>.Failure("The selected slot is no longer available or overlaps an active appointment.", 409);
         }
+
+        if (bookingTransaction is not null)
+            await bookingTransaction.CommitAsync(cancellationToken);
 
         return AppointmentResult<AppointmentDto>.Success(ToDto(appointment));
     }
