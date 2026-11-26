@@ -47,6 +47,13 @@ public sealed class AuditQueryApiTests
         var csv = await export.Content.ReadAsStringAsync();
         Assert.Contains("ActorIssuer,ActorSubject,Action,ResourceType", csv, StringComparison.Ordinal);
         Assert.Contains("ListHospitals", csv, StringComparison.Ordinal);
+
+        // The export request itself must also be captured by the audit middleware.
+        var afterExport = await client.GetAsync($"/api/v1/audit/events?{query}");
+        Assert.Equal(HttpStatusCode.OK, afterExport.StatusCode);
+        var afterExportPage = await afterExport.Content.ReadFromJsonAsync<AuditEventPage>();
+        Assert.NotNull(afterExportPage);
+        Assert.Contains(afterExportPage!.Items, item => item.Action == "ExportAuditEvents");
     }
 
     [Fact]
@@ -114,7 +121,7 @@ public sealed class AuditQueryApiTests
     [Fact]
     public async Task CsvExportNeutralizesSpreadsheetFormulaValues()
     {
-        const string subject = "=HYPERLINK(\"https://example.invalid\",\"open\")";
+        const string subject = "\t=HYPERLINK(\"https://example.invalid\",\"open\")";
         var tenantId = Guid.NewGuid();
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin, subject: subject);
         using var client = CreateAuthenticatedClient(tenantId, subject);
@@ -125,7 +132,7 @@ public sealed class AuditQueryApiTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var csv = await response.Content.ReadAsStringAsync();
-        Assert.Contains("\"'=HYPERLINK", csv, StringComparison.Ordinal);
+        Assert.Contains("\"'\t=HYPERLINK", csv, StringComparison.Ordinal);
     }
 
     private async Task SeedHospitalAsync(Guid tenantId, Guid hospitalId)
