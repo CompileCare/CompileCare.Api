@@ -77,6 +77,33 @@ public sealed class AuditQueryApiTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData(TenantRoles.PatientRegistrar)]
+    [InlineData(TenantRoles.ClinicalUser)]
+    [InlineData(TenantRoles.FacilityManager)]
+    [InlineData(TenantRoles.FacilityViewer)]
+    public async Task MembershipWithoutAuditPermissionCannotQueryOrExportEvenWithForgedTokenClaims(string role)
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, role);
+        using var client = CreateAuthenticatedClient(
+            tenantId,
+            additionalClaims:
+            [
+                new("compilecare:permission", "audit.read"),
+                new("compilecare:tenant_role", TenantRoles.HospitalAdmin),
+                new("role", TenantRoles.HospitalAdmin),
+                new(System.Security.Claims.ClaimTypes.Role, TenantRoles.HospitalAdmin)
+            ]);
+
+        var query = BuildQuery(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow);
+        var listResponse = await client.GetAsync($"/api/v1/audit/events?{query}");
+        var exportResponse = await client.GetAsync($"/api/v1/audit/events/export?{query}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, listResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, exportResponse.StatusCode);
+    }
+
     [Fact]
     public async Task AuditQueryAndExportEnforceMaximumTimeRanges()
     {
@@ -151,11 +178,16 @@ public sealed class AuditQueryApiTests
         await db.SaveChangesAsync();
     }
 
-    private HttpClient CreateAuthenticatedClient(Guid tenantId, string? subject = null)
+    private HttpClient CreateAuthenticatedClient(
+        Guid tenantId,
+        string? subject = null,
+        IEnumerable<System.Security.Claims.Claim>? additionalClaims = null)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(subject ?? TestJwtTokenFactory.Subject));
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(
+                subject ?? TestJwtTokenFactory.Subject,
+                additionalClaims: additionalClaims));
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
