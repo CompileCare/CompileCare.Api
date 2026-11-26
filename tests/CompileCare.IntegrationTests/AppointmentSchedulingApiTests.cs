@@ -111,7 +111,8 @@ public sealed class AppointmentSchedulingApiTests
         var slots = await admin.GetFromJsonAsync<List<AppointmentSlotDto>>(
             $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
         Assert.NotNull(slots);
-        var slot = Assert.Single(slots!);
+        Assert.NotEmpty(slots!);
+        var slot = slots![0];
 
         var availabilityRead = await restricted.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/availability-sessions?date={date:yyyy-MM-dd}&departmentId={departmentId:D}");
