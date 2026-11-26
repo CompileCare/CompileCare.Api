@@ -116,11 +116,15 @@ public sealed class TenantRegistryApiTests
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         Assert.NotNull(tenant);
 
-        await _factory.SeedTenantMembershipAsync(tenant!.Id, TenantRoles.HospitalAdmin);
-        using var tenantClient = CreateAuthenticatedClient(tenant.Id);
+        using var tenantClient = CreateAuthenticatedClient(tenant!.Id);
         var beforeActivation = await tenantClient.GetAsync("/api/v1/hospitals");
         Assert.Equal(HttpStatusCode.Forbidden, beforeActivation.StatusCode);
 
+        var activateWithoutAdministrator = await platformClient.PostAsync(
+            $"/api/v1/platform/tenants/{tenant.Id:D}/activate", content: null);
+        Assert.Equal(HttpStatusCode.Conflict, activateWithoutAdministrator.StatusCode);
+
+        await _factory.SeedTenantMembershipAsync(tenant.Id, TenantRoles.HospitalAdmin);
         var activate = await platformClient.PostAsync(
             $"/api/v1/platform/tenants/{tenant.Id:D}/activate", content: null);
         Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
@@ -157,7 +161,7 @@ public sealed class TenantRegistryApiTests
                             value.Action == "ClosePlatformTenant")
             .ToListAsync();
 
-        Assert.Equal(5, lifecycleAudits.Count);
+        Assert.Equal(6, lifecycleAudits.Count);
         Assert.All(lifecycleAudits, value =>
         {
             Assert.Equal(tenant.Id, value.ResourceId);
