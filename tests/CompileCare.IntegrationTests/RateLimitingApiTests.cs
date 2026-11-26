@@ -1,0 +1,54 @@
+using System.Net;
+using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using Xunit;
+
+namespace CompileCare.IntegrationTests;
+
+public sealed class RateLimitingApiTests
+{
+    [Fact]
+    public async Task AnonymousRequestsAreThrottledWithProblemDetailsAndRetryAfter()
+    {
+        using var factory = new RateLimitedApiFactory();
+        using var client = factory.CreateClient();
+
+        var first = await client.GetAsync("/");
+        var second = await client.GetAsync("/");
+        var third = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, third.StatusCode);
+        Assert.NotNull(third.Headers.RetryAfter);
+        Assert.True(third.Headers.RetryAfter!.Delta > TimeSpan.Zero);
+        Assert.Equal(
+            "application/problem+json",
+            third.Content.Headers.ContentType?.MediaType);
+
+        using var problem = JsonDocument.Parse(await third.Content.ReadAsStringAsync());
+        Assert.Equal(429, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("Too many requests", problem.RootElement.GetProperty("title").GetString());
+        Assert.True(problem.RootElement.TryGetProperty("traceId", out _));
+    }
+
+    private sealed class RateLimitedApiFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Authentication:Authority"] = "https://identity.compilecare.test/",
+                    ["Authentication:Audience"] = "compilecare-api",
+                    ["Authentication:RequireHttpsMetadata"] = "true",
+                    ["RateLimiting:WindowSeconds"] = "60",
+                    ["RateLimiting:AnonymousPermitLimit"] = "2",
+                    ["RateLimiting:AuthenticatedPermitLimit"] = "2"
+                }));
+        }
+    }
+}
