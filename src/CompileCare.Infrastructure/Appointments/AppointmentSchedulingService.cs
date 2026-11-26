@@ -216,6 +216,39 @@ public sealed class AppointmentSchedulingService(
         return AppointmentResult<AppointmentDto>.Success(ToDto(appointment));
     }
 
+    public async Task<AppointmentResult<AppointmentPage>> ListAppointmentsAsync(
+        Guid hospitalId, Guid departmentId, DateOnly localDate, string? status, int page, int pageSize,
+        CancellationToken cancellationToken)
+    {
+        if (!CanReadHospital(hospitalId, departmentId))
+            return AppointmentResult<AppointmentPage>.Failure("Appointments not found.", 404);
+
+        if (!string.IsNullOrWhiteSpace(status) && !new[]
+            { AppointmentStatuses.Booked, AppointmentStatuses.Cancelled, AppointmentStatuses.Completed, AppointmentStatuses.NoShow }
+            .Contains(status, StringComparer.OrdinalIgnoreCase))
+            return AppointmentResult<AppointmentPage>.Failure("The appointment status filter is invalid.", 400);
+
+        page = page < 1 ? 1 : Math.Min(page, 2_000_000);
+        pageSize = pageSize < 1 ? 25 : Math.Min(pageSize, 100);
+        var sessionIds = db.ProviderAvailabilitySessions.AsNoTracking()
+            .Where(x => x.HospitalId == hospitalId && x.DepartmentId == departmentId && x.LocalDate == localDate)
+            .Select(x => x.Id);
+        var query = db.Appointments.AsNoTracking().Where(x =>
+            x.HospitalId == hospitalId && x.DepartmentId == departmentId && sessionIds.Contains(x.AvailabilitySessionId));
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(x => x.Status == status);
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query.OrderBy(x => x.SlotStartsAtUtc).ThenBy(x => x.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(x => new AppointmentDto(
+                x.Id, x.HospitalId, x.DepartmentId, x.PatientId, x.ProviderStaffId,
+                x.AvailabilitySessionId, x.SlotStartsAtUtc, x.SlotEndsAtUtc,
+                x.Status, x.Reason, x.CreatedAtUtc, x.RescheduledFromAppointmentId))
+            .ToListAsync(cancellationToken);
+        return AppointmentResult<AppointmentPage>.Success(new(items, page, pageSize, total));
+    }
+
     public async Task<AppointmentResult<AppointmentDto>> GetAppointmentAsync(
         Guid hospitalId, Guid appointmentId, CancellationToken cancellationToken)
     {
