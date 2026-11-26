@@ -44,6 +44,14 @@ public sealed class DatabaseConnectionSecurityTests
     }
 
     [Fact]
+    public void Testing_allows_the_isolated_integration_database()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+
+        DatabaseConnectionSecurity.Validate(configuration, CreateEnvironment("Testing"));
+    }
+
+    [Fact]
     public void Development_allows_local_plaintext_postgres()
     {
         var configuration = CreateConfiguration(
