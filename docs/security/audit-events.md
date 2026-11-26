@@ -22,6 +22,8 @@ The one-time platform-operator bootstrap uses a PostgreSQL transaction-scoped ad
 
 If the audit record cannot be committed, the business transaction is rolled back and the API returns an audit-unavailable response rather than reporting an unrecorded success. Failed endpoint execution is rolled back and a separate failure audit attempt is made.
 
+The integration suite now includes a PostgreSQL failure-injection regression: it forces audit-event insertion to fail during patient registration and verifies that the API returns 503 and neither the patient nor hospital registration is committed. This protects the fail-closed transaction boundary against future middleware or service refactors.
+
 Audit events are append-only. Application-level change tracking rejects updates/deletes, and PostgreSQL protections prevent direct update or truncate operations. Access to audit records must remain restricted to explicitly authorized administrative or compliance workflows; no general patient-facing audit browsing endpoint is implied by this storage capability.
 
 ## Privacy and security requirements
