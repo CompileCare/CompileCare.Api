@@ -8,10 +8,14 @@ using CompileCare.Infrastructure.Persistence;
 using CompileCare.Observability.Extensions;
 using CompileCare.Observability.AspNetCore.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseCompileCareObservability();
 builder.Services.AddObservability(builder.Configuration);
+// PostgreSQL data-access spans join the same trace provider/export pipeline.
+builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddNpgsql());
 builder.Services.AddObservabilityHealthChecks();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
