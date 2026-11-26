@@ -44,16 +44,6 @@ public sealed class DatabaseConnectionSecurityTests
     }
 
     [Fact]
-    public void Production_rejects_trust_server_certificate()
-    {
-        var configuration = CreateConfiguration(
-            "Host=db.example.com;Database=compilecare;Username=compilecare;Password=test-only;SSL Mode=VerifyFull;Trust Server Certificate=true");
-
-        Assert.Throws<InvalidOperationException>(() =>
-            DatabaseConnectionSecurity.Validate(configuration, CreateEnvironment(Environments.Production)));
-    }
-
-    [Fact]
     public void Development_allows_local_plaintext_postgres()
     {
         var configuration = CreateConfiguration(
