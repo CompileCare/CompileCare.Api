@@ -291,6 +291,8 @@ public sealed class AppointmentSchedulingService(
             return AppointmentResult<AppointmentDto>.Failure("Appointment not found.", 404);
         if (appointment.Status != AppointmentStatuses.Booked)
             return AppointmentResult<AppointmentDto>.Failure("Only booked appointments can be cancelled.", 409);
+        if (await db.QueueEntries.AnyAsync(x => x.AppointmentId == appointmentId, cancellationToken))
+            return AppointmentResult<AppointmentDto>.Failure("A checked-in appointment cannot be cancelled.", 409);
 
         appointment.Status = AppointmentStatuses.Cancelled;
         await db.SaveChangesAsync(cancellationToken);
