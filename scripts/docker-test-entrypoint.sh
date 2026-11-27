@@ -2,13 +2,12 @@
 set -euo pipefail
 
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-  dotnet nuget update source github \
-    --username "${GITHUB_ACTOR:-github-actions}" \
+      --username "${GITHUB_ACTOR:-github-actions}" \
     --password "$GITHUB_TOKEN" \
     --store-password-in-clear-text
 fi
 
-dotnet restore HeapCare.Api.slnx
+dotnet restore HeapCare.Api.slnx --configfile .ci-nuget.config
 dotnet tool restore
 dotnet build HeapCare.Api.slnx --configuration Release --no-restore
 dotnet ef migrations has-pending-model-changes \
