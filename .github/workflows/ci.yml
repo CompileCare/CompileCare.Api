@@ -28,7 +28,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      ConnectionStrings__CompileCareTests: Host=localhost;Port=5432;Database=compilecare_test;Username=postgres;Password=postgres
+      ConnectionStrings__HeapCareTests: Host=localhost;Port=5432;Database=compilecare_test;Username=postgres;Password=postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
