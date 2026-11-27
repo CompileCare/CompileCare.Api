@@ -267,6 +267,99 @@ public sealed class TenantMembershipApiTests
     }
 
     [Fact]
+    public async Task HospitalScopedAdministrator_ListsOnlyMembershipsWithinHospitalScope()
+    {
+        await _factory.SeedPlatformOperatorAsync();
+        using var platformClient = CreateClient(TestJwtTokenFactory.Subject);
+
+        var tenantId = await CreateTenantAsync(
+            platformClient, "Scoped membership list tenant", "scoped-membership-list");
+        var initialAdmin = await platformClient.PostAsJsonAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/initial-administrator",
+            new { issuer = TestJwtTokenFactory.Issuer, subject = "scoped-list-tenant-admin" });
+        Assert.Equal(HttpStatusCode.Created, initialAdmin.StatusCode);
+
+        var activate = await platformClient.PostAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/activate", content: null);
+        Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
+
+        using var tenantAdmin = CreateClient("scoped-list-tenant-admin", tenantId);
+        var hospitalA = await CreateHospitalAsync(tenantAdmin, "Scoped List Hospital A", "LIST-A");
+        var hospitalB = await CreateHospitalAsync(tenantAdmin, "Scoped List Hospital B", "LIST-B");
+        var departmentA = await CreateDepartmentAsync(tenantAdmin, hospitalA, "Scoped List Department A");
+
+        async Task<Guid> CreateMembershipAsync(
+            string subject,
+            string role,
+            object scope)
+        {
+            var response = await tenantAdmin.PostAsJsonAsync(
+                "/api/v1/tenant/memberships",
+                new
+                {
+                    issuer = TestJwtTokenFactory.Issuer,
+                    subject,
+                    role,
+                    scopes = new[] { scope }
+                });
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var membership = await response.Content.ReadFromJsonAsync<MembershipResponse>();
+            Assert.NotNull(membership);
+            return membership!.Id;
+        }
+
+        var hospitalMemberId = await CreateMembershipAsync(
+            "scoped-list-hospital-member",
+            TenantRoles.FacilityViewer,
+            new { scopeType = OrganizationScopeTypes.Hospital, hospitalId = hospitalA });
+        var departmentMemberId = await CreateMembershipAsync(
+            "scoped-list-department-member",
+            TenantRoles.ClinicalUser,
+            new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentA });
+        var otherHospitalMemberId = await CreateMembershipAsync(
+            "scoped-list-other-hospital-member",
+            TenantRoles.FacilityViewer,
+            new { scopeType = OrganizationScopeTypes.Hospital, hospitalId = hospitalB });
+        var tenantWideMemberId = await CreateMembershipAsync(
+            "scoped-list-tenant-wide-member",
+            TenantRoles.HospitalAdmin,
+            new { scopeType = OrganizationScopeTypes.Tenant });
+
+        var scopedAdminResponse = await tenantAdmin.PostAsJsonAsync(
+            "/api/v1/tenant/memberships",
+            new
+            {
+                issuer = TestJwtTokenFactory.Issuer,
+                subject = "scoped-list-hospital-admin",
+                role = TenantRoles.HospitalAdmin,
+                scopes = new[]
+                {
+                    new { scopeType = OrganizationScopeTypes.Hospital, hospitalId = hospitalA }
+                }
+            });
+        Assert.Equal(HttpStatusCode.Created, scopedAdminResponse.StatusCode);
+        var scopedAdmin = await scopedAdminResponse.Content.ReadFromJsonAsync<MembershipResponse>();
+        Assert.NotNull(scopedAdmin);
+
+        using var hospitalAdmin = CreateClient("scoped-list-hospital-admin", tenantId);
+        var response = await hospitalAdmin.GetAsync("/api/v1/tenant/memberships?page=1&pageSize=100");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        var items = root.GetProperty("items").EnumerateArray().ToArray();
+        var returnedIds = items.Select(item => item.GetProperty("id").GetGuid()).ToHashSet();
+
+        Assert.Equal(3, root.GetProperty("totalCount").GetInt32());
+        Assert.Equal(3, items.Length);
+        Assert.Contains(hospitalMemberId, returnedIds);
+        Assert.Contains(departmentMemberId, returnedIds);
+        Assert.Contains(scopedAdmin!.Id, returnedIds);
+        Assert.DoesNotContain(otherHospitalMemberId, returnedIds);
+        Assert.DoesNotContain(tenantWideMemberId, returnedIds);
+    }
+
+    [Fact]
     public async Task MembershipCreation_RejectsUnknownOrOutOfTenantOrganizationScope()
     {
         await _factory.SeedPlatformOperatorAsync();
