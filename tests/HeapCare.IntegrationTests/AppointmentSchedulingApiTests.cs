@@ -503,18 +503,35 @@ public sealed class AppointmentSchedulingApiTests
         var appointment = await booking.Content.ReadFromJsonAsync<AppointmentDto>();
         Assert.NotNull(appointment);
 
-        var first = await registrar.PostAsync(
-            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment!.Id:D}/check-in", null);
-        var second = await registrar.PostAsync(
-            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/check-in", null);
-        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
-        var firstEntry = await first.Content.ReadFromJsonAsync<QueueEntryDto>();
-        var secondEntry = await second.Content.ReadFromJsonAsync<QueueEntryDto>();
-        Assert.NotNull(firstEntry);
-        Assert.NotNull(secondEntry);
-        Assert.Equal(firstEntry!.Id, secondEntry!.Id);
-        Assert.Equal(firstEntry.TokenNumber, secondEntry.TokenNumber);
+        var checkInPath = $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment!.Id:D}/check-in";
+        // Simultaneous arrivals for the same appointment must serialize at the
+        // database boundary. Every caller should receive the one durable queue
+        // entry rather than allocating a second token or returning a conflict.
+        var concurrentResponses = await Task.WhenAll(
+            Enumerable.Range(0, 8).Select(_ => registrar.PostAsync(checkInPath, null)));
+        Assert.All(concurrentResponses, response =>
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+
+        var returnedEntries = await Task.WhenAll(
+            concurrentResponses.Select(response => response.Content.ReadFromJsonAsync<QueueEntryDto>()));
+        Assert.All(returnedEntries, entry => Assert.NotNull(entry));
+        var canonicalEntry = returnedEntries[0]!;
+        Assert.All(returnedEntries, entry =>
+        {
+            Assert.Equal(canonicalEntry.Id, entry!.Id);
+            Assert.Equal(canonicalEntry.TokenNumber, entry.TokenNumber);
+            Assert.Equal(canonicalEntry.Status, QueueEntryStatuses.Waiting);
+        });
+
+        using var verificationScope = _factory.Services.CreateScope();
+        verificationScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var persistedEntries = await verificationDb.QueueEntries.AsNoTracking()
+            .Where(entry => entry.AppointmentId == appointment.Id)
+            .ToListAsync();
+        var persistedEntry = Assert.Single(persistedEntries);
+        Assert.Equal(canonicalEntry.Id, persistedEntry.Id);
+        Assert.Equal(canonicalEntry.TokenNumber, persistedEntry.TokenNumber);
     }
 
     [Fact]
