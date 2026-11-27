@@ -40,6 +40,13 @@ public sealed class AppointmentQueueService(
     public async Task<AppointmentResult<QueueEntryDto>> CheckInAsync(
         Guid hospitalId, Guid appointmentId, CancellationToken cancellationToken)
     {
+        var tenantId = db.CurrentTenantId
+            ?? throw new InvalidOperationException("A tenant context is required to check in an appointment.");
+        var lifecycleLockKey = $"heapcare:appointment-lifecycle:{tenantId:N}:{hospitalId:N}:{appointmentId:N}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lifecycleLockKey}, 0))",
+            cancellationToken);
+
         var appointment = await db.Appointments.FirstOrDefaultAsync(
             x => x.Id == appointmentId && x.HospitalId == hospitalId, cancellationToken);
         if (appointment is null || !organizationScope.CanManageDepartment(hospitalId, appointment.DepartmentId))
