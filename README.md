@@ -1,6 +1,8 @@
-# CompileCare.Api
+# HeapCare API
 
-Tenant-aware modular backend for the CompileCare healthcare platform.
+> **Brand migration in progress:** HeapCare is the product brand. Repository names, .NET namespaces, package IDs, database identifiers, OIDC realm/client IDs, and deployment identifiers remain unchanged until their coordinated migration is implemented and validated. Do not infer that technical identifiers have already changed.
+
+Tenant-aware modular backend for the HeapCare healthcare platform.
 
 ## Architecture
 
