@@ -20,7 +20,7 @@ services:
       context: .
       dockerfile: Dockerfile.test
     environment:
-      ConnectionStrings__CompileCareTests: Host=postgres;Port=5432;Database=compilecare_test;Username=postgres;Password=postgres
+      ConnectionStrings__HeapCareTests: Host=postgres;Port=5432;Database=compilecare_test;Username=postgres;Password=postgres
       GITHUB_ACTOR: ${GITHUB_ACTOR:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     depends_on:
