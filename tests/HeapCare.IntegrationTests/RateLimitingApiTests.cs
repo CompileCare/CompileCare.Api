@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.RateLimiting;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 public sealed class RateLimitingApiTests
 {

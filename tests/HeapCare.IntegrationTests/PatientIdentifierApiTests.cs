@@ -1,15 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
@@ -181,7 +181,7 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
         // The tenant-B audit watermark excludes any earlier fixture or tenant setup events.
         using var auditBaselineScope = factory.Services.CreateScope();
         auditBaselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
-        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var existingAuditIds = await auditBaselineDb.AuditEvents.AsNoTracking()
             .Where(audit => audit.ActorSubject == tenantBAdminSubject)
             .Select(audit => audit.Id)
@@ -218,7 +218,7 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
 
         using var auditScope = factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvents = await auditDb.AuditEvents.AsNoTracking()
             .Where(audit => audit.ActorSubject == tenantBAdminSubject &&
                             !existingAuditIds.Contains(audit.Id))
@@ -265,7 +265,7 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
 
         if (!await db.Tenants.AnyAsync(x => x.Id == tenantId))
         {
@@ -307,7 +307,7 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var hospital = new Hospital { Name = name, Code = Guid.NewGuid().ToString("N")[..8] };
         db.Hospitals.Add(hospital);
         await db.SaveChangesAsync();
@@ -318,7 +318,7 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,

@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
-using CompileCare.Api.Middleware;
+using HeapCare.Api.Middleware;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class PlatformEndpointTests

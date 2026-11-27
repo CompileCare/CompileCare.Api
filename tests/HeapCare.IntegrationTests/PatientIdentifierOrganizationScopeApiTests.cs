@@ -1,15 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class PatientIdentifierOrganizationScopeApiTests(FacilityApiFactory factory)
@@ -81,7 +81,7 @@ public sealed class PatientIdentifierOrganizationScopeApiTests(FacilityApiFactor
         // Capture the audit watermark after all successful setup and allowed requests.
         using var auditBaselineScope = factory.Services.CreateScope();
         auditBaselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var scopedSubjects = new[] { hospitalAdminSubject, departmentAdminSubject };
         var existingAuditIds = await auditBaselineDb.AuditEvents.AsNoTracking()
             .Where(audit => scopedSubjects.Contains(audit.ActorSubject))
@@ -144,7 +144,7 @@ public sealed class PatientIdentifierOrganizationScopeApiTests(FacilityApiFactor
 
         using var auditScope = factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var rejectedAudits = await auditDb.AuditEvents.AsNoTracking()
             .Where(audit =>
                 !existingAuditIds.Contains(audit.Id) &&
@@ -181,7 +181,7 @@ public sealed class PatientIdentifierOrganizationScopeApiTests(FacilityApiFactor
     {
         using var scope = factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,

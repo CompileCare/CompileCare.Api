@@ -1,12 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class PlatformOperatorBootstrapTests
@@ -43,7 +43,7 @@ public sealed class PlatformOperatorBootstrapTests
             TestJwtTokenFactory.Issuer, TestJwtTokenFactory.Subject,
             "expected-secret", "wrong-secret", CancellationToken.None);
         Assert.True(invalid.InvalidSecret);
-        Assert.Empty(await scope.ServiceProvider.GetRequiredService<CompileCareDbContext>()
+        Assert.Empty(await scope.ServiceProvider.GetRequiredService<HeapCareDbContext>()
             .PlatformOperators.ToListAsync());
 
         var created = await service.BootstrapAsync(
@@ -58,7 +58,7 @@ public sealed class PlatformOperatorBootstrapTests
         Assert.True(secondIdentity.AlreadyInitialized);
         Assert.False(secondIdentity.Created);
 
-        var operators = await scope.ServiceProvider.GetRequiredService<CompileCareDbContext>()
+        var operators = await scope.ServiceProvider.GetRequiredService<HeapCareDbContext>()
             .PlatformOperators.ToListAsync();
         var platformOperator = Assert.Single(operators);
         Assert.Equal(TestJwtTokenFactory.Issuer, platformOperator.Issuer);
@@ -70,7 +70,7 @@ public sealed class PlatformOperatorBootstrapTests
     public async Task Bootstrap_ParticipatesInAmbientTransaction_AndRollsBackWithOwner()
     {
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var service = scope.ServiceProvider.GetRequiredService<IPlatformOperatorBootstrapService>();
 
         await using var transaction = await db.Database.BeginTransactionAsync();
