@@ -1,23 +1,23 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
-public sealed class CompileCareDbContextFactory : IDesignTimeDbContextFactory<CompileCareDbContext>
+public sealed class HeapCareDbContextFactory : IDesignTimeDbContextFactory<HeapCareDbContext>
 {
-    public CompileCareDbContext CreateDbContext(string[] args)
+    public HeapCareDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__CompileCare")
             ?? "Host=localhost;Database=compilecare;Username=compilecare;Password=compilecare";
 
-        var options = new DbContextOptionsBuilder<CompileCareDbContext>()
+        var options = new DbContextOptionsBuilder<HeapCareDbContext>()
             .UseNpgsql(connectionString)
             .Options;
 
-        return new CompileCareDbContext(options, new DesignTimeTenantContext());
+        return new HeapCareDbContext(options, new DesignTimeTenantContext());
     }
 
-    private sealed class DesignTimeTenantContext : CompileCare.Application.Tenancy.ITenantContext
+    private sealed class DesignTimeTenantContext : HeapCare.Application.Tenancy.ITenantContext
     {
         public Guid? TenantId => null;
         public void SetTenant(Guid tenantId) => throw new NotSupportedException("Design-time tenant context is not writable.");

@@ -1,4 +1,4 @@
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
 /// <summary>
 /// Append-only audit record. TenantId is populated only from the validated request

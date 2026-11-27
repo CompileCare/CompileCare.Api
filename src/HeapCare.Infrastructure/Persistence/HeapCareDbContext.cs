@@ -1,15 +1,15 @@
-using CompileCare.Application.Appointments;
-using CompileCare.Application.Billing;
-using CompileCare.Application.Clinical;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Staff;
-using CompileCare.Application.Tenancy;
+using HeapCare.Application.Appointments;
+using HeapCare.Application.Billing;
+using HeapCare.Application.Clinical;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Staff;
+using HeapCare.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
-public sealed class CompileCareDbContext(
-    DbContextOptions<CompileCareDbContext> options,
+public sealed class HeapCareDbContext(
+    DbContextOptions<HeapCareDbContext> options,
     ITenantContext tenantContext) : DbContext(options)
 {
     public Guid? CurrentTenantId => tenantContext.TenantId;
@@ -42,7 +42,7 @@ public sealed class CompileCareDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(CompileCareDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(HeapCareDbContext).Assembly);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
