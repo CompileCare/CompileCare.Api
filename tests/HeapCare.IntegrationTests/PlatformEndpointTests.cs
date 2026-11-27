@@ -65,6 +65,29 @@ public sealed class PlatformEndpointTests
     }
 
     [Fact]
+    public async Task PlatformTenantEndpoints_RejectTenantUserEvenWhenTokenClaimsPlatformOperator()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            HeapCare.Application.Tenancy.TenantRoles.HospitalAdmin);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestJwtTokenFactory.CreateToken(additionalClaims:
+            [
+                new System.Security.Claims.Claim("role", "PlatformOperator"),
+                new System.Security.Claims.Claim("platform_operator", "true"),
+                new System.Security.Claims.Claim("permission", "platform.tenants.manage")
+            ]));
+
+        var response = await client.GetAsync("/api/v1/platform/tenants/");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PlatformOperatorStatus_RequiresAuthentication()
     {
         using var client = _factory.CreateClient();
