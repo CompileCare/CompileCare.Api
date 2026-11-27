@@ -32,7 +32,7 @@ The first delivery is a **modular monolith** with explicit capability boundaries
 
 ## Database configuration
 
-Set `ConnectionStrings__CompileCare` through environment variables or a secret store. Do not commit credentials.
+Set `ConnectionStrings__HeapCare` through environment variables or a secret store. Do not commit credentials.
 
 Example local connection string:
 
@@ -57,7 +57,7 @@ dotnet ef database update --project src/HeapCare.Infrastructure --startup-projec
 dotnet ef migrations script --idempotent --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output artifacts/heapcare-migrations.sql
 ```
 
-The design-time factory supports `ConnectionStrings__CompileCare`; its local fallback is tooling-only. Never use it in production. Production deployments must review and apply a generated migration script through the release process after a verified backup. **The API does not run migrations automatically at startup.** Keep migration files and the model snapshot in source control; never edit a migration already applied to a shared environment. Integration tests recreate their dedicated `_test` database and apply migrations rather than using `EnsureCreated`.
+The design-time factory supports `ConnectionStrings__HeapCare`; its local fallback is tooling-only. Never use it in production. Production deployments must review and apply a generated migration script through the release process after a verified backup. **The API does not run migrations automatically at startup.** Keep migration files and the model snapshot in source control; never edit a migration already applied to a shared environment. Integration tests recreate their dedicated `_test` database and apply migrations rather than using `EnsureCreated`.
 
 ## Authentication and tenant authorization
 
@@ -163,7 +163,7 @@ dotnet test HeapCare.Api.slnx
 dotnet run --project src/HeapCare.Api
 ```
 
-The integration suite exercises the facility API against PostgreSQL. CI provisions this service automatically. For local runs, provide `ConnectionStrings__CompileCareTests` pointing to a dedicated test database whose name ends in `_test` (the default is `compilecare_test`). The integration test host deletes and recreates that database, and refuses to reset a database without the required suffix. Do not point it at a development, staging, or production database.
+The integration suite exercises the facility API against PostgreSQL. CI provisions this service automatically. For local runs, provide `ConnectionStrings__HeapCareTests` pointing to a dedicated test database whose name ends in `_test` (the default is `compilecare_test`). The integration test host deletes and recreates that database, and refuses to reset a database without the required suffix. Do not point it at a development, staging, or production database.
 
 Platform endpoints: `/`, `/health/live`, `/health/ready`, `/metrics`, `/api/v1/platform/context`, and (Development only) `/openapi/v1.json`.
 
