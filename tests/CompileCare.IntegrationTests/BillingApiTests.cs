@@ -121,6 +121,7 @@ public sealed class BillingApiTests
     }
 
     [Theory]
+    [InlineData(TenantRoles.FacilityManager)]
     [InlineData(TenantRoles.FacilityViewer)]
     [InlineData(TenantRoles.ClinicalUser)]
     public async Task RolesWithoutBillingGrants_CannotReadOrMutateBilling(

@@ -79,6 +79,7 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Theory]
+    [InlineData(TenantRoles.FacilityManager)]
     [InlineData(TenantRoles.FacilityViewer)]
     [InlineData(TenantRoles.ClinicalUser)]
     public async Task RolesWithoutSchedulingGrants_CannotReadAvailabilityOrBookAppointments(

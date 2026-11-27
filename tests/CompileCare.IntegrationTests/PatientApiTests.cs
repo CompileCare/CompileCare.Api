@@ -56,19 +56,24 @@ public sealed class PatientApiTests
         Assert.Empty(otherHospitalSearch!.Items);
     }
 
-    [Fact]
-    public async Task FacilityRoles_DoNotImplicitlyGrantPatientAccess()
+    [Theory]
+    [InlineData(TenantRoles.FacilityManager)]
+    [InlineData(TenantRoles.FacilityViewer)]
+    public async Task FacilityRoles_DoNotImplicitlyGrantPatientAccess(string role)
     {
         var tenantId = Guid.NewGuid();
-        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.FacilityManager);
+        await _factory.SeedTenantMembershipAsync(tenantId, role);
         var hospitalId = await SeedHospitalAsync(tenantId, "Restricted Hospital");
         using var client = CreateClient(tenantId);
 
-        var response = await client.PostAsJsonAsync(
+        var registration = await client.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/patients",
             new PatientRegistrationInput("No", null, "Access", null));
+        var search = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients?page=1&pageSize=10");
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, registration.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, search.StatusCode);
     }
 
     [Fact]
