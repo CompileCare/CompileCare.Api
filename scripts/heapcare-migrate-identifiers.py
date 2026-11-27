@@ -30,7 +30,6 @@ for path in ROOT.rglob("*"):
         continue
     try:
         raw = path.read_bytes()
-        bom = raw.startswith(b"\\xef\\xbb\\xbf")
         text = raw.decode("utf-8-sig")
     except (UnicodeDecodeError, OSError):
         continue
@@ -39,7 +38,7 @@ for path in ROOT.rglob("*"):
     # Keep existing connection-string key names working for deployed environments.
     updated = updated.replace(f"ConnectionStrings:{NEW}", f"ConnectionStrings:{OLD}")
     updated = updated.replace(f"ConnectionStrings__{NEW}", f"ConnectionStrings__{OLD}")
-    updated = updated.replace(f'GetConnectionString("{NEW}")', f'GetConnectionString("{OLD}")')
+    updated = updated.replace(f'GetConnectionString("{NEW}', f'GetConnectionString("{OLD}')
     # The GitHub owner and repository slugs remain unchanged until the admin rename.
     repo_names = ["Api", "ApiClient", "Caching", "Database", "Local", "Mobile", "Observability", "OtpService", "Site", "Web"]
     for suffix in repo_names:
@@ -47,6 +46,6 @@ for path in ROOT.rglob("*"):
         updated = updated.replace(f"{NEW}/{NEW}.{suffix}.git", f"{OLD}/{OLD}.{suffix}.git")
     updated = updated.replace(f"nuget.pkg.github.com/{NEW}", f"nuget.pkg.github.com/{OLD}")
     if updated != text:
-        path.write_bytes((b"\\xef\\xbb\\xbf" if bom else b"") + updated.encode("utf-8"))
+        path.write_text(updated, encoding="utf-8")
 
 print("HeapCare source/project identifier migration completed; legacy persistence and external identity contracts were preserved.")
