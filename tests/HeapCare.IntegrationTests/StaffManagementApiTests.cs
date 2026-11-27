@@ -1,15 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Staff;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Staff;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class StaffManagementApiTests
@@ -176,7 +176,7 @@ public sealed class StaffManagementApiTests
 
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         Assert.Equal(1, await db.StaffProfiles.AsNoTracking().CountAsync());
         Assert.Equal(1, await db.StaffAssignments.AsNoTracking().CountAsync());
 
@@ -236,7 +236,7 @@ public sealed class StaffManagementApiTests
         // The shared integration database may contain earlier audit rows for the same test subject.
         using var auditBaselineScope = _factory.Services.CreateScope();
         auditBaselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
-        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var existingAuditIds = await auditBaselineDb.AuditEvents.AsNoTracking()
             .Where(audit => audit.ActorSubject == TestJwtTokenFactory.Subject)
             .Select(audit => audit.Id)
@@ -269,7 +269,7 @@ public sealed class StaffManagementApiTests
 
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvents = await db.AuditEvents.AsNoTracking()
             .Where(audit => audit.ActorSubject == TestJwtTokenFactory.Subject &&
                             !existingAuditIds.Contains(audit.Id))
@@ -292,7 +292,7 @@ public sealed class StaffManagementApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,

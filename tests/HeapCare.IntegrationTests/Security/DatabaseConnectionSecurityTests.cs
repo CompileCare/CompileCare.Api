@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using CompileCare.Api.Security;
+using HeapCare.Api.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
-namespace CompileCare.IntegrationTests.Security;
+namespace HeapCare.IntegrationTests.Security;
 
 public sealed class DatabaseConnectionSecurityTests
 {
@@ -72,7 +72,7 @@ public sealed class DatabaseConnectionSecurityTests
         new TestHostEnvironment
         {
             EnvironmentName = environmentName,
-            ApplicationName = "CompileCare.Api",
+            ApplicationName = "HeapCare.Api",
             ContentRootPath = Directory.GetCurrentDirectory(),
             ContentRootFileProvider = new NullFileProvider()
         };

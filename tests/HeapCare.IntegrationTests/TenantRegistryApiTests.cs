@@ -1,15 +1,15 @@
 using System.Net;
 using System.Security.Claims;
-using CompileCare.Api.Security;
+using HeapCare.Api.Security;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class TenantRegistryApiTests
@@ -41,7 +41,7 @@ public sealed class TenantRegistryApiTests
         Assert.Equal(HttpStatusCode.Forbidden, deniedResponse.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var deniedEvents = await db.AuditEvents
             .Where(value => value.Action == "ListPlatformTenants")
             .OrderBy(value => value.StatusCode)
@@ -87,7 +87,7 @@ public sealed class TenantRegistryApiTests
         Assert.Contains(page!.Items, tenant => tenant.Id == created.Id);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var audit = await db.AuditEvents
             .Where(value => value.Action == "CreatePlatformTenant")
             .SingleAsync();
@@ -154,7 +154,7 @@ public sealed class TenantRegistryApiTests
         Assert.Equal(HttpStatusCode.Conflict, reopen.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var lifecycleAudits = await db.AuditEvents
             .Where(value => value.Action == "ActivatePlatformTenant" ||
                             value.Action == "SuspendPlatformTenant" ||
@@ -218,7 +218,7 @@ public sealed class TenantRegistryApiTests
         Assert.Equal(HttpStatusCode.Created, provision.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var audit = await db.AuditEvents
             .SingleAsync(value => value.Action == "CreateInitialTenantAdministrator");
 

@@ -2,14 +2,14 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class TenantMembershipApiTests
@@ -52,7 +52,7 @@ public sealed class TenantMembershipApiTests
             Assert.Single(statuses, status => status == HttpStatusCode.Conflict));
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var memberships = await db.TenantMemberships.IgnoreQueryFilters()
             .Where(value => value.TenantId == tenantId)
             .Include(value => value.Scopes)
@@ -174,7 +174,7 @@ public sealed class TenantMembershipApiTests
 
         using (var verifyScope = _factory.Services.CreateScope())
         {
-            var verifyDb = verifyScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var verifyDb = verifyScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             var persistedScope = await verifyDb.TenantMembershipScopes.IgnoreQueryFilters()
                 .SingleAsync(value => value.MembershipId == reassignMembership.Id);
             Assert.Equal(departmentB, persistedScope.DepartmentId);
@@ -354,7 +354,7 @@ public sealed class TenantMembershipApiTests
         using (var baselineScope = _factory.Services.CreateScope())
         {
             baselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-            var baselineDb = baselineScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var baselineDb = baselineScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             var existingAuditIds = await baselineDb.AuditEvents.IgnoreQueryFilters()
                 .Where(value => value.TenantId == tenantId &&
                                 value.ActorSubject == "membership-audit-admin")
@@ -495,7 +495,7 @@ public sealed class TenantMembershipApiTests
     private async Task<Guid> GetInitialAdminIdAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var membership = await db.TenantMemberships.IgnoreQueryFilters()
             .SingleAsync(value => value.TenantId == tenantId &&
                                   value.Subject == "tenant-admin");

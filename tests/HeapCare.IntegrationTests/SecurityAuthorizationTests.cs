@@ -1,16 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Api.Security;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Api.Security;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class SecurityAuthorizationTests
@@ -231,7 +231,7 @@ public sealed class SecurityAuthorizationTests
 
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var remainingHospitals = await db.Hospitals.AsNoTracking().CountAsync();
         var expectedRemaining = 1
             + (expectedCreateStatus == HttpStatusCode.Created ? 1 : 0)
@@ -262,7 +262,7 @@ public sealed class SecurityAuthorizationTests
         var tenantId = Guid.NewGuid();
         await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.FacilityViewer);
         // Simulate claims emitted by the configured identity provider. Only the
-        // CompileCare membership row is authoritative for tenant role/permissions.
+        // HeapCare membership row is authoritative for tenant role/permissions.
         using var client = CreateAuthenticatedClient(
             tenantId,
             new System.Security.Claims.Claim(AuthorizationPolicies.PermissionClaim, TenantPermissions.FacilityWrite),

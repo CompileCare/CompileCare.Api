@@ -4,9 +4,9 @@ using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
-using CompileCare.Api.Security;
+using HeapCare.Api.Security;
 
-namespace CompileCare.IntegrationTests.Security;
+namespace HeapCare.IntegrationTests.Security;
 
 public sealed class CorsOriginConfigurationTests
 {
@@ -101,7 +101,7 @@ public sealed class CorsOriginConfigurationTests
         new TestHostEnvironment
         {
             EnvironmentName = environmentName,
-            ApplicationName = "CompileCare.Api",
+            ApplicationName = "HeapCare.Api",
             ContentRootPath = Directory.GetCurrentDirectory(),
             ContentRootFileProvider = new NullFileProvider()
         };
