@@ -140,6 +140,89 @@ public sealed class PatientDuplicateDetectionApiTests
     }
 
     [Fact]
+    public async Task HospitalScopedHospitalAdmin_CanReviewDuplicatesOnlyWithinAssignedHospital_AndScopeDenialIsAudited()
+    {
+        var tenantId = Guid.NewGuid();
+        var (authorizedHospitalId, otherHospitalId) = await SeedTenantAndTwoHospitalsAsync(tenantId);
+        const string seedSubject = "duplicate-scope-seed-registrar";
+        const string scopedAdminSubject = "duplicate-scope-hospital-admin";
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar, subject: seedSubject);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, authorizedHospitalId)],
+            subject: scopedAdminSubject);
+
+        using var seedClient = CreateClient(tenantId, seedSubject);
+        using var scopedAdminClient = CreateClient(tenantId, scopedAdminSubject);
+
+        var authorizedPatient = await RegisterPatientAsync(
+            seedClient, authorizedHospitalId, "Asha", "R.", "Patil", new DateOnly(1990, 4, 12));
+        _ = await RegisterPatientAsync(
+            seedClient, otherHospitalId, "Asha", "R.", "Patil", new DateOnly(1990, 4, 12));
+
+        // Capture the scoped administrator's audit watermark after setup and before the
+        // allowed and denied duplicate-review requests under test.
+        using var auditBaselineScope = _factory.Services.CreateScope();
+        auditBaselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var existingAuditIds = await auditBaselineDb.AuditEvents.AsNoTracking()
+            .Where(audit => audit.ActorSubject == scopedAdminSubject)
+            .Select(audit => audit.Id)
+            .ToListAsync();
+
+        var allowed = await scopedAdminClient.PostAsJsonAsync(
+            $"/api/v1/hospitals/{authorizedHospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Asha", "R.", "Patil", new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        var allowedResult = await allowed.Content.ReadFromJsonAsync<PatientDuplicateCheckDto>();
+        Assert.NotNull(allowedResult);
+        var allowedCandidate = Assert.Single(allowedResult!.Candidates);
+        Assert.Equal(authorizedPatient.Id, allowedCandidate.PatientId);
+
+        var denied = await scopedAdminClient.PostAsJsonAsync(
+            $"/api/v1/hospitals/{otherHospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Asha", "R.", "Patil", new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
+        var deniedBody = await denied.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Asha", deniedBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("Patil", deniedBody, StringComparison.Ordinal);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var auditEvents = await auditDb.AuditEvents.AsNoTracking()
+            .Where(audit =>
+                audit.ActorSubject == scopedAdminSubject &&
+                !existingAuditIds.Contains(audit.Id))
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, auditEvents.Count);
+        Assert.Equal(
+            new[] { (int)HttpStatusCode.OK, (int)HttpStatusCode.NotFound },
+            auditEvents.Select(audit => audit.StatusCode).ToArray());
+        Assert.Equal(
+            new[] { "Succeeded", "Rejected" },
+            auditEvents.Select(audit => audit.Outcome).ToArray());
+        Assert.All(auditEvents, audit =>
+        {
+            Assert.Equal(tenantId, audit.TenantId);
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal(scopedAdminSubject, audit.ActorSubject);
+            Assert.Equal("FindPatientDuplicateCandidates", audit.Action);
+            Assert.Equal("Patients", audit.ResourceType);
+        });
+        Assert.Equal(authorizedHospitalId, auditEvents[0].ResourceId);
+        Assert.Equal(otherHospitalId, auditEvents[1].ResourceId);
+    }
+
+    [Fact]
     public async Task DuplicateCheck_BoundsCandidateResultToTwenty()
     {
         var tenantId = Guid.NewGuid();
