@@ -405,6 +405,118 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Fact]
+    public async Task AppointmentCancellationIsAuditedAndPreventsFurtherLifecycleActions()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        const string registrarSubject = "appointment-cancel-registrar";
+        const string clinicalSubject = "appointment-cancel-clinical";
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: registrarSubject);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.ClinicalUser,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: clinicalSubject);
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        using var registrar = CreateClient(tenantId, registrarSubject);
+        using var clinicalUser = CreateClient(tenantId, clinicalSubject);
+
+        var date = new DateOnly(2026, 12, 18);
+        var sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentId, providerId, date,
+                new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await registrar.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        Assert.Equal(2, slots!.Count);
+
+        var bookingResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, patientId, slots[0].StartsAtUtc, "Cancellation lifecycle"));
+        Assert.Equal(HttpStatusCode.Created, bookingResponse.StatusCode);
+        var appointment = await bookingResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(appointment);
+
+        var deniedCancellation = await clinicalUser.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment!.Id:D}/cancel", null);
+        Assert.Equal(HttpStatusCode.Forbidden, deniedCancellation.StatusCode);
+
+        var cancellation = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/cancel", null);
+        Assert.Equal(HttpStatusCode.OK, cancellation.StatusCode);
+        var cancelledAppointment = await cancellation.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(cancelledAppointment);
+        Assert.Equal(AppointmentStatuses.Cancelled, cancelledAppointment!.Status);
+        Assert.Equal(appointment.Id, cancelledAppointment.Id);
+
+        var duplicateCancellation = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/cancel", null);
+        Assert.Equal(HttpStatusCode.Conflict, duplicateCancellation.StatusCode);
+
+        var rescheduleCancelled = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/reschedule",
+            new AppointmentBookInput(session.Id, patientId, slots[1].StartsAtUtc, "Must not revive cancelled booking"));
+        Assert.Equal(HttpStatusCode.Conflict, rescheduleCancelled.StatusCode);
+
+        var checkInCancelled = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/check-in", null);
+        Assert.Equal(HttpStatusCode.Conflict, checkInCancelled.StatusCode);
+
+        var readBack = await registrar.GetFromJsonAsync<AppointmentDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}");
+        Assert.NotNull(readBack);
+        Assert.Equal(AppointmentStatuses.Cancelled, readBack!.Status);
+
+        var cancelledPage = await registrar.GetFromJsonAsync<AppointmentPage>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments?departmentId={departmentId:D}&date={date:yyyy-MM-dd}&status=Cancelled");
+        Assert.NotNull(cancelledPage);
+        Assert.Contains(cancelledPage!.Items, item => item.Id == appointment.Id);
+        Assert.DoesNotContain(cancelledPage.Items, item => item.Status != AppointmentStatuses.Cancelled);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var cancellationAudits = await auditDb.AuditEvents.AsNoTracking()
+            .Where(audit =>
+                audit.TenantId == tenantId &&
+                audit.ResourceType == "Appointments and scheduling" &&
+                audit.ResourceId == appointment.Id &&
+                audit.Action == "CancelAppointment")
+            .OrderBy(audit => audit.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(3, cancellationAudits.Count);
+        var successfulCancellation = Assert.Single(
+            cancellationAudits.Where(audit => audit.ActorSubject == registrarSubject && audit.Outcome == "Succeeded"));
+        Assert.Equal((int)HttpStatusCode.OK, successfulCancellation.StatusCode);
+        Assert.Equal(TestJwtTokenFactory.Issuer, successfulCancellation.ActorIssuer);
+        Assert.Equal(tenantId, successfulCancellation.RequestedTenantId);
+
+        var rejectedRepeat = Assert.Single(
+            cancellationAudits.Where(audit => audit.ActorSubject == registrarSubject && audit.Outcome == "Rejected"));
+        Assert.Equal((int)HttpStatusCode.Conflict, rejectedRepeat.StatusCode);
+        Assert.Equal(TestJwtTokenFactory.Issuer, rejectedRepeat.ActorIssuer);
+
+        var deniedByRole = Assert.Single(
+            cancellationAudits.Where(audit => audit.ActorSubject == clinicalSubject && audit.Outcome == "Rejected"));
+        Assert.Equal((int)HttpStatusCode.Forbidden, deniedByRole.StatusCode);
+        Assert.Equal(TestJwtTokenFactory.Issuer, deniedByRole.ActorIssuer);
+    }
+
+    [Fact]
     public async Task AvailabilityRejectsInvalidTimeZoneAndSlotDuration()
     {
         var tenantId = Guid.NewGuid();
