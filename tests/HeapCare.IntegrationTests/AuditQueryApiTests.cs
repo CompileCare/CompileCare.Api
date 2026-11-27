@@ -172,6 +172,31 @@ public sealed class AuditQueryApiTests
     }
 
     [Fact]
+    public async Task AuditQueryRejectsNonUtcOffsetsAndFutureEndTimes()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin);
+        using var client = CreateAuthenticatedClient(tenantId);
+
+        var localFrom = new DateTimeOffset(
+            DateTime.SpecifyKind(DateTime.UtcNow.AddHours(-2), DateTimeKind.Unspecified),
+            TimeSpan.FromHours(5.5));
+        var localTo = localFrom.AddHours(1);
+        var nonUtcQuery =
+            $"fromUtc={Uri.EscapeDataString(localFrom.ToString("O"))}" +
+            $"&toUtc={Uri.EscapeDataString(localTo.ToString("O"))}";
+        var nonUtcResponse = await client.GetAsync($"/api/v1/audit/events?{nonUtcQuery}");
+
+        var futureQuery = BuildQuery(
+            DateTimeOffset.UtcNow.AddHours(1),
+            DateTimeOffset.UtcNow.AddHours(2));
+        var futureResponse = await client.GetAsync($"/api/v1/audit/events?{futureQuery}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, nonUtcResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, futureResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task AuditQueryCannotReturnEventsFromAnotherTenant()
     {
         var firstTenantId = Guid.NewGuid();
