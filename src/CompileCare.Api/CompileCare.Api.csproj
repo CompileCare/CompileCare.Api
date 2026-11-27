@@ -3,8 +3,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="CompileCare.Observability" />
-    <PackageReference Include="CompileCare.Observability.AspNetCore" />
+    <PackageReference Include="HeapCare.Observability" />
+    <PackageReference Include="HeapCare.Observability.AspNetCore" />
     <PackageReference Include="Npgsql.OpenTelemetry" />
   </ItemGroup>
   <ItemGroup>
