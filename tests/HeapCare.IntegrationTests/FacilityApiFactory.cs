@@ -116,7 +116,7 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         await db.SaveChangesAsync();
     }
 
-    public async Task SeedPlatformOperatorAsync()
+    public async Task SeedPlatformOperatorAsync(bool isActive = true)
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
@@ -124,7 +124,7 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         {
             Issuer = TestJwtTokenFactory.Issuer,
             Subject = TestJwtTokenFactory.Subject,
-            IsActive = true
+            IsActive = isActive
         });
         await db.SaveChangesAsync();
     }
