@@ -15,7 +15,8 @@ namespace HeapCare.IntegrationTests;
 public sealed class FacilityApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString =
-        Environment.GetEnvironmentVariable("ConnectionStrings__CompileCareTests")
+        Environment.GetEnvironmentVariable("ConnectionStrings__HeapCareTests")
+        ?? Environment.GetEnvironmentVariable("ConnectionStrings__CompileCareTests")
         ?? "Host=localhost;Port=5432;Database=compilecare_test;Username=postgres;Password=postgres";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
