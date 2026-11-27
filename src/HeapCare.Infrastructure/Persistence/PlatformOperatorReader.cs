@@ -1,10 +1,10 @@
-using CompileCare.Application.Tenancy;
+using HeapCare.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
 /// <summary>Resolves platform privileges from persisted operator records, never token role claims.</summary>
-public sealed class PlatformOperatorReader(CompileCareDbContext db) : IPlatformOperatorReader
+public sealed class PlatformOperatorReader(HeapCareDbContext db) : IPlatformOperatorReader
 {
     public Task<bool> IsActiveAsync(string issuer, string subject, CancellationToken cancellationToken) =>
         db.PlatformOperators

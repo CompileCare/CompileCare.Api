@@ -4,14 +4,14 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace CompileCare.Infrastructure.Persistence.Migrations;
+namespace HeapCare.Infrastructure.Persistence.Migrations;
 
-[DbContext(typeof(CompileCareDbContext))]
+[DbContext(typeof(HeapCareDbContext))]
 [Migration("20261125124500_AddInvoiceSettlementStatuses")]
 public partial class AddInvoiceSettlementStatuses : Migration
 {
     protected override void BuildTargetModel(ModelBuilder modelBuilder) =>
-        CompileCareDbContextModelSnapshot.BuildModelForMigration(modelBuilder);
+        HeapCareDbContextModelSnapshot.BuildModelForMigration(modelBuilder);
 
     protected override void Up(MigrationBuilder migrationBuilder)
     {

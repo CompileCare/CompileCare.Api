@@ -1,6 +1,6 @@
-using CompileCare.Application.Clinical;
+using HeapCare.Application.Clinical;
 
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
 public sealed class OpdEncounter : TenantOwnedEntity
 {

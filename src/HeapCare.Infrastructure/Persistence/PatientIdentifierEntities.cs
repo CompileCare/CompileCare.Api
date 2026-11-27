@@ -1,4 +1,4 @@
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
 public static class PatientIdentifierTypes
 {

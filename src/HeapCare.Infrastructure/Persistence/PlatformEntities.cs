@@ -1,4 +1,4 @@
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
 /// <summary>Global platform-owned records. These are deliberately not tenant filtered.</summary>
 public interface IPlatformEntity
@@ -9,7 +9,7 @@ public interface IPlatformEntity
     Guid Version { get; set; }
 }
 
-/// <summary>Customer/contract boundary for CompileCare. A tenant may own one or more hospitals.</summary>
+/// <summary>Customer/contract boundary for HeapCare. A tenant may own one or more hospitals.</summary>
 public sealed class Tenant : IPlatformEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -21,7 +21,7 @@ public sealed class Tenant : IPlatformEntity
     public string Status { get; set; } = string.Empty;
 }
 
-/// <summary>A trusted CompileCare platform operator, keyed by a validated external OIDC identity.</summary>
+/// <summary>A trusted HeapCare platform operator, keyed by a validated external OIDC identity.</summary>
 public sealed class PlatformOperator : IPlatformEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();

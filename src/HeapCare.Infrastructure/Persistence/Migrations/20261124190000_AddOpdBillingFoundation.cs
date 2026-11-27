@@ -5,14 +5,14 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace CompileCare.Infrastructure.Persistence.Migrations;
+namespace HeapCare.Infrastructure.Persistence.Migrations;
 
-[DbContext(typeof(CompileCareDbContext))]
+[DbContext(typeof(HeapCareDbContext))]
 [Migration("20261124190000_AddOpdBillingFoundation")]
 public partial class AddOpdBillingFoundation : Migration
 {
     protected override void BuildTargetModel(ModelBuilder modelBuilder) =>
-        CompileCareDbContextModelSnapshot.BuildModelForMigration(modelBuilder);
+        HeapCareDbContextModelSnapshot.BuildModelForMigration(modelBuilder);
 
     protected override void Up(MigrationBuilder migrationBuilder)
     {
