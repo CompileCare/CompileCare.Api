@@ -1,10 +1,10 @@
-using CompileCare.Application.Facilities;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Facilities;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 public sealed class FacilityModelTests
 {
@@ -38,12 +38,12 @@ public sealed class FacilityModelTests
         Assert.Equal(5, result.TotalCount);
     }
 
-    private static CompileCareDbContext CreateContext()
+    private static HeapCareDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<CompileCareDbContext>()
+        var options = new DbContextOptionsBuilder<HeapCareDbContext>()
             .UseNpgsql("Host=localhost;Database=compilecare;Username=test;Password=test")
             .Options;
-        return new CompileCareDbContext(options, new TenantContext());
+        return new HeapCareDbContext(options, new TenantContext());
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class FacilityModelTests
         AssertTenantScopedRestrictiveRelationship<Bed, Room>(db, nameof(Bed.RoomId));
     }
 
-    private static void AssertTenantScopedRestrictiveRelationship<TChild, TParent>(CompileCareDbContext db, string parentIdProperty)
+    private static void AssertTenantScopedRestrictiveRelationship<TChild, TParent>(HeapCareDbContext db, string parentIdProperty)
         where TChild : TenantOwnedEntity
         where TParent : TenantOwnedEntity
     {

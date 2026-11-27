@@ -1,14 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class PatientApiTests
@@ -155,7 +155,7 @@ public sealed class PatientApiTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await auditDb.AuditEvents.AsNoTracking()
             .SingleAsync(item =>
                 item.TenantId == tenantId &&
@@ -199,7 +199,7 @@ public sealed class PatientApiTests
         using (var scope = _factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             var otherDepartment = new Department
             {
                 HospitalId = hospitalId, Name = "Neurology", Code = "NEUR"
@@ -283,7 +283,7 @@ public sealed class PatientApiTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var deniedPatientAudits = await auditDb.AuditEvents.AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId &&
@@ -309,7 +309,7 @@ public sealed class PatientApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,
@@ -338,7 +338,7 @@ public sealed class PatientApiTests
         using (var scope = _factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
-            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             var patient = new Patient
             {
                 GivenName = "Synthetic",
@@ -392,7 +392,7 @@ public sealed class PatientApiTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantA);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await auditDb.AuditEvents
             .AsNoTracking()
             .SingleAsync(item =>
@@ -411,7 +411,7 @@ public sealed class PatientApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,
@@ -435,7 +435,7 @@ public sealed class PatientApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var hospital = new Hospital { Name = name, Code = Guid.NewGuid().ToString("N")[..8] };
         db.Hospitals.Add(hospital);
         await db.SaveChangesAsync();

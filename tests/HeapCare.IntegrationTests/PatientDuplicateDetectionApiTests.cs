@@ -1,15 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class PatientDuplicateDetectionApiTests
@@ -262,7 +262,7 @@ public sealed class PatientDuplicateDetectionApiTests
         // Capture the tenant-B audit watermark after fixture setup and before the requests under test.
         using var auditBaselineScope = _factory.Services.CreateScope();
         auditBaselineScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
-        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditBaselineDb = auditBaselineScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var existingAuditIds = await auditBaselineDb.AuditEvents.AsNoTracking()
             .Where(audit => audit.ActorSubject == tenantBSubject)
             .Select(audit => audit.Id)
@@ -295,7 +295,7 @@ public sealed class PatientDuplicateDetectionApiTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvents = await auditDb.AuditEvents.AsNoTracking()
             .Where(audit => audit.ActorSubject == tenantBSubject &&
                             !existingAuditIds.Contains(audit.Id))
@@ -342,7 +342,7 @@ public sealed class PatientDuplicateDetectionApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var hospital = new Hospital { Name = name, Code = Guid.NewGuid().ToString("N")[..8] };
         db.Hospitals.Add(hospital);
         await db.SaveChangesAsync();
@@ -353,7 +353,7 @@ public sealed class PatientDuplicateDetectionApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,
@@ -381,7 +381,7 @@ public sealed class PatientDuplicateDetectionApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,

@@ -2,18 +2,18 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Appointments;
-using CompileCare.Application.Billing;
-using CompileCare.Application.Clinical;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Appointments;
+using HeapCare.Application.Billing;
+using HeapCare.Application.Clinical;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class OpdJourneyApiTests
@@ -205,7 +205,7 @@ public sealed class OpdJourneyApiTests
         // copying clinical note text or payment reference data into the audit record.
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvents = await auditDb.AuditEvents
             .AsNoTracking()
             .Where(item => item.TenantId == tenantId)
@@ -252,7 +252,7 @@ public sealed class OpdJourneyApiTests
         using (var scope = _factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             db.Departments.Add(new Department
             {
                 Id = unrelatedDepartmentId,
@@ -285,7 +285,7 @@ public sealed class OpdJourneyApiTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await auditDb.AuditEvents
             .AsNoTracking()
             .SingleAsync(item =>
@@ -304,7 +304,7 @@ public sealed class OpdJourneyApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
 
         db.Tenants.Add(new Tenant
         {

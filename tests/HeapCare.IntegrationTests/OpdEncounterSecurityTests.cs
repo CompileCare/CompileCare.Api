@@ -1,16 +1,16 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Appointments;
-using CompileCare.Application.Clinical;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Appointments;
+using HeapCare.Application.Clinical;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class OpdEncounterSecurityTests
@@ -108,7 +108,7 @@ public sealed class OpdEncounterSecurityTests
 
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var events = await db.AuditEvents.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.ResourceType == "OPD encounters")
             .ToListAsync();
@@ -138,7 +138,7 @@ public sealed class OpdEncounterSecurityTests
         using (var scope = _factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             var hospital = new Hospital { Name = "Second OPD Hospital", Code = Guid.NewGuid().ToString("N")[..8] };
             db.Hospitals.Add(hospital);
             await db.SaveChangesAsync();
@@ -237,7 +237,7 @@ public sealed class OpdEncounterSecurityTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var deniedEncounterAudits = await auditDb.AuditEvents.AsNoTracking()
             .Where(audit =>
                 audit.TenantId == tenantId &&
@@ -271,7 +271,7 @@ public sealed class OpdEncounterSecurityTests
         using (var seedScope = _factory.Services.CreateScope())
         {
             seedScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-            var db = seedScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var db = seedScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             var department = new Department
             {
                 HospitalId = hospitalId,
@@ -362,7 +362,7 @@ public sealed class OpdEncounterSecurityTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var deniedEncounterAudits = await auditDb.AuditEvents.AsNoTracking()
             .Where(audit =>
                 audit.TenantId == tenantId &&
@@ -484,7 +484,7 @@ public sealed class OpdEncounterSecurityTests
 
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantB);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvents = await db.AuditEvents.AsNoTracking()
             .Where(audit => audit.ActorSubject == clinicianB)
             .OrderBy(audit => audit.OccurredAtUtc)
@@ -514,7 +514,7 @@ public sealed class OpdEncounterSecurityTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId,
