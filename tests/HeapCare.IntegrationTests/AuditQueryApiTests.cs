@@ -213,6 +213,55 @@ public sealed class AuditQueryApiTests
         Assert.Contains("\"'\t=HYPERLINK", csv, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task AuditQueryPaginationUsesStableIdTieBreakerForIdenticalTimestamps()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin);
+        var occurredAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        var expectedIds = new[]
+        {
+            Guid.Parse("00000000-0000-0000-0000-000000000003"),
+            Guid.Parse("00000000-0000-0000-0000-000000000002"),
+            Guid.Parse("00000000-0000-0000-0000-000000000001")
+        };
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+            db.AuditEvents.AddRange(expectedIds.Select(id => new AuditEvent
+            {
+                Id = id,
+                TenantId = tenantId,
+                Action = "StablePagination",
+                ResourceType = "Test",
+                HttpMethod = "GET",
+                RouteTemplate = "/test",
+                Outcome = "Succeeded",
+                StatusCode = (int)HttpStatusCode.OK,
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                OccurredAtUtc = occurredAt
+            }));
+            await db.SaveChangesAsync();
+        }
+
+        using var client = CreateAuthenticatedClient(tenantId);
+        var query = BuildQuery(occurredAt.AddMinutes(-1), occurredAt.AddMinutes(1));
+        var firstResponse = await client.GetAsync($"/api/v1/audit/events?{query}&page=1&pageSize=2");
+        var secondResponse = await client.GetAsync($"/api/v1/audit/events?{query}&page=2&pageSize=2");
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        var firstPage = await firstResponse.Content.ReadFromJsonAsync<AuditEventPage>();
+        var secondPage = await secondResponse.Content.ReadFromJsonAsync<AuditEventPage>();
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+        Assert.Equal(3, firstPage!.TotalCount);
+        Assert.Equal(expectedIds.Take(2), firstPage.Items.Select(item => item.Id));
+        Assert.Equal(expectedIds.Skip(2), secondPage!.Items.Select(item => item.Id));
+    }
+
     private async Task SeedHospitalAsync(Guid tenantId, Guid hospitalId)
     {
         using var scope = _factory.Services.CreateScope();
