@@ -26,7 +26,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("CompileCare");
+        var connectionString = configuration.GetConnectionString("HeapCare") ?? configuration.GetConnectionString("CompileCare");
         services.AddDbContext<HeapCareDbContext>(options =>
         {
             if (!string.IsNullOrWhiteSpace(connectionString))
