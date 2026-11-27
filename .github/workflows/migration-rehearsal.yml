@@ -50,13 +50,13 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: CompileCare/CompileCare.Observability
+          repository: HeapCare/HeapCare.Observability
           ref: main
           path: HeapCare.Observability
 
       - uses: actions/checkout@v4
         with:
-          repository: CompileCare/CompileCare.Observability
+          repository: HeapCare/HeapCare.Observability
           ref: 935f6629d5abb92296385ec2e0c1ec04060b3fb7
           path: CompileCare.Observability.Legacy
 
@@ -74,12 +74,12 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/.ci-nuget"
           dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
           dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
-          cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<'EOF'
+          cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<EOF
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
             <packageSources>
               <clear />
-              <add key="heapcare-ci" value=".ci-nuget" />
+              <add key="heapcare-ci" value="$GITHUB_WORKSPACE/.ci-nuget" />
               <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
             </packageSources>
             <packageSourceMapping>
@@ -128,22 +128,39 @@ jobs:
           set -euo pipefail
           git fetch origin "$BASE_SHA"
           git worktree add /tmp/heapcare-base "$BASE_SHA"
-          cp "$GITHUB_WORKSPACE/.legacy-nuget.config" /tmp/heapcare-base/NuGet.Config
+          if [[ -f /tmp/heapcare-base/HeapCare.Api.slnx ]]; then
+            cp "$GITHUB_WORKSPACE/.ci-nuget.config" /tmp/heapcare-base/NuGet.Config
+          else
+            cp "$GITHUB_WORKSPACE/.legacy-nuget.config" /tmp/heapcare-base/NuGet.Config
+          fi
 
       - name: Restore and build base revision
         working-directory: /tmp/heapcare-base
         run: |
-          dotnet restore CompileCare.Api.slnx --configfile NuGet.Config
-          dotnet tool restore --configfile NuGet.Config
-          dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+          if [[ -f HeapCare.Api.slnx ]]; then
+            dotnet restore HeapCare.Api.slnx --configfile NuGet.Config
+            dotnet tool restore --configfile NuGet.Config
+            dotnet build HeapCare.Api.slnx --configuration Release --no-restore
+          else
+            dotnet restore CompileCare.Api.slnx --configfile NuGet.Config
+            dotnet tool restore --configfile NuGet.Config
+            dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+          fi
 
       - name: Apply base migrations to the upgrade database
         working-directory: /tmp/heapcare-base
         run: |
-          dotnet ef database update \
-            --project src/CompileCare.Infrastructure \
-            --startup-project src/CompileCare.Api \
-            --context CompileCareDbContext
+          if [[ -f HeapCare.Api.slnx ]]; then
+            dotnet ef database update \
+              --project src/HeapCare.Infrastructure \
+              --startup-project src/HeapCare.Api \
+              --context HeapCareDbContext
+          else
+            dotnet ef database update \
+              --project src/CompileCare.Infrastructure \
+              --startup-project src/CompileCare.Api \
+              --context CompileCareDbContext
+          fi
 
       - name: Restore and build pull request revision
         run: |
