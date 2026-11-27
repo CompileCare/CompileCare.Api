@@ -21,8 +21,6 @@ services:
       dockerfile: Dockerfile.test
     environment:
       ConnectionStrings__HeapCareTests: Host=postgres;Port=5432;Database=heapcare_test;Username=postgres;Password=postgres
-      GITHUB_ACTOR: ${GITHUB_ACTOR:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
