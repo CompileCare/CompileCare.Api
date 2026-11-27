@@ -1,5 +1,5 @@
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 public sealed class FacilityApiFactory : WebApplicationFactory<Program>
 {
@@ -30,8 +30,8 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
             }));
         builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<DbContextOptions<CompileCareDbContext>>();
-            services.AddDbContext<CompileCareDbContext>(
+            services.RemoveAll<DbContextOptions<HeapCareDbContext>>();
+            services.AddDbContext<HeapCareDbContext>(
                 options => options.UseNpgsql(_connectionString));
 
             // Keep the real JwtBearer handler and issuer-stamping event. Only replace
@@ -78,7 +78,7 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
         var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
         tenantContext.SetTenant(tenantId);
 
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var tenantExists = await db.Tenants.AnyAsync(value => value.Id == tenantId);
         if (!tenantExists)
         {
@@ -118,7 +118,7 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
     public async Task SeedPlatformOperatorAsync()
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.PlatformOperators.Add(new PlatformOperator
         {
             Issuer = TestJwtTokenFactory.Issuer,
@@ -131,7 +131,7 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
     public void ResetDatabase()
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var databaseName = db.Database.GetDbConnection().Database;
 
         if (!databaseName.EndsWith("_test", StringComparison.OrdinalIgnoreCase))

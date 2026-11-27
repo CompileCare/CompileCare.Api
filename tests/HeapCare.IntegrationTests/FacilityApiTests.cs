@@ -1,14 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class FacilityApiTests
@@ -243,13 +243,13 @@ public sealed class FacilityApiTests
         using var firstScope = _factory.Services.CreateScope();
         var firstTenant = firstScope.ServiceProvider.GetRequiredService<ITenantContext>();
         firstTenant.SetTenant(tenantId);
-        var firstDb = firstScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var firstDb = firstScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var firstCopy = await firstDb.Hospitals.SingleAsync(hospital => hospital.Id == hospitalId);
 
         using var secondScope = _factory.Services.CreateScope();
         var secondTenant = secondScope.ServiceProvider.GetRequiredService<ITenantContext>();
         secondTenant.SetTenant(tenantId);
-        var secondDb = secondScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var secondDb = secondScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var staleCopy = await secondDb.Hospitals.SingleAsync(hospital => hospital.Id == hospitalId);
 
         var originalVersion = firstCopy.Version;
@@ -268,7 +268,7 @@ public sealed class FacilityApiTests
         using var invalidScope = _factory.Services.CreateScope();
         var invalidTenant = invalidScope.ServiceProvider.GetRequiredService<ITenantContext>();
         invalidTenant.SetTenant(tenantId);
-        var invalidDb = invalidScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var invalidDb = invalidScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         invalidDb.Hospitals.Add(new Hospital
         {
             TenantId = Guid.NewGuid(),
@@ -287,7 +287,7 @@ public sealed class FacilityApiTests
         using var scope = _factory.Services.CreateScope();
         var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
         tenantContext.SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
 
         db.Tenants.Add(new Tenant
         {

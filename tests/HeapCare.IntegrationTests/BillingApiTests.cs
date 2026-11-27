@@ -1,15 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Billing;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Billing;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class BillingApiTests
@@ -183,7 +183,7 @@ public sealed class BillingApiTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var deniedAudits = await auditDb.AuditEvents.AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId &&
@@ -253,7 +253,7 @@ public sealed class BillingApiTests
         using (var scope = _factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             var unrelatedDepartment = new Department
             {
                 HospitalId = hospitalId, Name = "Neurology", Code = "NEUR"
@@ -277,7 +277,7 @@ public sealed class BillingApiTests
 
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var auditDb = auditScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var deniedBillingAudits = await auditDb.AuditEvents.AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId &&
@@ -362,7 +362,7 @@ public sealed class BillingApiTests
         });
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvents = await db.AuditEvents
             .Where(audit => audit.ActorSubject == "billing-tenant-b-cashier")
             .OrderBy(audit => audit.OccurredAtUtc)
@@ -446,7 +446,7 @@ public sealed class BillingApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Tenants.Add(new Tenant
         {
             Id = tenantId, Name = "Billing test tenant", Slug = $"billing-{tenantId:N}",

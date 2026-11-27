@@ -1,15 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class AuditFailureRollbackTests
@@ -33,7 +33,7 @@ public sealed class AuditFailureRollbackTests
         // fails only when the middleware attempts to persist the audit event.
         using (var scope = _factory.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             await db.Database.ExecuteSqlRawAsync("""
                 CREATE FUNCTION reject_audit_event_insert() RETURNS trigger AS $$
                 BEGIN
@@ -67,7 +67,7 @@ public sealed class AuditFailureRollbackTests
 
         using var verificationScope = _factory.Services.CreateScope();
         verificationScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
 
         Assert.False(await verificationDb.Patients.AnyAsync(patient =>
             patient.GivenName == "Synthetic" && patient.FamilyName == "Rollback"));
@@ -80,7 +80,7 @@ public sealed class AuditFailureRollbackTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var hospital = new Hospital
         {
             Name = "Audit rollback test hospital",

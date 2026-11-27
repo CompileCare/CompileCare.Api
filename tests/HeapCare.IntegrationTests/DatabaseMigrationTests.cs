@@ -1,12 +1,12 @@
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
@@ -17,7 +17,7 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
         factory.ResetDatabase();
 
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
 
         var appliedMigrations = await db.Database.GetAppliedMigrationsAsync();
         var pendingMigrations = await db.Database.GetPendingMigrationsAsync();
@@ -46,7 +46,7 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
     public async Task TenantRegistryMigration_BackfillsExistingTenantMemberships()
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var databaseName = db.Database.GetDbConnection().Database;
 
         if (!databaseName.EndsWith("_test", StringComparison.OrdinalIgnoreCase))
@@ -93,7 +93,7 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
     public async Task TenantMembershipScopeMigration_BackfillsLegacyMembershipsAsTenantWide()
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var databaseName = db.Database.GetDbConnection().Database;
 
         if (!databaseName.EndsWith("_test", StringComparison.OrdinalIgnoreCase))
@@ -149,7 +149,7 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
         factory.ResetDatabase();
 
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
 
         var appliedBefore = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
 

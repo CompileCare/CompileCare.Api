@@ -6,5 +6,5 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
-  <ItemGroup><ProjectReference Include="../../src/CompileCare.Api/CompileCare.Api.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../src/HeapCare.Api/HeapCare.Api.csproj" /></ItemGroup>
 </Project>

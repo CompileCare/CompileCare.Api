@@ -1,13 +1,13 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Auditing;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Auditing;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class AuditQueryApiTests
@@ -217,7 +217,7 @@ public sealed class AuditQueryApiTests
         using var scope = _factory.Services.CreateScope();
         var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
         tenantContext.SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         db.Hospitals.Add(new Hospital
         {
             Id = hospitalId,
@@ -232,7 +232,7 @@ public sealed class AuditQueryApiTests
     {
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var department = new Department
         {
             HospitalId = hospitalId,
