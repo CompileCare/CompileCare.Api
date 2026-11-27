@@ -515,7 +515,7 @@ public sealed class AppointmentSchedulingApiTests
         Assert.Equal(TestJwtTokenFactory.Issuer, rejectedRepeat.ActorIssuer);
 
         var deniedByRole = Assert.Single(
-            cancellationAudits, audit => audit.ActorSubject == clinicalSubject && audit.Outcome == "Rejected");
+            cancellationAudits, audit => audit.ActorSubject == clinicalSubject && audit.Outcome == "Denied");
         Assert.Equal((int)HttpStatusCode.Forbidden, deniedByRole.StatusCode);
         Assert.Equal(TestJwtTokenFactory.Issuer, deniedByRole.ActorIssuer);
 
