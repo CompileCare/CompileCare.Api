@@ -322,6 +322,27 @@ public sealed class AuditQueryApiTests
         Assert.Contains("\"' \t=1+1\"", csv, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task CsvExportQuotesAndEscapesCommasQuotesAndEmbeddedNewlines()
+    {
+        var tenantId = Guid.NewGuid();
+        const string exporter = "audit-csv-quoted-exporter";
+        const string subject = "Asha, \"R.\"\nPatil";
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin, subject: exporter);
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin, subject: subject);
+
+        using var actor = CreateAuthenticatedClient(tenantId, subject);
+        Assert.Equal(HttpStatusCode.OK, (await actor.GetAsync("/api/v1/hospitals")).StatusCode);
+
+        using var exportClient = CreateAuthenticatedClient(tenantId, exporter);
+        var query = BuildQuery(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(1));
+        var response = await exportClient.GetAsync($"/api/v1/audit/events/export?{query}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var csv = await response.Content.ReadAsStringAsync();
+        Assert.Contains("\"Asha, \"\"R.\"\"\nPatil\"", csv, StringComparison.Ordinal);
+    }
+
     private async Task SeedHospitalAsync(Guid tenantId, Guid hospitalId)
     {
         using var scope = _factory.Services.CreateScope();
