@@ -119,6 +119,84 @@ public sealed class StaffManagementApiTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData(TenantRoles.FacilityManager)]
+    [InlineData(TenantRoles.FacilityViewer)]
+    [InlineData(TenantRoles.PatientRegistrar)]
+    [InlineData(TenantRoles.ClinicalUser)]
+    public async Task RolesWithoutStaffGrants_CannotReadOrMutateProfilesOrAssignments(
+        string role)
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId) = await SeedHospitalAndDepartmentAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "staff-role-admin");
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, role,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "staff-role-restricted");
+
+        using var admin = CreateClient(tenantId, "staff-role-admin");
+        using var restricted = CreateClient(tenantId, "staff-role-restricted");
+
+        var create = await admin.PostAsJsonAsync("/api/v1/staff", new StaffProfileCreateInput(
+            "STAFF-ROLE-001", "Asha", "R.", "Patil", "Consultant",
+            hospitalId, departmentId, new DateOnly(2026, 1, 1)));
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var profile = await create.Content.ReadFromJsonAsync<StaffProfileDto>();
+        Assert.NotNull(profile);
+        var assignment = Assert.Single(profile!.Assignments);
+
+        var list = await restricted.GetAsync("/api/v1/staff");
+        var read = await restricted.GetAsync($"/api/v1/staff/{profile.Id:D}");
+        var update = await restricted.PutAsJsonAsync(
+            $"/api/v1/staff/{profile.Id:D}",
+            new StaffProfileUpdateInput("Unauthorized", null, "Change", "Unauthorized"));
+        var deactivate = await restricted.PostAsync($"/api/v1/staff/{profile.Id:D}/deactivate", null);
+        var addAssignment = await restricted.PostAsJsonAsync(
+            $"/api/v1/staff/{profile.Id:D}/assignments",
+            new StaffAssignmentInput(hospitalId, null, new DateOnly(2026, 3, 1)));
+        var endAssignment = await restricted.PostAsJsonAsync(
+            $"/api/v1/staff/{profile.Id:D}/assignments/{assignment.Id:D}/end",
+            new StaffAssignmentEndInput(new DateOnly(2026, 8, 31)));
+
+        Assert.All(
+            new[] { list, read, update, deactivate, addAssignment, endAssignment },
+            response => Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode));
+
+        var unchanged = await admin.GetFromJsonAsync<StaffProfileDto>(
+            $"/api/v1/staff/{profile.Id:D}");
+        Assert.NotNull(unchanged);
+        Assert.Equal("Asha", unchanged!.GivenName);
+        Assert.Equal("Patil", unchanged.FamilyName);
+        Assert.True(unchanged.IsActive);
+        Assert.Single(unchanged.Assignments);
+
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        Assert.Equal(1, await db.StaffProfiles.AsNoTracking().CountAsync());
+        Assert.Equal(1, await db.StaffAssignments.AsNoTracking().CountAsync());
+
+        var deniedAudits = await db.AuditEvents.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ActorSubject == "staff-role-restricted" &&
+                item.ResourceType == "Staff" &&
+                item.Outcome == "Denied")
+            .ToListAsync();
+        Assert.Equal(6, deniedAudits.Count);
+        Assert.All(deniedAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal("staff-role-restricted", audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.Forbidden, audit.StatusCode);
+        });
+    }
+
     [Fact]
     public async Task CrossTenantAdminCannotDiscoverReadOrMutateStaffProfilesAndAssignments()
     {
@@ -234,11 +312,11 @@ public sealed class StaffManagementApiTests
         return (hospital.Id, department.Id);
     }
 
-    private HttpClient CreateClient(Guid tenantId)
+    private HttpClient CreateClient(Guid tenantId, string subject = TestJwtTokenFactory.Subject)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+            new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken(subject));
         client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantId.ToString("D"));
         return client;
     }
