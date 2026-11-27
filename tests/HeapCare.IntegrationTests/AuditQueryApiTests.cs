@@ -222,6 +222,38 @@ public sealed class AuditQueryApiTests
     }
 
     [Fact]
+    public async Task AuditExportCannotReturnEventsFromAnotherTenant()
+    {
+        var firstTenantId = Guid.NewGuid();
+        var secondTenantId = Guid.NewGuid();
+        const string firstTenantSubject = "audit-export-first-tenant";
+        const string secondTenantSubject = "audit-export-second-tenant";
+
+        await _factory.SeedTenantMembershipAsync(
+            firstTenantId, TenantRoles.HospitalAdmin, subject: firstTenantSubject);
+        await _factory.SeedTenantMembershipAsync(
+            secondTenantId, TenantRoles.HospitalAdmin, subject: secondTenantSubject);
+
+        using var firstClient = CreateAuthenticatedClient(firstTenantId, firstTenantSubject);
+        using var secondClient = CreateAuthenticatedClient(secondTenantId, secondTenantSubject);
+
+        Assert.Equal(HttpStatusCode.OK, (await firstClient.GetAsync("/api/v1/hospitals")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await secondClient.GetAsync("/api/v1/hospitals")).StatusCode);
+
+        var fromUtc = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var toUtc = DateTimeOffset.UtcNow.AddMinutes(1);
+        var response = await firstClient.GetAsync(
+            $"/api/v1/audit/events/export?{BuildQuery(fromUtc, toUtc)}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
+
+        var csv = await response.Content.ReadAsStringAsync();
+        Assert.Contains(firstTenantSubject, csv, StringComparison.Ordinal);
+        Assert.DoesNotContain(secondTenantSubject, csv, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CsvExportNeutralizesSpreadsheetFormulaValues()
     {
         const string subject = "\t=HYPERLINK(\"https://example.invalid\",\"open\")";
