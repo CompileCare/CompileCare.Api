@@ -285,12 +285,28 @@ public sealed class AppointmentSchedulingService(
     public async Task<AppointmentResult<AppointmentDto>> CancelAsync(
         Guid hospitalId, Guid appointmentId, CancellationToken cancellationToken)
     {
+        var candidate = await db.Appointments.AsNoTracking().FirstOrDefaultAsync(
+            x => x.Id == appointmentId && x.HospitalId == hospitalId, cancellationToken);
+        if (candidate is null || !organizationScope.CanManageDepartment(hospitalId, candidate.DepartmentId))
+            return AppointmentResult<AppointmentDto>.Failure("Appointment not found.", 404);
+
+        var tenantId = db.CurrentTenantId
+            ?? throw new InvalidOperationException("A tenant context is required to cancel an appointment.");
+        var lifecycleLockKey = $"heapcare:appointment-lifecycle:{tenantId:N}:{hospitalId:N}:{appointmentId:N}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lifecycleLockKey}, 0))",
+            cancellationToken);
+
+        // Re-read under the shared lifecycle lock: a concurrent check-in or
+        // reschedule must finish before cancellation evaluates the current state.
         var appointment = await db.Appointments.FirstOrDefaultAsync(
             x => x.Id == appointmentId && x.HospitalId == hospitalId, cancellationToken);
         if (appointment is null || !organizationScope.CanManageDepartment(hospitalId, appointment.DepartmentId))
             return AppointmentResult<AppointmentDto>.Failure("Appointment not found.", 404);
         if (appointment.Status != AppointmentStatuses.Booked)
             return AppointmentResult<AppointmentDto>.Failure("Only booked appointments can be cancelled.", 409);
+        if (await db.QueueEntries.AnyAsync(x => x.AppointmentId == appointmentId, cancellationToken))
+            return AppointmentResult<AppointmentDto>.Failure("A checked-in appointment cannot be cancelled.", 409);
 
         appointment.Status = AppointmentStatuses.Cancelled;
         await db.SaveChangesAsync(cancellationToken);

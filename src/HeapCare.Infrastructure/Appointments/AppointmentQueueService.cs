@@ -14,6 +14,18 @@ public sealed class AppointmentQueueService(
     public async Task<AppointmentResult<AppointmentDto>> RescheduleAsync(
         Guid hospitalId, Guid appointmentId, AppointmentBookInput input, CancellationToken cancellationToken)
     {
+        var candidate = await db.Appointments.AsNoTracking().FirstOrDefaultAsync(
+            x => x.Id == appointmentId && x.HospitalId == hospitalId, cancellationToken);
+        if (candidate is null || !organizationScope.CanManageDepartment(hospitalId, candidate.DepartmentId))
+            return AppointmentResult<AppointmentDto>.Failure("Appointment not found.", 404);
+
+        var tenantId = db.CurrentTenantId
+            ?? throw new InvalidOperationException("A tenant context is required to reschedule an appointment.");
+        var lifecycleLockKey = $"heapcare:appointment-lifecycle:{tenantId:N}:{hospitalId:N}:{appointmentId:N}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lifecycleLockKey}, 0))",
+            cancellationToken);
+
         var current = await db.Appointments.FirstOrDefaultAsync(
             x => x.Id == appointmentId && x.HospitalId == hospitalId, cancellationToken);
         if (current is null || !organizationScope.CanManageDepartment(hospitalId, current.DepartmentId))
@@ -40,6 +52,21 @@ public sealed class AppointmentQueueService(
     public async Task<AppointmentResult<QueueEntryDto>> CheckInAsync(
         Guid hospitalId, Guid appointmentId, CancellationToken cancellationToken)
     {
+        var candidate = await db.Appointments.AsNoTracking().FirstOrDefaultAsync(
+            x => x.Id == appointmentId && x.HospitalId == hospitalId, cancellationToken);
+        if (candidate is null || !organizationScope.CanManageDepartment(hospitalId, candidate.DepartmentId))
+            return AppointmentResult<QueueEntryDto>.Failure("Appointment not found.", 404);
+
+        var tenantId = db.CurrentTenantId
+            ?? throw new InvalidOperationException("A tenant context is required to check in an appointment.");
+        var lifecycleLockKey = $"heapcare:appointment-lifecycle:{tenantId:N}:{hospitalId:N}:{appointmentId:N}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lifecycleLockKey}, 0))",
+            cancellationToken);
+
+        // Re-read after acquiring the shared lifecycle lock so the status and
+        // queue-entry checks observe any cancellation/reschedule that committed
+        // while this request waited for the lock.
         var appointment = await db.Appointments.FirstOrDefaultAsync(
             x => x.Id == appointmentId && x.HospitalId == hospitalId, cancellationToken);
         if (appointment is null || !organizationScope.CanManageDepartment(hospitalId, appointment.DepartmentId))
