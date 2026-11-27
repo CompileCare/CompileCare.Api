@@ -45,3 +45,29 @@ jobs:
       - name: Detect pending EF Core model changes
         run: dotnet ef migrations has-pending-model-changes --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
       - run: dotnet test CompileCare.Api.slnx --configuration Release --no-build
+
+  heapcare-identifier-migration:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/migration/heapcare-branding'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: migration/heapcare-branding
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Rename HeapCare source identifiers and paths
+        run: python3 scripts/heapcare-migrate-identifiers.py
+      - name: Commit migration changes
+        run: |
+          if git diff --quiet; then
+            echo "No remaining PascalCase identifiers or paths to migrate."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: migrate API source identifiers to HeapCare"
+          git push origin HEAD:migration/heapcare-branding
