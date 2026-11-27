@@ -65,6 +65,20 @@ public sealed class PlatformEndpointTests
     }
 
     [Fact]
+    public async Task PlatformOperatorStatus_ReturnsFalseForAnInactivePersistedOperator()
+    {
+        await _factory.SeedPlatformOperatorAsync(isActive: false);
+        using var client = CreateAuthenticatedClient();
+
+        var response = await client.GetAsync("/api/v1/platform/operator/status");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = System.Text.Json.JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+        Assert.False(document.RootElement.GetProperty("isPlatformOperator").GetBoolean());
+    }
+
+    [Fact]
     public async Task PlatformTenantEndpoints_RejectTenantUserEvenWhenTokenClaimsPlatformOperator()
     {
         var tenantId = Guid.NewGuid();
