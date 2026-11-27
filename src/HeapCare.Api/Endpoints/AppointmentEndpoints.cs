@@ -1,7 +1,7 @@
-using CompileCare.Api.Security;
-using CompileCare.Application.Appointments;
+using HeapCare.Api.Security;
+using HeapCare.Application.Appointments;
 
-namespace CompileCare.Api;
+namespace HeapCare.Api;
 
 public static class AppointmentEndpoints
 {
