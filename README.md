@@ -1,6 +1,6 @@
 # HeapCare API
 
-> **HeapCare migration status:** .NET solution, project/folder names, source namespaces, EF context/migration namespaces, package references and API-facing documentation are migrated and merged to main. The GitHub organization and repository slug are now HeapCare. The existing PostgreSQL database/role, EF migration IDs/history, legacy connection-string key remains a fallback, while HeapCare is preferred; OIDC realm/client/audience remain compatibility contracts; do not rename or recreate them as part of this code migration.
+> **HeapCare migration status:** .NET solution, project/folder names, source namespaces, EF context/migration namespaces, package references and API-facing documentation are migrated and merged to main. The GitHub organization and repository slug are now HeapCare. The existing PostgreSQL database/role, EF migration IDs/history and legacy connection-string key remain compatibility contracts; `ConnectionStrings:HeapCare` is preferred and `ConnectionStrings:CompileCare` remains a fallback. OIDC realm/client/audience identifiers are also preserved until a separately tested identity migration.
 
 Tenant-aware modular backend for the HeapCare healthcare platform.
 
