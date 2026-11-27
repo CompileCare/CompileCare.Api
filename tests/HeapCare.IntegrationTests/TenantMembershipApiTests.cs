@@ -360,6 +360,79 @@ public sealed class TenantMembershipApiTests
     }
 
     [Fact]
+    public async Task DepartmentScopedAdministrator_ListsOnlyMembershipsWithinDepartmentScope()
+    {
+        await _factory.SeedPlatformOperatorAsync();
+        using var platformClient = CreateClient(TestJwtTokenFactory.Subject);
+
+        var tenantId = await CreateTenantAsync(
+            platformClient, "Department membership list tenant", "department-membership-list");
+        var initialAdmin = await platformClient.PostAsJsonAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/initial-administrator",
+            new { issuer = TestJwtTokenFactory.Issuer, subject = "department-list-tenant-admin" });
+        Assert.Equal(HttpStatusCode.Created, initialAdmin.StatusCode);
+        var activate = await platformClient.PostAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/activate", content: null);
+        Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
+
+        using var tenantAdmin = CreateClient("department-list-tenant-admin", tenantId);
+        var hospital = await CreateHospitalAsync(tenantAdmin, "Department List Hospital", "DEPT-LIST");
+        var departmentA = await CreateDepartmentAsync(tenantAdmin, hospital, "Department A");
+        var departmentB = await CreateDepartmentAsync(tenantAdmin, hospital, "Department B");
+
+        async Task<Guid> CreateMembershipAsync(string subject, string role, object scope)
+        {
+            var response = await tenantAdmin.PostAsJsonAsync(
+                "/api/v1/tenant/memberships",
+                new
+                {
+                    issuer = TestJwtTokenFactory.Issuer,
+                    subject,
+                    role,
+                    scopes = new[] { scope }
+                });
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var membership = await response.Content.ReadFromJsonAsync<MembershipResponse>();
+            Assert.NotNull(membership);
+            return membership!.Id;
+        }
+
+        var ownDepartmentMemberId = await CreateMembershipAsync(
+            "department-list-own-member",
+            TenantRoles.ClinicalUser,
+            new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentA });
+        var otherDepartmentMemberId = await CreateMembershipAsync(
+            "department-list-other-member",
+            TenantRoles.ClinicalUser,
+            new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentB });
+        var hospitalWideMemberId = await CreateMembershipAsync(
+            "department-list-hospital-member",
+            TenantRoles.FacilityViewer,
+            new { scopeType = OrganizationScopeTypes.Hospital, hospitalId = hospital });
+
+        var scopedAdminId = await CreateMembershipAsync(
+            "department-list-scoped-admin",
+            TenantRoles.HospitalAdmin,
+            new { scopeType = OrganizationScopeTypes.Department, departmentId = departmentA });
+
+        using var departmentAdmin = CreateClient("department-list-scoped-admin", tenantId);
+        var response = await departmentAdmin.GetAsync("/api/v1/tenant/memberships?page=1&pageSize=100");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        var items = root.GetProperty("items").EnumerateArray().ToArray();
+        var returnedIds = items.Select(item => item.GetProperty("id").GetGuid()).ToHashSet();
+
+        Assert.Equal(2, root.GetProperty("totalCount").GetInt32());
+        Assert.Equal(2, items.Length);
+        Assert.Contains(ownDepartmentMemberId, returnedIds);
+        Assert.Contains(scopedAdminId, returnedIds);
+        Assert.DoesNotContain(otherDepartmentMemberId, returnedIds);
+        Assert.DoesNotContain(hospitalWideMemberId, returnedIds);
+    }
+
+    [Fact]
     public async Task MembershipCreation_RejectsUnknownOrOutOfTenantOrganizationScope()
     {
         await _factory.SeedPlatformOperatorAsync();
