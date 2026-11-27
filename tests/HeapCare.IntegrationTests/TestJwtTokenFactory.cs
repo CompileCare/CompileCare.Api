@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.IdentityModel.Tokens;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 /// <summary>
 /// Issues short-lived test-only HS256 JWTs for the real JwtBearer integration pipeline.

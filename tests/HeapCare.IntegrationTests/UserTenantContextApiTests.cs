@@ -1,13 +1,13 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class UserTenantContextApiTests
@@ -58,7 +58,7 @@ public sealed class UserTenantContextApiTests
         Assert.DoesNotContain("billing.catalogue.manage", registrar.Permissions);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var audit = await db.AuditEvents.SingleAsync();
 
         Assert.Null(audit.TenantId);
@@ -81,7 +81,7 @@ public sealed class UserTenantContextApiTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var audit = await db.AuditEvents.SingleAsync();
 
         Assert.Null(audit.TenantId);

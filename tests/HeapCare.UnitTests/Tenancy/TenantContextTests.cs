@@ -1,5 +1,5 @@
-using CompileCare.Application.Tenancy;
-namespace CompileCare.UnitTests.Tenancy;
+using HeapCare.Application.Tenancy;
+namespace HeapCare.UnitTests.Tenancy;
 public sealed class TenantContextTests
 {
     [Fact] public void SetTenant_StoresId() { var sut = new TenantContext(); var id = Guid.NewGuid(); sut.SetTenant(id); Assert.Equal(id, sut.TenantId); }

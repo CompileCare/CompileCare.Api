@@ -5,5 +5,5 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
-  <ItemGroup><ProjectReference Include="../../src/CompileCare.Application/CompileCare.Application.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../src/HeapCare.Application/HeapCare.Application.csproj" /></ItemGroup>
 </Project>

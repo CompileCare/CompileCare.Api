@@ -1,6 +1,6 @@
-using CompileCare.Application.Patients;
+using HeapCare.Application.Patients;
 
-namespace CompileCare.UnitTests.Patients;
+namespace HeapCare.UnitTests.Patients;
 
 public sealed class PatientNameNormalizerTests
 {
