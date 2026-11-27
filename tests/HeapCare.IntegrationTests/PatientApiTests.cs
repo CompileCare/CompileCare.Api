@@ -305,6 +305,30 @@ public sealed class PatientApiTests
         Assert.Contains(deniedPatientAudits, audit => audit.Action == "SearchDepartmentPatients");
     }
 
+    [Fact]
+    public async Task DepartmentScopedPatientRegistrar_CannotRegisterHospitalWidePatient_AndDoesNotPersistData()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId) = await SeedHospitalAndDepartmentAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentId)]);
+
+        using var client = CreateClient(tenantId);
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients",
+            new PatientRegistrationInput("Unauthorized", null, "Registration", null));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        Assert.Equal(0, await db.Patients.CountAsync());
+        Assert.Equal(0, await db.HospitalPatientRegistrations.CountAsync());
+    }
+
     private async Task<(Guid AuthorizedHospitalId, Guid OtherHospitalId)> SeedTenantAndTwoHospitalsAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
