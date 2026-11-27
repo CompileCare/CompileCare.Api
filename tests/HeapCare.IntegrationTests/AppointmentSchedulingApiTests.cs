@@ -520,7 +520,8 @@ public sealed class AppointmentSchedulingApiTests
         {
             Assert.Equal(canonicalEntry.Id, entry!.Id);
             Assert.Equal(canonicalEntry.TokenNumber, entry.TokenNumber);
-            Assert.Equal(canonicalEntry.Status, QueueEntryStatuses.Waiting);
+            Assert.Equal(QueueEntryStatuses.Waiting, entry!.Status);
+            Assert.Equal(canonicalEntry.Status, entry.Status);
         });
 
         using var verificationScope = _factory.Services.CreateScope();
