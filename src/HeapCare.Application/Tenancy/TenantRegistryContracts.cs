@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Tenancy;
+namespace HeapCare.Application.Tenancy;
 
 public static class TenantStatuses
 {

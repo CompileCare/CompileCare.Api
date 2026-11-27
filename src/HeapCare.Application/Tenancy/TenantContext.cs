@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Tenancy;
+namespace HeapCare.Application.Tenancy;
 public sealed class TenantContext : ITenantContext
 {
     public Guid? TenantId { get; private set; }

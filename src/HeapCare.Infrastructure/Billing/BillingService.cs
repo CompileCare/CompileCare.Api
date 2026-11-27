@@ -1,12 +1,12 @@
-using CompileCare.Application.Billing;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Billing;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Billing;
+namespace HeapCare.Infrastructure.Billing;
 
 public sealed class BillingService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     IOrganizationScopeContext organizationScope) : IBillingService
 {
     public async Task<BillingResult<BillingServiceItemDto>> CreateServiceItemAsync(

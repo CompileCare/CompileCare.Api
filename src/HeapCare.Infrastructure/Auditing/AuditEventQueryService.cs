@@ -1,13 +1,13 @@
 using System.Text;
-using CompileCare.Application.Auditing;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Auditing;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Auditing;
+namespace HeapCare.Infrastructure.Auditing;
 
 public sealed class AuditEventQueryService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     ITenantContext tenantContext,
     IOrganizationScopeContext organizationScopeContext) : IAuditEventQueryService
 {

@@ -1,13 +1,13 @@
-using CompileCare.Application.Appointments;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Appointments;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace CompileCare.Infrastructure.Appointments;
+namespace HeapCare.Infrastructure.Appointments;
 
 public sealed class AppointmentSchedulingService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     IOrganizationScopeContext organizationScope) : IAppointmentSchedulingService
 {
     public async Task<AppointmentResult<AvailabilitySessionDto>> CreateAvailabilityAsync(
