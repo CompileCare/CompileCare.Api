@@ -1,6 +1,6 @@
 # HeapCare API
 
-> **Brand migration in progress:** HeapCare is the product brand. Repository names, .NET namespaces, package IDs, database identifiers, OIDC realm/client IDs, and deployment identifiers remain unchanged until their coordinated migration is implemented and validated. Do not infer that technical identifiers have already changed.
+> **HeapCare migration status:** .NET solution, project/folder names, source namespaces, EF context/migration namespaces, package references and API-facing documentation are migrated in this branch. The GitHub repository slug and owner remain CompileCare until the administrative rename. The existing PostgreSQL database/role, EF migration IDs/history, connection-string key and OIDC realm/client/audience remain compatibility contracts; do not rename or recreate them as part of this code migration.
 
 Tenant-aware modular backend for the HeapCare healthcare platform.
 
@@ -54,7 +54,7 @@ Infrastructure registers EF Core/Npgsql and database readiness only when the con
 dotnet ef migrations add <MigrationName> --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output-dir Persistence/Migrations
 dotnet ef database update --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api
 
-dotnet ef migrations script --idempotent --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output artifacts/compilecare-migrations.sql
+dotnet ef migrations script --idempotent --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output artifacts/heapcare-migrations.sql
 ```
 
 The design-time factory supports `ConnectionStrings__CompileCare`; its local fallback is tooling-only. Never use it in production. Production deployments must review and apply a generated migration script through the release process after a verified backup. **The API does not run migrations automatically at startup.** Keep migration files and the model snapshot in source control; never edit a migration already applied to a shared environment. Integration tests recreate their dedicated `_test` database and apply migrations rather than using `EnsureCreated`.
