@@ -1,4 +1,4 @@
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 /// <summary>Marks endpoints requiring an authenticated tenant membership and tenant context.</summary>
 public sealed class TenantScopedEndpointMetadata

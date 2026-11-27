@@ -2,11 +2,11 @@ using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 public static class RateLimitingServiceCollectionExtensions
 {
-    public static IServiceCollection AddCompileCareRateLimiting(
+    public static IServiceCollection AddHeapCareRateLimiting(
         this IServiceCollection services,
         IConfiguration configuration)
     {

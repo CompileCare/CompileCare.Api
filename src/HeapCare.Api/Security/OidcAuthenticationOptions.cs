@@ -1,4 +1,4 @@
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 public sealed class OidcAuthenticationOptions
 {

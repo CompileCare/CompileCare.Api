@@ -1,14 +1,14 @@
 using System.Security.Claims;
-using CompileCare.Application.Tenancy;
+using HeapCare.Application.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 public static class SecurityServiceCollectionExtensions
 {
-    public static IServiceCollection AddCompileCareSecurity(
+    public static IServiceCollection AddHeapCareSecurity(
         this IServiceCollection services,
         IConfiguration configuration,
         IHostEnvironment environment)
@@ -56,7 +56,7 @@ public static class SecurityServiceCollectionExtensions
                     {
                         var logger = context.HttpContext.RequestServices
                             .GetRequiredService<ILoggerFactory>()
-                            .CreateLogger("CompileCare.Authentication");
+                            .CreateLogger("HeapCare.Authentication");
                         logger.LogWarning(
                             context.Exception,
                             "Bearer token validation failed for {Path}. Token contents are intentionally not logged.",

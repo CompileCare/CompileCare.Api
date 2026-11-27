@@ -1,12 +1,12 @@
-using CompileCare.Application.Appointments;
-using CompileCare.Application.Auditing;
-using CompileCare.Application.Billing;
-using CompileCare.Application.Clinical;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Staff;
-using CompileCare.Application.Tenancy;
+using HeapCare.Application.Appointments;
+using HeapCare.Application.Auditing;
+using HeapCare.Application.Billing;
+using HeapCare.Application.Clinical;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Staff;
+using HeapCare.Application.Tenancy;
 
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 internal static class TenantRolePermissions
 {

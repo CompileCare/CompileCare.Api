@@ -1,4 +1,4 @@
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 /// <summary>
 /// Marks authenticated user-context endpoints that resolve data from the validated

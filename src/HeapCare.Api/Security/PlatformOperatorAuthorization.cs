@@ -1,7 +1,7 @@
-using CompileCare.Application.Tenancy;
+using HeapCare.Application.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 /// <summary>Metadata used by the request audit middleware for global platform administration routes.</summary>
 public sealed class PlatformOperatorEndpointMetadata
