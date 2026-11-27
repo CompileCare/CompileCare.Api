@@ -298,7 +298,7 @@ public sealed class OpdJourneyApiTests
         Assert.Equal(tenantId, auditEvent.RequestedTenantId);
         Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
         Assert.Equal(actorSubject, auditEvent.ActorSubject);
-        Assert.Equal(hospitalId, auditEvent.ResourceId);
+        Assert.Equal(queueEntry.Id, auditEvent.ResourceId);
         Assert.Equal("Rejected", auditEvent.Outcome);
         Assert.Equal((int)HttpStatusCode.NotFound, auditEvent.StatusCode);
     }
