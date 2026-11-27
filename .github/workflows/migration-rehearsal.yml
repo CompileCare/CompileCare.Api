@@ -47,6 +47,40 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/checkout@v4
+        with:
+          repository: CompileCare/CompileCare.Observability
+          ref: main
+          path: CompileCare.Observability
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Pack HeapCare observability packages for the PR revision
+        run: |
+          mkdir -p .ci-nuget
+          dotnet pack CompileCare.Observability/src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
+          dotnet pack CompileCare.Observability/src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
+          cat > .ci-nuget.config <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="heapcare-ci" value=".ci-nuget" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="heapcare-ci">
+                <package pattern="HeapCare.*" />
+              </packageSource>
+              <packageSource key="nuget.org">
+                <package pattern="*" />
+              </packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -71,7 +105,7 @@ jobs:
       - name: Restore and build base revision
         working-directory: /tmp/compilecare-base
         run: |
-          dotnet restore CompileCare.Api.slnx
+          dotnet restore CompileCare.Api.slnx --configfile NuGet.Config
           dotnet tool restore
           dotnet build CompileCare.Api.slnx --configuration Release --no-restore
 
@@ -85,7 +119,7 @@ jobs:
 
       - name: Restore and build pull request revision
         run: |
-          dotnet restore CompileCare.Api.slnx
+          dotnet restore CompileCare.Api.slnx --configfile .ci-nuget.config
           dotnet tool restore
           dotnet build CompileCare.Api.slnx --configuration Release --no-restore
 
