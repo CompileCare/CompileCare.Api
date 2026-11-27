@@ -8,11 +8,11 @@ if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     --store-password-in-clear-text
 fi
 
-dotnet restore CompileCare.Api.slnx
+dotnet restore HeapCare.Api.slnx
 dotnet tool restore
-dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+dotnet build HeapCare.Api.slnx --configuration Release --no-restore
 dotnet ef migrations has-pending-model-changes \
-  --project src/CompileCare.Infrastructure \
-  --startup-project src/CompileCare.Api \
-  --context CompileCareDbContext
-dotnet test CompileCare.Api.slnx --configuration Release --no-build
+  --project src/HeapCare.Infrastructure \
+  --startup-project src/HeapCare.Api \
+  --context HeapCareDbContext
+dotnet test HeapCare.Api.slnx --configuration Release --no-build
