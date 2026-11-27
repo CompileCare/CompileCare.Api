@@ -74,12 +74,12 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/.ci-nuget"
           dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
           dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
-          cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<'EOF'
+          cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<EOF
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
             <packageSources>
               <clear />
-              <add key="heapcare-ci" value=".ci-nuget" />
+              <add key="heapcare-ci" value="$GITHUB_WORKSPACE/.ci-nuget" />
               <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
             </packageSources>
             <packageSourceMapping>
