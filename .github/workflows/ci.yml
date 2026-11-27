@@ -45,8 +45,8 @@ jobs:
         working-directory: HeapCare.Observability
         run: |
           mkdir -p "$GITHUB_WORKSPACE/.ci-nuget"
-          dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -o "$GITHUB_WORKSPACE/.ci-nuget"
-          dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -o "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
           cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
