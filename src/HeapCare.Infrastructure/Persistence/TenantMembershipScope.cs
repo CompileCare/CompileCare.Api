@@ -1,4 +1,4 @@
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
 /// <summary>
 /// Maps a tenant membership to one explicit organization boundary.

@@ -1,7 +1,7 @@
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
 /// <summary>
-/// Maps a validated external OIDC identity to one tenant and one CompileCare role.
+/// Maps a validated external OIDC identity to one tenant and one HeapCare role.
 /// Issuer and subject together identify the external principal; email is not an identity key.
 /// </summary>
 public sealed class TenantMembership : TenantOwnedEntity

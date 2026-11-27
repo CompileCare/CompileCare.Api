@@ -1,11 +1,11 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
 internal static class TenantModelConfiguration
 {
-    public static void ApplyTenantFilters(ModelBuilder modelBuilder, CompileCareDbContext context)
+    public static void ApplyTenantFilters(ModelBuilder modelBuilder, HeapCareDbContext context)
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {

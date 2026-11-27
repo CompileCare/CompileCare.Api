@@ -1,9 +1,9 @@
-using CompileCare.Application.Tenancy;
+using HeapCare.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
-public sealed class TenantMembershipReader(CompileCareDbContext db) : ITenantMembershipReader
+public sealed class TenantMembershipReader(HeapCareDbContext db) : ITenantMembershipReader
 {
     public async Task<TenantMembershipAuthorization?> FindActiveMembershipAsync(
         Guid tenantId,
