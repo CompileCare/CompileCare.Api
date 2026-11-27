@@ -2,7 +2,7 @@ using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 public static class CorsOriginConfiguration
 {

@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace CompileCare.Api.Middleware;
+namespace HeapCare.Api.Middleware;
 
 public sealed class MetricsEndpointAccessMiddleware(
     RequestDelegate next,

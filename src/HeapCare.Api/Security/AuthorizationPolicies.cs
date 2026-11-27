@@ -1,14 +1,14 @@
 using System.Security.Claims;
-using CompileCare.Application.Appointments;
-using CompileCare.Application.Auditing;
-using CompileCare.Application.Billing;
-using CompileCare.Application.Clinical;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Staff;
-using CompileCare.Application.Tenancy;
+using HeapCare.Application.Appointments;
+using HeapCare.Application.Auditing;
+using HeapCare.Application.Billing;
+using HeapCare.Application.Clinical;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Staff;
+using HeapCare.Application.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 public static class AuthorizationPolicies
 {
@@ -48,7 +48,7 @@ public static class AuthorizationPolicies
     public const string TenantRoleClaim = "compilecare:tenant_role";
     public const string PermissionClaim = "compilecare:permission";
     public const string ValidatedIssuerClaim = "compilecare:validated_issuer";
-    public const string MembershipIdentityAuthenticationType = "CompileCareTenantMembership";
+    public const string MembershipIdentityAuthenticationType = "HeapCareTenantMembership";
 
     public static void Configure(AuthorizationOptions options)
     {

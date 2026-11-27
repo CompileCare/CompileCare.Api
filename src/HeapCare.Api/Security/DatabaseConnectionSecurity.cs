@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 
-namespace CompileCare.Api.Security;
+namespace HeapCare.Api.Security;
 
 public static class DatabaseConnectionSecurity
 {

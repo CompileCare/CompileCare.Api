@@ -1,9 +1,9 @@
 using System.Security.Claims;
-using CompileCare.Api.Security;
-using CompileCare.Application.Tenancy;
+using HeapCare.Api.Security;
+using HeapCare.Application.Tenancy;
 using Serilog.Context;
 
-namespace CompileCare.Api.Middleware;
+namespace HeapCare.Api.Middleware;
 
 public sealed class TenantContextMiddleware(RequestDelegate next)
 {
