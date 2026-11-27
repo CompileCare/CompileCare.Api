@@ -1,13 +1,13 @@
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace CompileCare.Infrastructure.Persistence.Migrations;
+namespace HeapCare.Infrastructure.Persistence.Migrations;
 
-[DbContext(typeof(CompileCareDbContext))]
+[DbContext(typeof(HeapCareDbContext))]
 [Migration("20261124160000_AddAppointmentRescheduleLineage")]
 public sealed class AddAppointmentRescheduleLineage : Migration
 {
@@ -50,6 +50,6 @@ public sealed class AddAppointmentRescheduleLineage : Migration
 
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
     {
-        // The runtime model is represented by CompileCareDbContextModelSnapshot.
+        // The runtime model is represented by HeapCareDbContextModelSnapshot.
     }
 }

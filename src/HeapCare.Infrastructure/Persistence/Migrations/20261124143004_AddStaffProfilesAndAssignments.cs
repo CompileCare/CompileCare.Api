@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace CompileCare.Infrastructure.Persistence.Migrations;
+namespace HeapCare.Infrastructure.Persistence.Migrations;
 
 partial class AddStaffProfilesAndAssignments : Migration
 {
