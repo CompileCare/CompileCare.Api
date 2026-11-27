@@ -243,6 +243,67 @@ public sealed class OpdJourneyApiTests
     }
 
     [Fact]
+    public async Task ClinicalUser_CannotReadQueueOutsideAssignedDepartment_AndDenialIsAudited()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, authorizedDepartmentId) = await SeedHospitalAndDepartmentAsync(tenantId);
+        var unrelatedDepartmentId = Guid.NewGuid();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+            db.Departments.Add(new Department
+            {
+                Id = unrelatedDepartmentId,
+                HospitalId = hospitalId,
+                Name = "Neurology",
+                Code = "NEUR"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        const string actorSubject = "clinical-user-queue-other-department";
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.ClinicalUser,
+            scopes:
+            [
+                new OrganizationScope(
+                    OrganizationScopeTypes.Department,
+                    hospitalId,
+                    unrelatedDepartmentId)
+            ],
+            subject: actorSubject);
+
+        using var clinician = CreateClient(tenantId, actorSubject);
+        var response = await clinician.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue?departmentId={authorizedDepartmentId:D}&date=2026-11-27&page=1&pageSize=25");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("queueEntryId", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(authorizedDepartmentId.ToString("D"), body, StringComparison.OrdinalIgnoreCase);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var auditEvent = await auditDb.AuditEvents
+            .AsNoTracking()
+            .SingleAsync(item =>
+                item.TenantId == tenantId &&
+                item.Action == "ListDepartmentQueue" &&
+                item.ActorSubject == actorSubject);
+
+        Assert.Equal(tenantId, auditEvent.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
+        Assert.Equal(actorSubject, auditEvent.ActorSubject);
+        Assert.Equal(hospitalId, auditEvent.ResourceId);
+        Assert.Equal("Rejected", auditEvent.Outcome);
+        Assert.Equal((int)HttpStatusCode.NotFound, auditEvent.StatusCode);
+    }
+
+    [Fact]
     public async Task CrossDepartmentClinicalPatientRead_ReturnsNotFoundAndAuditsRejectedAttempt()
     {
         var tenantId = Guid.NewGuid();
