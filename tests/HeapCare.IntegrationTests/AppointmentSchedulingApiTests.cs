@@ -560,6 +560,101 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Fact]
+    public async Task AppointmentCancellationAndCheckInAreSerializedWithoutInconsistentState()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, patientId) = await SeedSchedulingDataAsync(tenantId);
+        const string registrarSubject = "appointment-cancel-checkin-race";
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.PatientRegistrar,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: registrarSubject);
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        using var registrar = CreateClient(tenantId, registrarSubject);
+
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        var localStart = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).DateTime.AddMinutes(10);
+        var start = new TimeOnly(localStart.Hour, localStart.Minute, localStart.Second);
+        var date = DateOnly.FromDateTime(localStart);
+        var sessionResponse = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
+            new AvailabilitySessionCreateInput(
+                departmentId, providerId, date, start, start.AddMinutes(10), 10, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
+        Assert.NotNull(session);
+
+        var slots = await registrar.GetFromJsonAsync<List<AppointmentSlotDto>>(
+            $"/api/v1/hospitals/{hospitalId:D}/availability-sessions/{session!.Id:D}/slots");
+        Assert.NotNull(slots);
+        var slot = Assert.Single(slots!, item => item.IsAvailable);
+
+        var bookingResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, patientId, slot.StartsAtUtc, "Cancellation/check-in race"));
+        Assert.Equal(HttpStatusCode.Created, bookingResponse.StatusCode);
+        var appointment = await bookingResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(appointment);
+
+        var cancelPath = $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment!.Id:D}/cancel";
+        var checkInPath = $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}/check-in";
+        var concurrent = await Task.WhenAll(
+            registrar.PostAsync(cancelPath, null),
+            registrar.PostAsync(checkInPath, null));
+
+        var cancelResponse = concurrent[0];
+        var checkInResponse = concurrent[1];
+        var cancellationWon = cancelResponse.StatusCode == HttpStatusCode.OK &&
+                             checkInResponse.StatusCode == HttpStatusCode.Conflict;
+        var checkInWon = cancelResponse.StatusCode == HttpStatusCode.Conflict &&
+                         checkInResponse.StatusCode == HttpStatusCode.OK;
+        Assert.True(
+            cancellationWon || checkInWon,
+            $"Concurrent lifecycle result was inconsistent: cancel={(int)cancelResponse.StatusCode}, check-in={(int)checkInResponse.StatusCode}.");
+
+        var persistedAppointment = await registrar.GetFromJsonAsync<AppointmentDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{appointment.Id:D}");
+        Assert.NotNull(persistedAppointment);
+
+        using var verificationScope = _factory.Services.CreateScope();
+        verificationScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var queueEntries = await verificationDb.QueueEntries.AsNoTracking()
+            .Where(entry => entry.AppointmentId == appointment.Id)
+            .ToListAsync();
+
+        if (cancellationWon)
+        {
+            Assert.Equal(AppointmentStatuses.Cancelled, persistedAppointment!.Status);
+            Assert.Empty(queueEntries);
+        }
+        else
+        {
+            Assert.Equal(AppointmentStatuses.Booked, persistedAppointment!.Status);
+            Assert.Single(queueEntries);
+            var checkedInEntry = await checkInResponse.Content.ReadFromJsonAsync<QueueEntryDto>();
+            Assert.NotNull(checkedInEntry);
+            Assert.Equal(queueEntries[0].Id, checkedInEntry!.Id);
+        }
+
+        var auditEvents = await verificationDb.AuditEvents.AsNoTracking()
+            .Where(audit =>
+                audit.TenantId == tenantId &&
+                audit.ResourceType == "Appointments and scheduling" &&
+                audit.ResourceId == appointment.Id &&
+                (audit.Action == "CancelAppointment" || audit.Action == "CheckInAppointment"))
+            .ToListAsync();
+        Assert.Contains(auditEvents, audit => audit.Action == "CancelAppointment");
+        Assert.Contains(auditEvents, audit => audit.Action == "CheckInAppointment");
+        Assert.Equal(2, auditEvents.Count);
+    }
+
+    [Fact]
     public async Task AvailabilityRejectsInvalidTimeZoneAndSlotDuration()
     {
         var tenantId = Guid.NewGuid();
