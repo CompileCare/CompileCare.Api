@@ -105,17 +105,17 @@ jobs:
       - name: Restore and build base revision
         working-directory: /tmp/compilecare-base
         run: |
-          dotnet restore HeapCare.Api.slnx --configfile NuGet.Config
+          dotnet restore CompileCare.Api.slnx --configfile NuGet.Config
           dotnet tool restore
-          dotnet build HeapCare.Api.slnx --configuration Release --no-restore
+          dotnet build CompileCare.Api.slnx --configuration Release --no-restore
 
       - name: Apply base migrations to the upgrade database
         working-directory: /tmp/compilecare-base
         run: |
           dotnet ef database update \
-            --project src/HeapCare.Infrastructure \
-            --startup-project src/HeapCare.Api \
-            --context HeapCareDbContext
+            --project src/CompileCare.Infrastructure \
+            --startup-project src/CompileCare.Api \
+            --context CompileCareDbContext
 
       - name: Restore and build pull request revision
         run: |
