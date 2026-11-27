@@ -57,6 +57,8 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
+      - name: Pin .NET 9 SDK for shared observability build
+        run: echo '{"sdk":{"version":"9.0.100","rollForward":"latestFeature"}}' > HeapCare.Observability/global.json
       - name: Pack HeapCare observability packages for the PR revision
         working-directory: HeapCare.Observability
         run: |
