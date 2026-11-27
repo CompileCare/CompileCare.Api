@@ -47,7 +47,7 @@ public static class AuditEndpoints
                 new AuditEventQuery(fromUtc, toUtc, action, resourceType, resourceId),
                 cancellationToken);
             return result.IsSuccess
-                ? Results.File(Encoding.UTF8.GetBytes(result.Value!), "text/csv; charset=utf-8", "compilecare-audit-events.csv")
+                ? Results.File(Encoding.UTF8.GetBytes(result.Value!), "text/csv; charset=utf-8", "heapcare-audit-events.csv")
                 : Results.Problem(title: "Audit export rejected", detail: result.Error, statusCode: result.StatusCode);
         })
         .WithName("ExportAuditEvents")
