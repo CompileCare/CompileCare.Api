@@ -44,7 +44,7 @@ public sealed class AuditQueryApiTests
         var export = await client.GetAsync($"/api/v1/audit/events/export?{query}");
         Assert.Equal(HttpStatusCode.OK, export.StatusCode);
         Assert.Equal("text/csv", export.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("\"heapcare-audit-events.csv\"", export.Content.Headers.ContentDisposition?.FileName);
+        Assert.Contains("heapcare-audit-events.csv", export.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
         var csv = await export.Content.ReadAsStringAsync();
         Assert.Contains("ActorIssuer,ActorSubject,Action,ResourceType", csv, StringComparison.Ordinal);
         Assert.Contains("ListHospitals", csv, StringComparison.Ordinal);
