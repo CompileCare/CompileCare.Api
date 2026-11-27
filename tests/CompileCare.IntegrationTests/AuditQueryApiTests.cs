@@ -94,9 +94,37 @@ public sealed class AuditQueryApiTests
 
         var fromUtc = DateTimeOffset.UtcNow.AddDays(-1);
         var toUtc = DateTimeOffset.UtcNow;
-        var response = await client.GetAsync($"/api/v1/audit/events?{BuildQuery(fromUtc, toUtc)}");
+        var query = BuildQuery(fromUtc, toUtc);
+        var response = await client.GetAsync($"/api/v1/audit/events?{query}");
+        var export = await client.GetAsync($"/api/v1/audit/events/export?{query}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, export.StatusCode);
+    }
+
+    [Fact]
+    public async Task DepartmentScopedAdministratorCannotReadOrExportTenantWideAuditEvents()
+    {
+        var tenantId = Guid.NewGuid();
+        var hospitalId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin, subject: "audit-department-seed");
+        await SeedHospitalAsync(tenantId, hospitalId);
+        var departmentId = await SeedDepartmentAsync(tenantId, hospitalId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentId)],
+            subject: TestJwtTokenFactory.Subject);
+        using var client = CreateAuthenticatedClient(tenantId);
+
+        var fromUtc = DateTimeOffset.UtcNow.AddDays(-1);
+        var toUtc = DateTimeOffset.UtcNow;
+        var query = BuildQuery(fromUtc, toUtc);
+        var response = await client.GetAsync($"/api/v1/audit/events?{query}");
+        var export = await client.GetAsync($"/api/v1/audit/events/export?{query}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, export.StatusCode);
     }
 
     [Theory]
@@ -198,6 +226,22 @@ public sealed class AuditQueryApiTests
             Code = $"AUD-{hospitalId:N}"[..12]
         });
         await db.SaveChangesAsync();
+    }
+
+    private async Task<Guid> SeedDepartmentAsync(Guid tenantId, Guid hospitalId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var department = new Department
+        {
+            HospitalId = hospitalId,
+            Name = "Audit scope department",
+            Code = "AUDDEP"
+        };
+        db.Departments.Add(department);
+        await db.SaveChangesAsync();
+        return department.Id;
     }
 
     private HttpClient CreateAuthenticatedClient(
