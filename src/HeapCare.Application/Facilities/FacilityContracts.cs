@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Facilities;
+namespace HeapCare.Application.Facilities;
 
 public sealed record FacilityResult<T>(T? Value, string? Error, int StatusCode)
 {

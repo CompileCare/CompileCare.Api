@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Patients;
+namespace HeapCare.Application.Patients;
 
 public static class PatientPermissions
 {

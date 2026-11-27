@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Staff;
+namespace HeapCare.Application.Staff;
 
 public static class StaffPermissions
 {

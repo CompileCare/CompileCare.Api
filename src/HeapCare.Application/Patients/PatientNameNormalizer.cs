@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace CompileCare.Application.Patients;
+namespace HeapCare.Application.Patients;
 
 /// <summary>
 /// Deterministic, locale-independent normalization for patient name comparison.
