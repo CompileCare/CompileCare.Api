@@ -60,6 +60,29 @@ public sealed class PatientDuplicateDetectionApiTests
     }
 
     [Fact]
+    public async Task HospitalAdmin_CanReviewPatientDuplicateCandidates()
+    {
+        var tenantId = Guid.NewGuid();
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin);
+        var hospitalId = await SeedHospitalAsync(tenantId, "Hospital Admin Duplicate Review Hospital");
+        using var client = CreateClient(tenantId);
+
+        var existingPatient = await RegisterPatientAsync(
+            client, hospitalId, "Meera", "S.", "Kulkarni", new DateOnly(1988, 7, 19));
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Meera", "S.", "Kulkarni", new DateOnly(1988, 7, 19)));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<PatientDuplicateCheckDto>();
+        Assert.NotNull(result);
+        Assert.True(result!.Evaluated);
+        var candidate = Assert.Single(result.Candidates);
+        Assert.Equal(existingPatient.Id, candidate.PatientId);
+    }
+
+    [Fact]
     public async Task DuplicateCheck_WithoutDateOfBirthDoesNotRunNameOnlySearch()
     {
         var tenantId = Guid.NewGuid();
