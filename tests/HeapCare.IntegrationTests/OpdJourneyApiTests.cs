@@ -304,6 +304,120 @@ public sealed class OpdJourneyApiTests
     }
 
     [Fact]
+    public async Task DepartmentScopedPatientRegistrar_CannotTransitionQueueOutsideAssignedDepartment_AndDenialIsAudited()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, authorizedDepartmentId) = await SeedHospitalAndDepartmentAsync(tenantId);
+        var unrelatedDepartmentId = Guid.NewGuid();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+            db.Departments.Add(new Department
+            {
+                Id = unrelatedDepartmentId,
+                HospitalId = hospitalId,
+                Name = "Neurology",
+                Code = "NEUR"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        const string registrarSubject = "queue-registrar-other-department";
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            subject: "queue-scope-admin");
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.PatientRegistrar,
+            scopes:
+            [
+                new OrganizationScope(
+                    OrganizationScopeTypes.Department,
+                    hospitalId,
+                    authorizedDepartmentId)
+            ],
+            subject: registrarSubject);
+
+        using var admin = CreateClient(tenantId, "queue-scope-admin");
+        using var registrar = CreateClient(tenantId, registrarSubject);
+        var registration = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients",
+            new PatientRegistrationInput("Queue", "Scope", "Synthetic", new DateOnly(1990, 1, 2)));
+        Assert.Equal(HttpStatusCode.Created, registration.StatusCode);
+        var patient = await registration.Content.ReadFromJsonAsync<PatientDto>();
+        Assert.NotNull(patient);
+
+        var authorizedWalkIn = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins",
+            new WalkInCreateInput(authorizedDepartmentId, patient!.Id, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, authorizedWalkIn.StatusCode);
+        var authorizedQueueEntry = await authorizedWalkIn.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(authorizedQueueEntry);
+        Assert.Equal(authorizedDepartmentId, authorizedQueueEntry!.DepartmentId);
+
+        var allowed = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{authorizedQueueEntry.Id:D}/call",
+            new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        var calledQueueEntry = await allowed.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(calledQueueEntry);
+        Assert.Equal("Called", calledQueueEntry!.Status);
+
+        var walkIn = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins",
+            new WalkInCreateInput(unrelatedDepartmentId, patient.Id, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, walkIn.StatusCode);
+        var queueEntry = await walkIn.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(queueEntry);
+        Assert.Equal(unrelatedDepartmentId, queueEntry!.DepartmentId);
+
+        var denied = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{queueEntry.Id:D}/call",
+            new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var auditEvents = await auditDb.AuditEvents
+            .AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.Action == "TransitionQueueEntry" &&
+                item.ActorSubject == registrarSubject)
+            .OrderBy(item => item.OccurredAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, auditEvents.Count);
+        var allowedAudit = Assert.Single(auditEvents, item => item.ResourceId == authorizedQueueEntry.Id);
+        Assert.Equal(tenantId, allowedAudit.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, allowedAudit.ActorIssuer);
+        Assert.Equal(registrarSubject, allowedAudit.ActorSubject);
+        Assert.Equal("Succeeded", allowedAudit.Outcome);
+        Assert.Equal((int)HttpStatusCode.OK, allowedAudit.StatusCode);
+
+        var deniedAudit = Assert.Single(auditEvents, item => item.ResourceId == queueEntry.Id);
+        Assert.Equal(tenantId, deniedAudit.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, deniedAudit.ActorIssuer);
+        Assert.Equal(registrarSubject, deniedAudit.ActorSubject);
+        Assert.Equal("Rejected", deniedAudit.Outcome);
+        Assert.Equal((int)HttpStatusCode.NotFound, deniedAudit.StatusCode);
+
+        var queueAfterDenial = await admin.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue?departmentId={unrelatedDepartmentId:D}&date={queueEntry.QueueDateLocal:yyyy-MM-dd}&page=1&pageSize=25");
+        Assert.Equal(HttpStatusCode.OK, queueAfterDenial.StatusCode);
+        var unchangedQueue = await queueAfterDenial.Content.ReadFromJsonAsync<QueuePage>();
+        Assert.NotNull(unchangedQueue);
+        var persistedEntry = Assert.Single(unchangedQueue!.Items);
+        Assert.Equal(queueEntry.Id, persistedEntry.Id);
+        Assert.Equal("Waiting", persistedEntry.Status);
+    }
+
+    [Fact]
     public async Task CrossDepartmentClinicalPatientRead_ReturnsNotFoundAndAuditsRejectedAttempt()
     {
         var tenantId = Guid.NewGuid();
