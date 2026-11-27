@@ -5,7 +5,7 @@
 
 ## Context
 
-CompileCare is a multi-tenant healthcare SaaS built as a .NET modular monolith. The platform needs relational integrity, migrations, tenant isolation, maintainability, and cost-effective deployment.
+HeapCare is a multi-tenant healthcare SaaS built as a .NET modular monolith. The platform needs relational integrity, migrations, tenant isolation, maintainability, and cost-effective deployment.
 
 ## Decision
 

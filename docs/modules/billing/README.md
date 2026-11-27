@@ -83,6 +83,6 @@ These are initial application role mappings, not a substitute for pilot role rev
 
 ## Explicitly not implemented
 
-GST/tax calculation and statutory invoice format, legal invoice series, discounts/waivers, invoice cancellation/credit notes, refunds/reversals, deposits/advances, insurance/TPA, payment gateway, accounting integration, cashier close/shift reconciliation, ageing and advanced finance reports. See the product [OPD billing foundation and deferred scope](https://github.com/CompileCare/Compilecare.Doc/blob/main/product/workflows/opd-billing-foundation.md).
+GST/tax calculation and statutory invoice format, legal invoice series, discounts/waivers, invoice cancellation/credit notes, refunds/reversals, deposits/advances, insurance/TPA, payment gateway, accounting integration, cashier close/shift reconciliation, ageing and advanced finance reports. See the product [OPD billing foundation and deferred scope](https://github.com/HeapCare/Compilecare.Doc/blob/main/product/workflows/opd-billing-foundation.md).
 
 The initial internal invoice/receipt references are operational identifiers only. Do not represent them as compliant tax invoices until finance/legal validation is complete.

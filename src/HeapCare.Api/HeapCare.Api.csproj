@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="HeapCare.Observability" />
+    <PackageReference Include="HeapCare.Observability.AspNetCore" />
+    <PackageReference Include="Npgsql.OpenTelemetry" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../HeapCare.Application/HeapCare.Application.csproj" />
+    <ProjectReference Include="../HeapCare.Infrastructure/HeapCare.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

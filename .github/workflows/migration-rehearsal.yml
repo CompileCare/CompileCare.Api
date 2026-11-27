@@ -3,8 +3,8 @@ name: PostgreSQL Migration Rehearsal
 on:
   pull_request:
     paths:
-      - "src/CompileCare.Infrastructure/**"
-      - "src/CompileCare.Api/**"
+      - "src/HeapCare.Infrastructure/**"
+      - "src/HeapCare.Api/**"
       - ".github/workflows/migration-rehearsal.yml"
       - "Directory.Build.props"
       - "Directory.Packages.props"
@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
   group: migration-rehearsal-${{ github.event.pull_request.number || github.ref }}
@@ -38,8 +37,10 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      ConnectionStrings__CompileCareTests: Host=localhost;Port=5432;Database=compilecare_upgrade;Username=postgres;Password=postgres
-      ConnectionStrings__CompileCare: Host=localhost;Port=5432;Database=compilecare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__HeapCareTests: Host=localhost;Port=5432;Database=heapcare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__CompileCareTests: Host=localhost;Port=5432;Database=heapcare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__HeapCare: Host=localhost;Port=5432;Database=heapcare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__CompileCare: Host=localhost;Port=5432;Database=heapcare_upgrade;Username=postgres;Password=postgres
       BASE_SHA: ${{ github.event.pull_request.base.sha }}
       PGPASSWORD: postgres
     steps:
@@ -47,36 +48,97 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/checkout@v4
+        with:
+          repository: CompileCare/CompileCare.Observability
+          ref: main
+          path: HeapCare.Observability
+
+      - uses: actions/checkout@v4
+        with:
+          repository: CompileCare/CompileCare.Observability
+          ref: 935f6629d5abb92296385ec2e0c1ec04060b3fb7
+          path: CompileCare.Observability.Legacy
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
-      - name: Configure GitHub Packages credentials
-        run: dotnet nuget update source github --username "$GITHUB_ACTOR" --password "$GITHUB_TOKEN" --store-password-in-clear-text
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pin compatible SDK for shared package builds
+        run: |
+          echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}' > HeapCare.Observability/global.json
+          echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}' > CompileCare.Observability.Legacy/global.json
+      - name: Pack HeapCare observability packages for the PR revision
+        working-directory: HeapCare.Observability
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="heapcare-ci" value=".ci-nuget" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="heapcare-ci">
+                <package pattern="HeapCare.*" />
+              </packageSource>
+              <packageSource key="nuget.org">
+                <package pattern="*" />
+              </packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+
+      - name: Pack legacy CompileCare observability packages for the base revision
+        working-directory: CompileCare.Observability.Legacy
+        run: |
+          dotnet pack src/CompileCare.Observability/CompileCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/CompileCare.Observability.AspNetCore/CompileCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          cat > "$GITHUB_WORKSPACE/.legacy-nuget.config" <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="legacy-ci" value="$GITHUB_WORKSPACE/.ci-nuget" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="legacy-ci"><package pattern="CompileCare.*" /></packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
       - name: Prepare isolated PostgreSQL databases
         run: |
           set -euo pipefail
-          createdb --host=localhost --username=postgres compilecare_upgrade
-          createdb --host=localhost --username=postgres compilecare_fresh
+          createdb --host=localhost --username=postgres heapcare_upgrade
+          createdb --host=localhost --username=postgres heapcare_fresh
 
       - name: Check out the base migration model
         run: |
           set -euo pipefail
           git fetch origin "$BASE_SHA"
-          git worktree add /tmp/compilecare-base "$BASE_SHA"
+          git worktree add /tmp/heapcare-base "$BASE_SHA"
+          cp "$GITHUB_WORKSPACE/.legacy-nuget.config" /tmp/heapcare-base/NuGet.Config
 
       - name: Restore and build base revision
-        working-directory: /tmp/compilecare-base
+        working-directory: /tmp/heapcare-base
         run: |
-          dotnet restore CompileCare.Api.slnx
-          dotnet tool restore
+          dotnet restore CompileCare.Api.slnx --configfile NuGet.Config
+          dotnet tool restore --configfile NuGet.Config
           dotnet build CompileCare.Api.slnx --configuration Release --no-restore
 
       - name: Apply base migrations to the upgrade database
-        working-directory: /tmp/compilecare-base
+        working-directory: /tmp/heapcare-base
         run: |
           dotnet ef database update \
             --project src/CompileCare.Infrastructure \
@@ -85,30 +147,30 @@ jobs:
 
       - name: Restore and build pull request revision
         run: |
-          dotnet restore CompileCare.Api.slnx
-          dotnet tool restore
-          dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+          dotnet restore HeapCare.Api.slnx --configfile .ci-nuget.config
+          dotnet tool restore --configfile .ci-nuget.config
+          dotnet build HeapCare.Api.slnx --configuration Release --no-restore
 
       - name: Generate idempotent migration script from pull request revision
         run: |
           dotnet ef migrations script --idempotent \
-            --project src/CompileCare.Infrastructure \
-            --startup-project src/CompileCare.Api \
-            --context CompileCareDbContext \
-            --output /tmp/compilecare-current-migrations.sql
+            --project src/HeapCare.Infrastructure \
+            --startup-project src/HeapCare.Api \
+            --context HeapCareDbContext \
+            --output /tmp/heapcare-current-migrations.sql
 
       - name: Rehearse upgrade and fresh-database installation
         run: |
           set -euo pipefail
-          for database in compilecare_upgrade compilecare_fresh; do
+          for database in heapcare_upgrade heapcare_fresh; do
             connection="postgresql://postgres:postgres@localhost:5432/$database"
-            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
+            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/heapcare-current-migrations.sql
             # Reapply the idempotent script to prove it safely handles an already-current schema.
-            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
+            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/heapcare-current-migrations.sql
           done
-          upgrade_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_upgrade" \
+          upgrade_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/heapcare_upgrade" \
             --command='SELECT string_agg("MigrationId", chr(44) ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
-          fresh_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_fresh" \
+          fresh_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/heapcare_fresh" \
             --command='SELECT string_agg("MigrationId", chr(44) ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
           if [[ -z "$upgrade_ids" || -z "$fresh_ids" ]]; then
             echo "::error::EF migration history was not populated in both rehearsal databases."

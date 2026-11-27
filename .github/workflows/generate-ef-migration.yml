@@ -70,7 +70,7 @@ jobs:
 
       - name: Restore solution and tools
         run: |
-          dotnet restore CompileCare.Api.slnx
+          dotnet restore HeapCare.Api.slnx
           dotnet tool restore
 
       - name: Generate migration from the committed EF model
@@ -79,9 +79,9 @@ jobs:
           MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           dotnet ef migrations add "$MIGRATION_NAME" \
-            --project src/CompileCare.Infrastructure \
-            --startup-project src/CompileCare.Api \
-            --context CompileCareDbContext \
+            --project src/HeapCare.Infrastructure \
+            --startup-project src/HeapCare.Api \
+            --context HeapCareDbContext \
             --output-dir Persistence/Migrations
 
       - name: Ensure migration ID follows existing migration history
@@ -90,7 +90,7 @@ jobs:
           MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
-          migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
+          migration_dir="src/HeapCare.Infrastructure/Persistence/Migrations"
           generated_file="$(find "$migration_dir" -maxdepth 1 -type f -name "*_$MIGRATION_NAME.cs" ! -name "*.Designer.cs" -print -quit)"
           if [[ -z "$generated_file" ]]; then
             echo "::error::Generated migration source file was not found."
@@ -111,13 +111,13 @@ jobs:
           fi
 
       - name: Build solution
-        run: dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+        run: dotnet build HeapCare.Api.slnx --configuration Release --no-restore
 
       - name: Verify EF model and migration snapshot are aligned
-        run: dotnet ef migrations has-pending-model-changes --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api --context CompileCareDbContext
+        run: dotnet ef migrations has-pending-model-changes --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --context HeapCareDbContext
 
       - name: Run integration and unit tests
-        run: dotnet test CompileCare.Api.slnx --configuration Release --no-build
+        run: dotnet test HeapCare.Api.slnx --configuration Release --no-build
 
       - name: Commit and push generated migration
         shell: bash
@@ -125,7 +125,7 @@ jobs:
           MIGRATION_NAME: ${{ inputs.migration_name || 'AddPatientIdentifierManagement' }}
         run: |
           set -euo pipefail
-          migration_dir="src/CompileCare.Infrastructure/Persistence/Migrations"
+          migration_dir="src/HeapCare.Infrastructure/Persistence/Migrations"
           if [[ -z "$(git status --porcelain -- "$migration_dir")" ]]; then
             echo "::error::EF tooling produced no migration changes; refusing to create an empty commit."
             exit 1

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HeapCare.Api/HeapCare.Api.csproj" />
+    <Project Path="src/HeapCare.Application/HeapCare.Application.csproj" />
+    <Project Path="src/HeapCare.Infrastructure/HeapCare.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HeapCare.UnitTests/HeapCare.UnitTests.csproj" />
+    <Project Path="tests/HeapCare.IntegrationTests/HeapCare.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

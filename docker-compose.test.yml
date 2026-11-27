@@ -4,13 +4,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: compilecare_test
+      POSTGRES_DB: heapcare_test
     ports:
       - "127.0.0.1:54329:5432"
     volumes:
-      - compilecare-test-postgres:/var/lib/postgresql/data
+      - heapcare-test-postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d compilecare_test"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d heapcare_test"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -20,12 +20,10 @@ services:
       context: .
       dockerfile: Dockerfile.test
     environment:
-      ConnectionStrings__CompileCareTests: Host=postgres;Port=5432;Database=compilecare_test;Username=postgres;Password=postgres
-      GITHUB_ACTOR: ${GITHUB_ACTOR:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      ConnectionStrings__HeapCareTests: Host=postgres;Port=5432;Database=heapcare_test;Username=postgres;Password=postgres
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
-  compilecare-test-postgres:
+  heapcare-test-postgres:

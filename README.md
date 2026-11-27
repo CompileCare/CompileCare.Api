@@ -1,6 +1,8 @@
-# CompileCare.Api
+# HeapCare API
 
-Tenant-aware modular backend for the CompileCare healthcare platform.
+> **HeapCare migration status:** .NET solution, project/folder names, source namespaces, EF context/migration namespaces, package references and API-facing documentation are migrated in this branch. The GitHub repository slug and owner remain CompileCare until the administrative rename. The existing PostgreSQL database/role, EF migration IDs/history, connection-string key and OIDC realm/client/audience remain compatibility contracts; do not rename or recreate them as part of this code migration.
+
+Tenant-aware modular backend for the HeapCare healthcare platform.
 
 ## Architecture
 
@@ -8,9 +10,9 @@ The first delivery is a **modular monolith** with explicit capability boundaries
 
 ## Solution layout
 
-- `CompileCare.Api`: ASP.NET Core host, HTTP middleware and endpoints.
-- `CompileCare.Application`: application contracts and use cases.
-- `CompileCare.Infrastructure`: provider-specific adapters.
+- `HeapCare.Api`: ASP.NET Core host, HTTP middleware and endpoints.
+- `HeapCare.Application`: application contracts and use cases.
+- `HeapCare.Infrastructure`: provider-specific adapters.
 - `Modules/`: business capabilities added incrementally.
 - `tests/`: unit and integration tests.
 
@@ -21,7 +23,7 @@ The first delivery is a **modular monolith** with explicit capability boundaries
 - PostgreSQL via Npgsql
 - Versioned platform endpoint
 - OpenAPI in Development
-- Shared `CompileCare.Observability` library for structured logging, OpenTelemetry traces/metrics and health checks
+- Shared `HeapCare.Observability` library for structured logging, OpenTelemetry traces/metrics and health checks
 - Liveness/readiness endpoints provided by the shared observability package
 - Correlation ID propagation through `X-Correlation-ID`
 - Request-scoped tenant context through `X-Tenant-ID`
@@ -30,7 +32,7 @@ The first delivery is a **modular monolith** with explicit capability boundaries
 
 ## Database configuration
 
-Set `ConnectionStrings__CompileCare` through environment variables or a secret store. Do not commit credentials.
+Set `ConnectionStrings__HeapCare` through environment variables or a secret store. Do not commit credentials.
 
 Example local connection string:
 
@@ -49,13 +51,13 @@ Host=postgres.example.com;Database=compilecare;Username=compilecare_app;Password
 Infrastructure registers EF Core/Npgsql and database readiness only when the connection string is configured. Migrations are created with the EF Core CLI from the Infrastructure project.
 
 ```bash
-dotnet ef migrations add <MigrationName> --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api --output-dir Persistence/Migrations
-dotnet ef database update --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
+dotnet ef migrations add <MigrationName> --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output-dir Persistence/Migrations
+dotnet ef database update --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api
 
-dotnet ef migrations script --idempotent --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api --output artifacts/compilecare-migrations.sql
+dotnet ef migrations script --idempotent --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output artifacts/heapcare-migrations.sql
 ```
 
-The design-time factory supports `ConnectionStrings__CompileCare`; its local fallback is tooling-only. Never use it in production. Production deployments must review and apply a generated migration script through the release process after a verified backup. **The API does not run migrations automatically at startup.** Keep migration files and the model snapshot in source control; never edit a migration already applied to a shared environment. Integration tests recreate their dedicated `_test` database and apply migrations rather than using `EnsureCreated`.
+The design-time factory supports `ConnectionStrings__HeapCare`; its local fallback is tooling-only. Never use it in production. Production deployments must review and apply a generated migration script through the release process after a verified backup. **The API does not run migrations automatically at startup.** Keep migration files and the model snapshot in source control; never edit a migration already applied to a shared environment. Integration tests recreate their dedicated `_test` database and apply migrations rather than using `EnsureCreated`.
 
 ## Authentication and tenant authorization
 
@@ -74,16 +76,16 @@ In non-Development environments, every configured `Cors:AllowedOrigins` entry mu
 
 The API's `/metrics` endpoint is intended for internal Prometheus scraping only. Outside Development and Testing, startup requires `Observability:Metrics:AllowedNetworks` with one or more explicit CIDRs (for example, `Observability__Metrics__AllowedNetworks__0=10.20.0.0/16`). Requests to `/metrics` from outside those networks receive 404. Configure the CIDR values to match the actual monitoring source network after the hosting topology is selected; do not use a broad public range. Forwarded client addresses are considered only from configured trusted proxies. Development and isolated Testing hosts do not require this setting.
 
-The API validates JWT signature, issuer, audience, lifetime, expiry and subject. The validated issuer and subject (`sub`) are matched against an active CompileCare tenant membership. Facility endpoints require exactly one `X-Tenant-ID` GUID; this header only selects the requested tenant and never grants access by itself.
+The API validates JWT signature, issuer, audience, lifetime, expiry and subject. The validated issuer and subject (`sub`) are matched against an active HeapCare tenant membership. Facility endpoints require exactly one `X-Tenant-ID` GUID; this header only selects the requested tenant and never grants access by itself.
 
-Tenant roles are stored in the CompileCare database. Current facility permissions are:
+Tenant roles are stored in the HeapCare database. Current facility permissions are:
 - `HospitalAdmin`: read, create/update and delete facility records.
 - `FacilityManager`: read and create/update facility records.
 - `FacilityViewer`: read facility records only.
 
 The complete source-derived grant snapshot for all five persisted tenant roles, including patient registration, identifiers, staff, appointments, OPD, billing and audit capabilities, is maintained in the [persisted role-to-permission matrix](https://github.com/CompileCare/Compilecare.Doc/blob/main/security/persisted-role-permission-matrix.md). PlatformOperator is a separate global identity, not a tenant membership role. The matrix describes current implementation grants and does not replace product/clinical approval or endpoint/resource-scope verification.
 
-Token-supplied role or permission claims do not grant CompileCare access. The source-derived [API authorization policy inventory](https://github.com/CompileCare/Compilecare.Doc/blob/main/security/authorization-policy-inventory.md) documents current policy-to-endpoint assignments and the required role/scope regression review; it is an inventory, not a grant matrix. Tenant registry endpoints are available only to persisted platform operators at `/api/v1/platform/tenants`. New tenants start in `Provisioning`; activation, suspension and closure are explicit lifecycle transitions. The first platform operator must be bootstrapped out-of-band by an authorised database administrator using the exact validated OIDC issuer and subject. Platform operators can provision exactly one initial tenant-wide HospitalAdmin while a tenant is in Provisioning. Tenant HospitalAdmins can create, update, deactivate and reactivate memberships inside their assigned organization scope. New memberships require an explicit tenant, hospital or department scope.
+Token-supplied role or permission claims do not grant HeapCare access. The source-derived [API authorization policy inventory](https://github.com/CompileCare/Compilecare.Doc/blob/main/security/authorization-policy-inventory.md) documents current policy-to-endpoint assignments and the required role/scope regression review; it is an inventory, not a grant matrix. Tenant registry endpoints are available only to persisted platform operators at `/api/v1/platform/tenants`. New tenants start in `Provisioning`; activation, suspension and closure are explicit lifecycle transitions. The first platform operator must be bootstrapped out-of-band by an authorised database administrator using the exact validated OIDC issuer and subject. Platform operators can provision exactly one initial tenant-wide HospitalAdmin while a tenant is in Provisioning. Tenant HospitalAdmins can create, update, deactivate and reactivate memberships inside their assigned organization scope. New memberships require an explicit tenant, hospital or department scope.
 
 ### Platform tenant registry
 
@@ -127,7 +129,7 @@ Tenant HospitalAdmins manage memberships within their assigned organization scop
 - `POST /api/v1/tenant/memberships/{membershipId}/deactivate`
 - `POST /api/v1/tenant/memberships/{membershipId}/reactivate`
 
-A membership requires an issuer matching the configured OIDC authority, a subject (`sub`), one supported CompileCare role, and one or more explicit scopes. Scope shapes are:
+A membership requires an issuer matching the configured OIDC authority, a subject (`sub`), one supported HeapCare role, and one or more explicit scopes. Scope shapes are:
 
 - Tenant: `{ "scopeType": "Tenant" }`
 - Hospital: `{ "scopeType": "Hospital", "hospitalId": "<guid>" }`
@@ -141,10 +143,10 @@ The integration suite uses synthetic, signed HS256 JWTs and a local static OIDC 
 
 ## Observability configuration
 
-The API consumes stable shared packages from the CompileCare GitHub Packages NuGet feed. CI uses `GITHUB_TOKEN` with `packages: read`; grant the API repository read access in each package's Settings → Manage Actions access.
+The API consumes stable shared packages from the HeapCare GitHub Packages NuGet feed. CI uses `GITHUB_TOKEN` with `packages: read`; grant the API repository read access in each package's Settings → Manage Actions access.
 
 Set:
-- `OpenTelemetry__ServiceName=CompileCare.Api`
+- `OpenTelemetry__ServiceName=HeapCare.Api`
 - `OpenTelemetry__OtlpEndpoint=http://localhost:4318`
 - `ElasticConfiguration__Uri` (optional)
 
@@ -152,16 +154,16 @@ Do not log patient data, credentials, tokens, or other sensitive healthcare info
 
 ## Run
 
-Requires the .NET 10 SDK and access to the CompileCare GitHub Packages feed.
+Requires the .NET 10 SDK and access to the HeapCare GitHub Packages feed.
 
 ```bash
-dotnet restore CompileCare.Api.slnx
-dotnet build CompileCare.Api.slnx
-dotnet test CompileCare.Api.slnx
-dotnet run --project src/CompileCare.Api
+dotnet restore HeapCare.Api.slnx
+dotnet build HeapCare.Api.slnx
+dotnet test HeapCare.Api.slnx
+dotnet run --project src/HeapCare.Api
 ```
 
-The integration suite exercises the facility API against PostgreSQL. CI provisions this service automatically. For local runs, provide `ConnectionStrings__CompileCareTests` pointing to a dedicated test database whose name ends in `_test` (the default is `compilecare_test`). The integration test host deletes and recreates that database, and refuses to reset a database without the required suffix. Do not point it at a development, staging, or production database.
+The integration suite exercises the facility API against PostgreSQL. CI provisions this service automatically. For local runs, provide `ConnectionStrings__HeapCareTests` pointing to a dedicated test database whose name ends in `_test` (the default is `compilecare_test`). The integration test host deletes and recreates that database, and refuses to reset a database without the required suffix. Do not point it at a development, staging, or production database.
 
 Platform endpoints: `/`, `/health/live`, `/health/ready`, `/metrics`, `/api/v1/platform/context`, and (Development only) `/openapi/v1.json`.
 
@@ -195,7 +197,7 @@ See [staff module API documentation](docs/modules/staff/README.md) and [document
 
 ## Tenant isolation
 
-The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Facility and platform-context API routes now require a validated OIDC/JWT principal and an active CompileCare membership matching the token issuer, subject and selected tenant. Persistence requires the validated tenant context for tenant-owned writes and applies tenant query filters. Background jobs and message consumers must establish an equivalent trusted tenant context before accessing tenant-owned data. The platform context endpoint is diagnostic only.
+The tenant header is request context only. It is **not authentication** and does not prove that a caller may access a tenant. Facility and platform-context API routes now require a validated OIDC/JWT principal and an active HeapCare membership matching the token issuer, subject and selected tenant. Persistence requires the validated tenant context for tenant-owned writes and applies tenant query filters. Background jobs and message consumers must establish an equivalent trusted tenant context before accessing tenant-owned data. The platform context endpoint is diagnostic only.
 
 ## Pull request workflow
 

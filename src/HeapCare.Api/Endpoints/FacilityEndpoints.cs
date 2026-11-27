@@ -1,0 +1,56 @@
+using HeapCare.Api.Security;
+using HeapCare.Application.Facilities;
+
+namespace HeapCare.Api;
+
+public static class HospitalEndpoints
+{
+    public static IEndpointRouteBuilder MapHospitalEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/v1/hospitals").WithTags("Hospitals").WithMetadata(TenantScopedEndpointMetadata.Instance).RequireAuthorization();
+
+        group.MapGet("/", async (
+            IHospitalService service,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default) =>
+                Results.Ok(await service.ListHospitals(new(page, pageSize), ct)))
+            .WithName("ListHospitals").RequireAuthorization(AuthorizationPolicies.FacilityRead);
+
+        group.MapGet("/{id:guid}", async (
+            Guid id,
+            IHospitalService service,
+            CancellationToken ct) =>
+                FacilityHttp.From(await service.GetHospital(id, ct)))
+            .WithName("GetHospital").RequireAuthorization(AuthorizationPolicies.FacilityRead);
+
+        group.MapPost("/", async (
+            HospitalRequest request,
+            IHospitalService service,
+            CancellationToken ct) =>
+                FacilityHttp.Created(
+                    await service.CreateHospital(new(request.Name, request.Code), ct),
+                    "/api/v1/hospitals",
+                    hospital => hospital.Id))
+            .WithName("CreateHospital").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
+
+        group.MapPut("/{id:guid}", async (
+            Guid id,
+            HospitalRequest request,
+            IHospitalService service,
+            CancellationToken ct) =>
+                FacilityHttp.From(await service.UpdateHospital(id, new(request.Name, request.Code), ct)))
+            .WithName("UpdateHospital").RequireAuthorization(AuthorizationPolicies.FacilityWrite);
+
+        group.MapDelete("/{id:guid}", async (
+            Guid id,
+            IHospitalService service,
+            CancellationToken ct) =>
+                FacilityHttp.Deleted(await service.DeleteHospital(id, ct)))
+            .WithName("DeleteHospital").RequireAuthorization(AuthorizationPolicies.FacilityDelete);
+
+        return endpoints;
+    }
+}
+
+public sealed record HospitalRequest(string? Name, string? Code);

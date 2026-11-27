@@ -8,7 +8,7 @@ The following choices remain open and should be resolved through the documentati
 | Identity provider | Not selected; OIDC-compatible integration preferred |
 | Messaging broker | Not selected |
 | API gateway | Not selected |
-| Observability exporter | Integrate with CompileCare.Observability after compatibility review |
+| Observability exporter | Integrate with HeapCare.Observability after compatibility review |
 | Deployment platform | Not selected |
 
 Avoid vendor-specific runtime dependencies until the corresponding decision is approved.

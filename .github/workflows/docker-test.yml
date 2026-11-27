@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
   group: docker-test-${{ github.ref }}
@@ -22,21 +21,45 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
+        with:
+          repository: CompileCare/CompileCare.Observability
+          ref: main
+          path: HeapCare.Observability
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Pin compatible SDK for shared package build
+        run: echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}' > HeapCare.Observability/global.json
+      - name: Pack HeapCare observability packages into an ephemeral feed
+        working-directory: HeapCare.Observability
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="heapcare-ci" value=".ci-nuget" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="heapcare-ci"><package pattern="HeapCare.*" /></packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
       - name: Build and run the isolated Docker test environment
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           docker compose -f docker-compose.test.yml up \
             --build \
             --abort-on-container-exit \
             --exit-code-from test
-
       - name: Capture container logs on failure
         if: failure()
         run: docker compose -f docker-compose.test.yml logs --no-color
-
       - name: Stop containers and remove test volumes
         if: always()
         run: docker compose -f docker-compose.test.yml down --volumes --remove-orphans
