@@ -70,4 +70,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "refactor: migrate API source identifiers to HeapCare"
-          git push origin HEAD:migration/heapcare-branding
+          git push origin HEAD:migration/heapcare-technical
