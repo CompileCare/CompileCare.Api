@@ -24,6 +24,7 @@ public sealed class OpdEncounterAuthorizationTests
     }
 
     [Theory]
+    [InlineData(TenantRoles.HospitalAdmin)]
     [InlineData(TenantRoles.FacilityManager)]
     [InlineData(TenantRoles.FacilityViewer)]
     [InlineData(TenantRoles.PatientRegistrar)]
