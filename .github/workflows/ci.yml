@@ -40,11 +40,12 @@ jobs:
         with:
           dotnet-version: 9.0.x
       - name: Pack HeapCare observability packages into an ephemeral feed
+        working-directory: HeapCare.Observability
         run: |
-          mkdir -p .ci-nuget
-          dotnet pack HeapCare.Observability/src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
-          dotnet pack HeapCare.Observability/src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
-          cat > .ci-nuget.config <<'EOF'
+          mkdir -p "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
             <packageSources>
