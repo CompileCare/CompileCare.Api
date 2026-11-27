@@ -112,6 +112,37 @@ public sealed class SecurityAuthorizationTests
     }
 
     [Fact]
+    public async Task TenantScopedEndpoint_RejectsMalformedEmptyAndMultipleTenantHeaders()
+    {
+        static HttpClient CreateClient(FacilityApiFactory factory, params string[] tenantHeaderValues)
+        {
+            var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", TestJwtTokenFactory.CreateToken());
+            client.DefaultRequestHeaders.Add(TenantContextMiddleware.HeaderName, tenantHeaderValues);
+            return client;
+        }
+
+        using var malformed = CreateClient(_factory, "not-a-guid");
+        using var empty = CreateClient(_factory, Guid.Empty.ToString("D"));
+        using var multiple = CreateClient(
+            _factory,
+            Guid.NewGuid().ToString("D"),
+            Guid.NewGuid().ToString("D"));
+
+        foreach (var client in new[] { malformed, empty, multiple })
+        {
+            var response = await client.GetAsync("/api/v1/hospitals");
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+            using var problem = System.Text.Json.JsonDocument.Parse(
+                await response.Content.ReadAsStringAsync());
+            Assert.Equal("Invalid tenant context", problem.RootElement.GetProperty("title").GetString());
+        }
+    }
+
+    [Fact]
     public async Task TenantHeader_IsNotAuthorizationAndRequiresActiveMembership()
     {
         var permittedTenant = Guid.NewGuid();
