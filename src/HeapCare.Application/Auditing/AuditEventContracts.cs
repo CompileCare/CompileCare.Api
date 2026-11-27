@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Auditing;
+namespace HeapCare.Application.Auditing;
 
 public static class AuditPermissions
 {

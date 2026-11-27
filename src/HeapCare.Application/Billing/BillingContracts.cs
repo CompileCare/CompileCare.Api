@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Billing;
+namespace HeapCare.Application.Billing;
 
 public static class BillingPermissions
 {

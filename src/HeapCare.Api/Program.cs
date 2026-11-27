@@ -1,11 +1,11 @@
 using System.Net;
-using CompileCare.Api;
-using CompileCare.Api.Endpoints;
-using CompileCare.Api.Middleware;
-using CompileCare.Api.Security;
-using CompileCare.Application;
-using CompileCare.Infrastructure;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api;
+using HeapCare.Api.Endpoints;
+using HeapCare.Api.Middleware;
+using HeapCare.Api.Security;
+using HeapCare.Application;
+using HeapCare.Infrastructure;
+using HeapCare.Infrastructure.Persistence;
 using HeapCare.Observability.Extensions;
 using HeapCare.Observability.AspNetCore.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -25,8 +25,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddApplication();
 DatabaseConnectionSecurity.Validate(builder.Configuration, builder.Environment);
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddCompileCareSecurity(builder.Configuration, builder.Environment);
-builder.Services.AddCompileCareRateLimiting(builder.Configuration);
+builder.Services.AddHeapCareSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddHeapCareRateLimiting(builder.Configuration);
 builder.Services.AddHsts(options =>
 {
     options.MaxAge = TimeSpan.FromDays(365);
@@ -62,7 +62,7 @@ var metricsAllowedNetworks = MetricsEndpointNetworkConfiguration.GetAllowedNetwo
 if (allowedOrigins.Length > 0)
 {
     builder.Services.AddCors(options =>
-        options.AddPolicy("CompileCareWeb", policy =>
+        options.AddPolicy("HeapCareWeb", policy =>
             policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
 }
 
@@ -72,7 +72,7 @@ if (app.Environment.IsDevelopment() &&
     builder.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
     await using var scope = app.Services.CreateAsyncScope();
-    var database = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+    var database = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
     await database.Database.MigrateAsync();
 }
 
@@ -92,7 +92,7 @@ if (!app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseRouting();
-if (allowedOrigins.Length > 0) app.UseCors("CompileCareWeb");
+if (allowedOrigins.Length > 0) app.UseCors("HeapCareWeb");
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseMiddleware<AuditEventMiddleware>();
@@ -101,7 +101,7 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
 app.MapPrometheusScrapingEndpoint();
-app.MapGet("/", () => Results.Ok(new { service = "CompileCare.Api", status = "ready" }));
+app.MapGet("/", () => Results.Ok(new { service = "HeapCare.Api", status = "ready" }));
 app.MapHealthEndpoints();
 app.MapPlatformEndpoints();
 app.MapAuditEndpoints();

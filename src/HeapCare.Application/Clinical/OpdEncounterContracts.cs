@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Clinical;
+namespace HeapCare.Application.Clinical;
 
 public static class OpdEncounterPermissions
 {

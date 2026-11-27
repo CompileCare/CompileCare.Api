@@ -1,4 +1,4 @@
-namespace CompileCare.Application.Appointments;
+namespace HeapCare.Application.Appointments;
 
 public static class QueuePermissions
 {

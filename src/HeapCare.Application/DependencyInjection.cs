@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CompileCare.Application;
+namespace HeapCare.Application;
 
 public static class DependencyInjection
 {
