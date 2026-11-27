@@ -514,6 +514,45 @@ public sealed class AppointmentSchedulingApiTests
             cancellationAudits.Where(audit => audit.ActorSubject == clinicalSubject && audit.Outcome == "Rejected"));
         Assert.Equal((int)HttpStatusCode.Forbidden, deniedByRole.StatusCode);
         Assert.Equal(TestJwtTokenFactory.Issuer, deniedByRole.ActorIssuer);
+
+        // A second appointment has already checked in. Appointment cancellation
+        // must not orphan its durable queue entry or change the appointment state.
+        var checkedInBookingResponse = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments",
+            new AppointmentBookInput(session.Id, patientId, slots[1].StartsAtUtc, "Already checked in"));
+        Assert.Equal(HttpStatusCode.Created, checkedInBookingResponse.StatusCode);
+        var checkedInAppointment = await checkedInBookingResponse.Content.ReadFromJsonAsync<AppointmentDto>();
+        Assert.NotNull(checkedInAppointment);
+
+        var checkInResponse = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{checkedInAppointment!.Id:D}/check-in", null);
+        Assert.Equal(HttpStatusCode.OK, checkInResponse.StatusCode);
+
+        var cancelAfterCheckIn = await registrar.PostAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{checkedInAppointment.Id:D}/cancel", null);
+        Assert.Equal(HttpStatusCode.Conflict, cancelAfterCheckIn.StatusCode);
+
+        var checkedInReadBack = await registrar.GetFromJsonAsync<AppointmentDto>(
+            $"/api/v1/hospitals/{hospitalId:D}/appointments/{checkedInAppointment.Id:D}");
+        Assert.NotNull(checkedInReadBack);
+        Assert.Equal(AppointmentStatuses.Booked, checkedInReadBack!.Status);
+
+        var checkedInQueueEntries = await auditDb.QueueEntries.AsNoTracking()
+            .Where(entry => entry.AppointmentId == checkedInAppointment.Id)
+            .ToListAsync();
+        Assert.Single(checkedInQueueEntries);
+
+        var deniedPostCheckInCancellation = await auditDb.AuditEvents.AsNoTracking()
+            .Where(audit =>
+                audit.TenantId == tenantId &&
+                audit.ResourceType == "Appointments and scheduling" &&
+                audit.ResourceId == checkedInAppointment.Id &&
+                audit.Action == "CancelAppointment" &&
+                audit.Outcome == "Rejected")
+            .ToListAsync();
+        var deniedCheckedInCancel = Assert.Single(deniedPostCheckInCancellation);
+        Assert.Equal((int)HttpStatusCode.Conflict, deniedCheckedInCancel.StatusCode);
+        Assert.Equal(registrarSubject, deniedCheckedInCancel.ActorSubject);
     }
 
     [Fact]
