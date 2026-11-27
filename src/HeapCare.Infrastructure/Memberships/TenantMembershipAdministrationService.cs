@@ -1,13 +1,13 @@
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
-namespace CompileCare.Infrastructure.Memberships;
+namespace HeapCare.Infrastructure.Memberships;
 
 public sealed class TenantMembershipAdministrationService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     ITenantContext tenantContext,
     IOrganizationScopeContext organizationScopeContext) : ITenantMembershipAdministrationService
 {

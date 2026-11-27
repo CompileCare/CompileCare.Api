@@ -1,12 +1,12 @@
-using CompileCare.Application.Patients;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Patients;
+namespace HeapCare.Infrastructure.Patients;
 
 public sealed class PatientService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     IOrganizationScopeContext organizationScope) : IPatientService
 {
     public async Task<PatientResult<PatientDto>> RegisterAsync(

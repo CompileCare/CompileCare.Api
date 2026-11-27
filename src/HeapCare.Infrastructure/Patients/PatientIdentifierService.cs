@@ -1,14 +1,14 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Patients;
+namespace HeapCare.Infrastructure.Patients;
 
 public sealed partial class PatientIdentifierService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     IOrganizationScopeContext organizationScope) : IPatientIdentifierService
 {
     private const int MaximumIdentifierLength = 40;

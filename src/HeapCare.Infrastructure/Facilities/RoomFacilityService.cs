@@ -1,8 +1,8 @@
-using CompileCare.Application.Facilities;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Facilities;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace CompileCare.Infrastructure.Facilities;
+namespace HeapCare.Infrastructure.Facilities;
 
 public sealed partial class FacilityService
 {
