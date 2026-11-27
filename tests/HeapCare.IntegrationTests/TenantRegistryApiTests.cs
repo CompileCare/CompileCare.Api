@@ -60,6 +60,29 @@ public sealed class TenantRegistryApiTests
     }
 
     [Fact]
+    public async Task TenantRegistry_RejectsInactivePersistedPlatformOperator()
+    {
+        await _factory.SeedPlatformOperatorAsync(isActive: false);
+        using var client = CreateAuthenticatedClient();
+
+        var response = await client.GetAsync("/api/v1/platform/tenants");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var audit = await db.AuditEvents.SingleAsync(value =>
+            value.Action == "ListPlatformTenants");
+
+        Assert.Null(audit.TenantId);
+        Assert.Null(audit.ResourceId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+        Assert.Equal(TestJwtTokenFactory.Subject, audit.ActorSubject);
+        Assert.Equal("Denied", audit.Outcome);
+        Assert.Equal((int)HttpStatusCode.Forbidden, audit.StatusCode);
+    }
+
+    [Fact]
     public async Task PlatformOperator_CanCreateListAndReadTenant()
     {
         await _factory.SeedPlatformOperatorAsync();
