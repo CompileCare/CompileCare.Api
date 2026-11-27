@@ -1,7 +1,7 @@
-using CompileCare.Api.Security;
-using CompileCare.Application.Staff;
+using HeapCare.Api.Security;
+using HeapCare.Application.Staff;
 
-namespace CompileCare.Api;
+namespace HeapCare.Api;
 
 public static class StaffEndpoints
 {

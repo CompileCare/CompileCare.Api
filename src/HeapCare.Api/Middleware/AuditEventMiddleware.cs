@@ -1,12 +1,12 @@
-using CompileCare.Api.Security;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Security;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore.Storage;
 using Serilog.Context;
 
-namespace CompileCare.Api.Middleware;
+namespace HeapCare.Api.Middleware;
 
 /// <summary>
 /// Writes metadata-only audit events for tenant-scoped, user-scoped and platform-operator API requests.
@@ -22,7 +22,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(
         HttpContext context,
-        CompileCareDbContext db,
+        HeapCareDbContext db,
         ITenantContext tenantContext,
         ILogger<AuditEventMiddleware> logger)
     {
@@ -92,7 +92,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
                 tenantContext,
                 context.Response.StatusCode));
 
-            // CompileCareDbContext and application services are scoped: the endpoint's
+            // HeapCareDbContext and application services are scoped: the endpoint's
             // SaveChanges and this audit insert participate in the same transaction.
             await db.SaveChangesAsync(CancellationToken.None);
             await transaction.CommitAsync(CancellationToken.None);
@@ -247,7 +247,7 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         HttpContext context,
         Endpoint endpoint,
         ITenantContext tenantContext,
-        CompileCareDbContext db,
+        HeapCareDbContext db,
         ILogger<AuditEventMiddleware> logger)
     {
         try

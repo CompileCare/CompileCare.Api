@@ -1,6 +1,6 @@
 using Serilog.Context;
 
-namespace CompileCare.Api.Middleware;
+namespace HeapCare.Api.Middleware;
 
 public sealed class CorrelationIdMiddleware(RequestDelegate next)
 {
