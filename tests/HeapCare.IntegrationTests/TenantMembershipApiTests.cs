@@ -308,6 +308,75 @@ public sealed class TenantMembershipApiTests
     }
 
     [Fact]
+    public async Task MembershipCreation_RejectsDepartmentPairedWithDifferentHospitalAndPersistsCanonicalParent()
+    {
+        await _factory.SeedPlatformOperatorAsync();
+        using var platformClient = CreateClient(TestJwtTokenFactory.Subject);
+
+        var tenantId = await CreateTenantAsync(
+            platformClient, "Department scope validation tenant", "department-scope-validation");
+        var initialAdmin = await platformClient.PostAsJsonAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/initial-administrator",
+            new { issuer = TestJwtTokenFactory.Issuer, subject = "department-scope-admin" });
+        Assert.Equal(HttpStatusCode.Created, initialAdmin.StatusCode);
+
+        var activate = await platformClient.PostAsync(
+            $"/api/v1/platform/tenants/{tenantId:D}/activate", content: null);
+        Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
+
+        using var adminClient = CreateClient("department-scope-admin", tenantId);
+        var hospitalA = await CreateHospitalAsync(adminClient, "Scope Hospital A", "SCOPE-A");
+        var hospitalB = await CreateHospitalAsync(adminClient, "Scope Hospital B", "SCOPE-B");
+        var departmentA = await CreateDepartmentAsync(adminClient, hospitalA, "Department A");
+        var departmentB = await CreateDepartmentAsync(adminClient, hospitalB, "Department B");
+
+        var mismatchedParent = await adminClient.PostAsJsonAsync(
+            "/api/v1/tenant/memberships",
+            new
+            {
+                issuer = TestJwtTokenFactory.Issuer,
+                subject = "mismatched-department-scope",
+                role = TenantRoles.ClinicalUser,
+                scopes = new[]
+                {
+                    new
+                    {
+                        scopeType = OrganizationScopeTypes.Department,
+                        hospitalId = hospitalA,
+                        departmentId = departmentB
+                    }
+                }
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, mismatchedParent.StatusCode);
+
+        var canonicalDepartmentScope = await adminClient.PostAsJsonAsync(
+            "/api/v1/tenant/memberships",
+            new
+            {
+                issuer = TestJwtTokenFactory.Issuer,
+                subject = "canonical-department-scope",
+                role = TenantRoles.ClinicalUser,
+                scopes = new[]
+                {
+                    new
+                    {
+                        scopeType = OrganizationScopeTypes.Department,
+                        departmentId = departmentA
+                    }
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.Created, canonicalDepartmentScope.StatusCode);
+        using var document = JsonDocument.Parse(
+            await canonicalDepartmentScope.Content.ReadAsStringAsync());
+        var scope = Assert.Single(document.RootElement.GetProperty("scopes").EnumerateArray());
+        Assert.Equal(OrganizationScopeTypes.Department,
+            scope.GetProperty("scopeType").GetString());
+        Assert.Equal(hospitalA, scope.GetProperty("hospitalId").GetGuid());
+        Assert.Equal(departmentA, scope.GetProperty("departmentId").GetGuid());
+    }
+
+    [Fact]
     public async Task MembershipRoleScopeAndActivationChanges_AreAuditedAsMetadata()
     {
         await _factory.SeedPlatformOperatorAsync();
