@@ -1,9 +1,9 @@
 using System.Text;
-using CompileCare.Api.Security;
-using CompileCare.Application.Auditing;
+using HeapCare.Api.Security;
+using HeapCare.Application.Auditing;
 using Microsoft.AspNetCore.Routing;
 
-namespace CompileCare.Api.Endpoints;
+namespace HeapCare.Api.Endpoints;
 
 public static class AuditEndpoints
 {

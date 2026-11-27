@@ -1,7 +1,7 @@
-using CompileCare.Api.Security;
-using CompileCare.Application.Facilities;
+using HeapCare.Api.Security;
+using HeapCare.Application.Facilities;
 
-namespace CompileCare.Api;
+namespace HeapCare.Api;
 
 public static class HospitalEndpoints
 {

@@ -8,7 +8,7 @@
     <PackageReference Include="Npgsql.OpenTelemetry" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../CompileCare.Application/CompileCare.Application.csproj" />
-    <ProjectReference Include="../CompileCare.Infrastructure/CompileCare.Infrastructure.csproj" />
+    <ProjectReference Include="../HeapCare.Application/HeapCare.Application.csproj" />
+    <ProjectReference Include="../HeapCare.Infrastructure/HeapCare.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
