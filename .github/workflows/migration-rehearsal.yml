@@ -52,6 +52,12 @@ jobs:
           ref: main
           path: HeapCare.Observability
 
+      - uses: actions/checkout@v4
+        with:
+          repository: CompileCare/CompileCare.Observability
+          ref: 935f6629d5abb92296385ec2e0c1ec04060b3fb7
+          path: CompileCare.Observability.Legacy
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
