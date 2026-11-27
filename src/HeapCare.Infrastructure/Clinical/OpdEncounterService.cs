@@ -1,13 +1,13 @@
-using CompileCare.Application.Clinical;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Clinical;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace CompileCare.Infrastructure.Clinical;
+namespace HeapCare.Infrastructure.Clinical;
 
 public sealed class OpdEncounterService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     IOrganizationScopeContext organizationScope) : IOpdEncounterService
 {
     public async Task<OpdEncounterResult<OpdEncounterDto>> CreateFromQueueAsync(

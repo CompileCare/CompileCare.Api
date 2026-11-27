@@ -1,13 +1,13 @@
-using CompileCare.Application.Facilities;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Facilities;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace CompileCare.Infrastructure.Facilities;
+namespace HeapCare.Infrastructure.Facilities;
 
 public sealed partial class FacilityService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     IOrganizationScopeContext organizationScopeContext) : IFacilityService
 {
     private IQueryable<Hospital> ScopedHospitals()

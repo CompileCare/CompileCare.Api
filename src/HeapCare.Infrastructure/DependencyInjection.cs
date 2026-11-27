@@ -1,37 +1,37 @@
-using CompileCare.Application.Appointments;
-using CompileCare.Application.Auditing;
-using CompileCare.Application.Billing;
-using CompileCare.Application.Clinical;
-using CompileCare.Application.Facilities;
-using CompileCare.Application.Patients;
-using CompileCare.Application.Staff;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Appointments;
-using CompileCare.Infrastructure.Auditing;
-using CompileCare.Infrastructure.Billing;
-using CompileCare.Infrastructure.Clinical;
-using CompileCare.Infrastructure.Facilities;
-using CompileCare.Infrastructure.Memberships;
-using CompileCare.Infrastructure.Patients;
-using CompileCare.Infrastructure.Staff;
-using CompileCare.Infrastructure.Persistence;
-using CompileCare.Infrastructure.Tenants;
+using HeapCare.Application.Appointments;
+using HeapCare.Application.Auditing;
+using HeapCare.Application.Billing;
+using HeapCare.Application.Clinical;
+using HeapCare.Application.Facilities;
+using HeapCare.Application.Patients;
+using HeapCare.Application.Staff;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Appointments;
+using HeapCare.Infrastructure.Auditing;
+using HeapCare.Infrastructure.Billing;
+using HeapCare.Infrastructure.Clinical;
+using HeapCare.Infrastructure.Facilities;
+using HeapCare.Infrastructure.Memberships;
+using HeapCare.Infrastructure.Patients;
+using HeapCare.Infrastructure.Staff;
+using HeapCare.Infrastructure.Persistence;
+using HeapCare.Infrastructure.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CompileCare.Infrastructure;
+namespace HeapCare.Infrastructure;
 
 public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("CompileCare");
-        services.AddDbContext<CompileCareDbContext>(options =>
+        services.AddDbContext<HeapCareDbContext>(options =>
         {
             if (!string.IsNullOrWhiteSpace(connectionString))
                 options.UseNpgsql(connectionString, npgsql =>
-                    npgsql.MigrationsAssembly(typeof(CompileCareDbContext).Assembly.FullName));
+                    npgsql.MigrationsAssembly(typeof(HeapCareDbContext).Assembly.FullName));
         });
 
         if (!string.IsNullOrWhiteSpace(connectionString))
