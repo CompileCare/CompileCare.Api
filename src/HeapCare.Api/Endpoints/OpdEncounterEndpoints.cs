@@ -1,8 +1,8 @@
 using System.Security.Claims;
-using CompileCare.Api.Security;
-using CompileCare.Application.Clinical;
+using HeapCare.Api.Security;
+using HeapCare.Application.Clinical;
 
-namespace CompileCare.Api;
+namespace HeapCare.Api;
 
 public static class OpdEncounterEndpoints
 {

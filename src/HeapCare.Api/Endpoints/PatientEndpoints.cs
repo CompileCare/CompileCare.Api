@@ -1,7 +1,7 @@
-using CompileCare.Api.Security;
-using CompileCare.Application.Patients;
+using HeapCare.Api.Security;
+using HeapCare.Application.Patients;
 
-namespace CompileCare.Api;
+namespace HeapCare.Api;
 
 public static class PatientEndpoints
 {
