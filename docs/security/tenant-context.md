@@ -33,7 +33,7 @@ Authenticated staff clients can discover their own active tenant memberships bef
 - `GET /api/v1/me/tenant-contexts?page=1&pageSize=50`
 - Requires a validated OIDC bearer token; no `X-Tenant-ID` header is accepted or needed.
 - Resolves memberships only by the validated issuer and `sub` claims. External role/permission claims are ignored.
-- Returns active memberships for active tenants, with the persisted CompileCare role and organization scopes. Results are bounded and paginated.
+- Returns active memberships for active tenants, with the persisted HeapCare role and organization scopes. Results are bounded and paginated.
 - Does not create or select a tenant context for the request. The client must choose one of the returned tenant IDs and then send that ID as `X-Tenant-ID` on subsequent tenant-scoped API requests.
 - The endpoint is user-scoped and its reads, denials and failures are written to the metadata-only audit log. No membership credentials, request bodies or patient data are included.
 
