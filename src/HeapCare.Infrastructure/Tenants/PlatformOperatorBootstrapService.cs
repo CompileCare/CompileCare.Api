@@ -1,18 +1,18 @@
 using System.Data;
 using System.Security.Cryptography;
 using System.Text;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
-namespace CompileCare.Infrastructure.Tenants;
+namespace HeapCare.Infrastructure.Tenants;
 
 /// <summary>
 /// One-time bootstrap for the first local platform operator. The API endpoint is
 /// Development-only; the caller must also present a validated OIDC identity.
 /// </summary>
-public sealed class PlatformOperatorBootstrapService(CompileCareDbContext db) : IPlatformOperatorBootstrapService
+public sealed class PlatformOperatorBootstrapService(HeapCareDbContext db) : IPlatformOperatorBootstrapService
 {
     // Stable, application-specific PostgreSQL advisory-lock key. This is a
     // transaction-scoped lock, so PostgreSQL releases it on commit or rollback.

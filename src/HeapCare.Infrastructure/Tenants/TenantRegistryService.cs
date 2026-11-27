@@ -1,12 +1,12 @@
 using System.Text.RegularExpressions;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace CompileCare.Infrastructure.Tenants;
+namespace HeapCare.Infrastructure.Tenants;
 
-public sealed class TenantRegistryService(CompileCareDbContext db) : ITenantRegistryService
+public sealed class TenantRegistryService(HeapCareDbContext db) : ITenantRegistryService
 {
     private static readonly Regex SlugPattern =
         new("^[a-z0-9]+(?:-[a-z0-9]+)*$", RegexOptions.CultureInvariant | RegexOptions.Compiled);

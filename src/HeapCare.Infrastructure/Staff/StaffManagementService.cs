@@ -1,13 +1,13 @@
-using CompileCare.Application.Staff;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Application.Staff;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace CompileCare.Infrastructure.Staff;
+namespace HeapCare.Infrastructure.Staff;
 
 public sealed class StaffManagementService(
-    CompileCareDbContext db,
+    HeapCareDbContext db,
     IOrganizationScopeContext organizationScope) : IStaffManagementService
 {
     public async Task<StaffResult<StaffProfileDto>> CreateAsync(

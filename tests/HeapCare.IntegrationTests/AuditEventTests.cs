@@ -1,13 +1,13 @@
 using System.Net;
 using System.Net.Http.Headers;
-using CompileCare.Api.Middleware;
-using CompileCare.Application.Tenancy;
-using CompileCare.Infrastructure.Persistence;
+using HeapCare.Api.Middleware;
+using HeapCare.Application.Tenancy;
+using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
-namespace CompileCare.IntegrationTests;
+namespace HeapCare.IntegrationTests;
 
 [Collection("PostgreSQL integration")]
 public sealed class AuditEventTests
@@ -35,7 +35,7 @@ public sealed class AuditEventTests
         Assert.Equal("audit-success-123", response.Headers.GetValues(CorrelationIdMiddleware.HeaderName).Single());
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await db.AuditEvents.SingleAsync();
 
         Assert.Equal(tenantId, auditEvent.TenantId);
@@ -64,7 +64,7 @@ public sealed class AuditEventTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await db.AuditEvents.SingleAsync();
 
         Assert.Null(auditEvent.TenantId);
@@ -87,7 +87,7 @@ public sealed class AuditEventTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await db.AuditEvents.SingleAsync();
 
         auditEvent.Action = "TamperedAction";
@@ -115,7 +115,7 @@ public sealed class AuditEventTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await db.AuditEvents.SingleAsync();
 
         Assert.Null(auditEvent.TenantId);
@@ -140,7 +140,7 @@ public sealed class AuditEventTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CompileCareDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await db.AuditEvents.SingleAsync();
 
         Assert.Null(auditEvent.TenantId);
