@@ -428,12 +428,16 @@ public sealed class AppointmentSchedulingApiTests
         using var registrar = CreateClient(tenantId, registrarSubject);
         using var clinicalUser = CreateClient(tenantId, clinicalSubject);
 
-        var date = new DateOnly(2026, 12, 18);
+        var appointmentZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        var localStart = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, appointmentZone)
+            .DateTime.AddMinutes(10);
+        var start = new TimeOnly(localStart.Hour, localStart.Minute, localStart.Second);
+        var date = DateOnly.FromDateTime(localStart);
         var sessionResponse = await admin.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/availability-sessions",
             new AvailabilitySessionCreateInput(
                 departmentId, providerId, date,
-                new TimeOnly(9, 0), new TimeOnly(10, 0), 30, "Asia/Kolkata"));
+                start, start.AddMinutes(20), 10, "Asia/Kolkata"));
         Assert.Equal(HttpStatusCode.Created, sessionResponse.StatusCode);
         var session = await sessionResponse.Content.ReadFromJsonAsync<AvailabilitySessionDto>();
         Assert.NotNull(session);
