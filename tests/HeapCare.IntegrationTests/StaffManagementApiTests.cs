@@ -288,6 +288,104 @@ public sealed class StaffManagementApiTests
         });
     }
 
+    [Fact]
+    public async Task DepartmentScopedAdmin_CannotDiscoverReadOrMutateStaffOutsideAssignedDepartment()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentA) = await SeedHospitalAndDepartmentAsync(tenantId);
+        Guid departmentB;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+            var department = new Department
+            {
+                HospitalId = hospitalId,
+                Name = "Surgery",
+                Code = "SUR"
+            };
+            db.Departments.Add(department);
+            await db.SaveChangesAsync();
+            departmentB = department.Id;
+        }
+
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
+            subject: "staff-dept-scope-admin");
+        await _factory.SeedTenantMembershipAsync(
+            tenantId, TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Department, hospitalId, departmentB)],
+            subject: "staff-dept-scope-member");
+
+        using var admin = CreateClient(tenantId, "staff-dept-scope-admin");
+        using var departmentAdmin = CreateClient(tenantId, "staff-dept-scope-member");
+
+        var outsideCreate = await admin.PostAsJsonAsync("/api/v1/staff", new StaffProfileCreateInput(
+            "STAFF-OUTSIDE-001", "Asha", null, "Patil", "Consultant",
+            hospitalId, departmentA, new DateOnly(2026, 1, 1)));
+        var insideCreate = await admin.PostAsJsonAsync("/api/v1/staff", new StaffProfileCreateInput(
+            "STAFF-INSIDE-001", "Ravi", null, "Deshmukh", "Consultant",
+            hospitalId, departmentB, new DateOnly(2026, 1, 1)));
+        Assert.Equal(HttpStatusCode.Created, outsideCreate.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, insideCreate.StatusCode);
+        var outside = await outsideCreate.Content.ReadFromJsonAsync<StaffProfileDto>();
+        var inside = await insideCreate.Content.ReadFromJsonAsync<StaffProfileDto>();
+        Assert.NotNull(outside);
+        Assert.NotNull(inside);
+        var outsideAssignment = Assert.Single(outside!.Assignments);
+
+        var list = await departmentAdmin.GetFromJsonAsync<StaffPage>("/api/v1/staff?page=1&pageSize=10");
+        Assert.NotNull(list);
+        Assert.Equal(1, list!.TotalCount);
+        Assert.Equal(inside!.Id, Assert.Single(list.Items).Id);
+
+        var hiddenRead = await departmentAdmin.GetAsync($"/api/v1/staff/{outside.Id:D}");
+        var hiddenUpdate = await departmentAdmin.PutAsJsonAsync(
+            $"/api/v1/staff/{outside.Id:D}",
+            new StaffProfileUpdateInput("Unauthorized", null, "Update", "Unauthorized"));
+        var hiddenDeactivate = await departmentAdmin.PostAsync(
+            $"/api/v1/staff/{outside.Id:D}/deactivate", null);
+        var hiddenAssignment = await departmentAdmin.PostAsJsonAsync(
+            $"/api/v1/staff/{outside.Id:D}/assignments",
+            new StaffAssignmentInput(hospitalId, departmentB, new DateOnly(2026, 3, 1)));
+        var hiddenEndAssignment = await departmentAdmin.PostAsJsonAsync(
+            $"/api/v1/staff/{outside.Id:D}/assignments/{outsideAssignment.Id:D}/end",
+            new StaffAssignmentEndInput(new DateOnly(2026, 8, 31)));
+
+        Assert.All(
+            new[] { hiddenRead, hiddenUpdate, hiddenDeactivate, hiddenAssignment, hiddenEndAssignment },
+            response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+
+        var permittedRead = await departmentAdmin.GetAsync($"/api/v1/staff/{inside.Id:D}");
+        Assert.Equal(HttpStatusCode.OK, permittedRead.StatusCode);
+
+        var unchanged = await admin.GetFromJsonAsync<StaffProfileDto>($"/api/v1/staff/{outside.Id:D}");
+        Assert.NotNull(unchanged);
+        Assert.Equal("Asha", unchanged!.GivenName);
+        Assert.True(unchanged.IsActive);
+        Assert.Single(unchanged.Assignments);
+
+        using var scopeAudit = _factory.Services.CreateScope();
+        scopeAudit.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var dbAudit = scopeAudit.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var deniedAudits = await dbAudit.AuditEvents.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ActorSubject == "staff-dept-scope-member" &&
+                item.ResourceType == "Staff" &&
+                item.Outcome == "Rejected")
+            .ToListAsync();
+        Assert.Equal(5, deniedAudits.Count);
+        Assert.All(deniedAudits, audit =>
+        {
+            Assert.Equal(tenantId, audit.RequestedTenantId);
+            Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+            Assert.Equal("staff-dept-scope-member", audit.ActorSubject);
+            Assert.Equal((int)HttpStatusCode.NotFound, audit.StatusCode);
+        });
+    }
+
     private async Task<(Guid HospitalId, Guid DepartmentId)> SeedHospitalAndDepartmentAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateScope();
