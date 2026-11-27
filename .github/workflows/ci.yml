@@ -35,15 +35,15 @@ jobs:
         with:
           repository: CompileCare/CompileCare.Observability
           ref: main
-          path: CompileCare.Observability
+          path: HeapCare.Observability
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
       - name: Pack HeapCare observability packages into an ephemeral feed
         run: |
           mkdir -p .ci-nuget
-          dotnet pack CompileCare.Observability/src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
-          dotnet pack CompileCare.Observability/src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
+          dotnet pack HeapCare.Observability/src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
+          dotnet pack HeapCare.Observability/src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
           cat > .ci-nuget.config <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
@@ -65,10 +65,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - run: dotnet restore CompileCare.Api.slnx --configfile .ci-nuget.config
-      - run: dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+      - run: dotnet restore HeapCare.Api.slnx --configfile .ci-nuget.config
+      - run: dotnet build HeapCare.Api.slnx --configuration Release --no-restore
       - name: Restore .NET tools
         run: dotnet tool restore
       - name: Detect pending EF Core model changes
-        run: dotnet ef migrations has-pending-model-changes --project src/CompileCare.Infrastructure --startup-project src/CompileCare.Api
-      - run: dotnet test CompileCare.Api.slnx --configuration Release --no-build
+        run: dotnet ef migrations has-pending-model-changes --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api
+      - run: dotnet test HeapCare.Api.slnx --configuration Release --no-build
