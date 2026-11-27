@@ -1,6 +1,6 @@
 # HeapCare API
 
-> **HeapCare migration status:** .NET solution, project/folder names, source namespaces, EF context/migration namespaces, package references and API-facing documentation are migrated and merged to main. The GitHub repository slug and owner remain CompileCare until the administrative rename. The existing PostgreSQL database/role, EF migration IDs/history, legacy connection-string key remains a fallback, while HeapCare is preferred; OIDC realm/client/audience remain compatibility contracts; do not rename or recreate them as part of this code migration.
+> **HeapCare migration status:** .NET solution, project/folder names, source namespaces, EF context/migration namespaces, package references and API-facing documentation are migrated and merged to main. The GitHub organization and repository slug are now HeapCare. The existing PostgreSQL database/role, EF migration IDs/history, legacy connection-string key remains a fallback, while HeapCare is preferred; OIDC realm/client/audience remain compatibility contracts; do not rename or recreate them as part of this code migration.
 
 Tenant-aware modular backend for the HeapCare healthcare platform.
 
@@ -40,7 +40,7 @@ Example local connection string:
 Host=localhost;Database=compilecare;Username=compilecare;Password=replace-me
 ```
 
-Outside Development and the isolated `Testing` host, the API requires `ConnectionStrings:CompileCare` and rejects startup unless PostgreSQL uses `SSL Mode=VerifyFull` with `Trust Server Certificate=false`. This verifies both the certificate chain and server hostname. If the selected provider uses a private CA, mount its CA certificate securely and configure Npgsql's `Root Certificate` connection-string option. Do not disable certificate validation to work around a provider certificate problem. Development may use the local plaintext PostgreSQL service.
+Outside Development and the isolated `Testing` host, the API requires `ConnectionStrings:HeapCare` (the legacy `ConnectionStrings:CompileCare` key remains a compatibility fallback) and rejects startup unless PostgreSQL uses `SSL Mode=VerifyFull` with `Trust Server Certificate=false`. This verifies both the certificate chain and server hostname. If the selected provider uses a private CA, mount its CA certificate securely and configure Npgsql's `Root Certificate` connection-string option. Do not disable certificate validation to work around a provider certificate problem. Development may use the local plaintext PostgreSQL service.
 
 Example production connection-string shape (replace host/database/user and supply the password from a secret manager):
 
@@ -83,9 +83,9 @@ Tenant roles are stored in the HeapCare database. Current facility permissions a
 - `FacilityManager`: read and create/update facility records.
 - `FacilityViewer`: read facility records only.
 
-The complete source-derived grant snapshot for all five persisted tenant roles, including patient registration, identifiers, staff, appointments, OPD, billing and audit capabilities, is maintained in the [persisted role-to-permission matrix](https://github.com/CompileCare/Compilecare.Doc/blob/main/security/persisted-role-permission-matrix.md). PlatformOperator is a separate global identity, not a tenant membership role. The matrix describes current implementation grants and does not replace product/clinical approval or endpoint/resource-scope verification.
+The complete source-derived grant snapshot for all five persisted tenant roles, including patient registration, identifiers, staff, appointments, OPD, billing and audit capabilities, is maintained in the [persisted role-to-permission matrix](https://github.com/HeapCare/HeapCare.Doc/blob/main/security/persisted-role-permission-matrix.md). PlatformOperator is a separate global identity, not a tenant membership role. The matrix describes current implementation grants and does not replace product/clinical approval or endpoint/resource-scope verification.
 
-Token-supplied role or permission claims do not grant HeapCare access. The source-derived [API authorization policy inventory](https://github.com/CompileCare/Compilecare.Doc/blob/main/security/authorization-policy-inventory.md) documents current policy-to-endpoint assignments and the required role/scope regression review; it is an inventory, not a grant matrix. Tenant registry endpoints are available only to persisted platform operators at `/api/v1/platform/tenants`. New tenants start in `Provisioning`; activation, suspension and closure are explicit lifecycle transitions. The first platform operator must be bootstrapped out-of-band by an authorised database administrator using the exact validated OIDC issuer and subject. Platform operators can provision exactly one initial tenant-wide HospitalAdmin while a tenant is in Provisioning. Tenant HospitalAdmins can create, update, deactivate and reactivate memberships inside their assigned organization scope. New memberships require an explicit tenant, hospital or department scope.
+Token-supplied role or permission claims do not grant HeapCare access. The source-derived [API authorization policy inventory](https://github.com/HeapCare/HeapCare.Doc/blob/main/security/authorization-policy-inventory.md) documents current policy-to-endpoint assignments and the required role/scope regression review; it is an inventory, not a grant matrix. Tenant registry endpoints are available only to persisted platform operators at `/api/v1/platform/tenants`. New tenants start in `Provisioning`; activation, suspension and closure are explicit lifecycle transitions. The first platform operator must be bootstrapped out-of-band by an authorised database administrator using the exact validated OIDC issuer and subject. Platform operators can provision exactly one initial tenant-wide HospitalAdmin while a tenant is in Provisioning. Tenant HospitalAdmins can create, update, deactivate and reactivate memberships inside their assigned organization scope. New memberships require an explicit tenant, hospital or department scope.
 
 ### Platform tenant registry
 
@@ -193,7 +193,7 @@ The first staff-management increment provides tenant-owned workforce profiles an
 
 Only HospitalAdmin receives the new staff read/manage permissions in this first increment. Every request still requires validated OIDC identity, active tenant membership, tenant context and organization-scope validation. Profiles and assignments are tenant-owned with composite tenant-aware facility/profile foreign keys. Provider designation is descriptive metadata only—not credential or clinical-privilege verification. Login provisioning, membership linking, payroll, attendance, credentialing and sensitive employment identifiers are deferred.
 
-See [staff module API documentation](docs/modules/staff/README.md) and [documentation PR #21](https://github.com/CompileCare/Compilecare.Doc/pull/21) for the product workflow and design boundaries.
+See [staff module API documentation](docs/modules/staff/README.md) and [documentation PR #21](https://github.com/HeapCare/HeapCare.Doc/pull/21) for the product workflow and design boundaries.
 
 ## Tenant isolation
 
