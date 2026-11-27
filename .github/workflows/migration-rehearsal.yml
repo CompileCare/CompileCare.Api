@@ -3,8 +3,8 @@ name: PostgreSQL Migration Rehearsal
 on:
   pull_request:
     paths:
-      - "src/CompileCare.Infrastructure/**"
-      - "src/CompileCare.Api/**"
+      - "src/HeapCare.Infrastructure/**"
+      - "src/HeapCare.Api/**"
       - ".github/workflows/migration-rehearsal.yml"
       - "Directory.Build.props"
       - "Directory.Packages.props"
@@ -51,7 +51,7 @@ jobs:
         with:
           repository: CompileCare/CompileCare.Observability
           ref: main
-          path: CompileCare.Observability
+          path: HeapCare.Observability
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -60,8 +60,8 @@ jobs:
       - name: Pack HeapCare observability packages for the PR revision
         run: |
           mkdir -p .ci-nuget
-          dotnet pack CompileCare.Observability/src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
-          dotnet pack CompileCare.Observability/src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
+          dotnet pack HeapCare.Observability/src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
+          dotnet pack HeapCare.Observability/src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -o .ci-nuget
           cat > .ci-nuget.config <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
@@ -105,30 +105,30 @@ jobs:
       - name: Restore and build base revision
         working-directory: /tmp/compilecare-base
         run: |
-          dotnet restore CompileCare.Api.slnx --configfile NuGet.Config
+          dotnet restore HeapCare.Api.slnx --configfile NuGet.Config
           dotnet tool restore
-          dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+          dotnet build HeapCare.Api.slnx --configuration Release --no-restore
 
       - name: Apply base migrations to the upgrade database
         working-directory: /tmp/compilecare-base
         run: |
           dotnet ef database update \
-            --project src/CompileCare.Infrastructure \
-            --startup-project src/CompileCare.Api \
-            --context CompileCareDbContext
+            --project src/HeapCare.Infrastructure \
+            --startup-project src/HeapCare.Api \
+            --context HeapCareDbContext
 
       - name: Restore and build pull request revision
         run: |
-          dotnet restore CompileCare.Api.slnx --configfile .ci-nuget.config
+          dotnet restore HeapCare.Api.slnx --configfile .ci-nuget.config
           dotnet tool restore
-          dotnet build CompileCare.Api.slnx --configuration Release --no-restore
+          dotnet build HeapCare.Api.slnx --configuration Release --no-restore
 
       - name: Generate idempotent migration script from pull request revision
         run: |
           dotnet ef migrations script --idempotent \
-            --project src/CompileCare.Infrastructure \
-            --startup-project src/CompileCare.Api \
-            --context CompileCareDbContext \
+            --project src/HeapCare.Infrastructure \
+            --startup-project src/HeapCare.Api \
+            --context HeapCareDbContext \
             --output /tmp/compilecare-current-migrations.sql
 
       - name: Rehearse upgrade and fresh-database installation
