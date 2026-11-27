@@ -358,6 +358,41 @@ public sealed class PatientDuplicateDetectionApiTests
         Assert.Equal((int)HttpStatusCode.Forbidden, audit.StatusCode);
     }
 
+    [Fact]
+    public async Task ClinicalUser_CannotReviewPatientDuplicateCandidates_AndDenialIsAudited()
+    {
+        var tenantId = Guid.NewGuid();
+        const string subject = "duplicate-denied-clinical-user";
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.ClinicalUser, subject: subject);
+        var hospitalId = await SeedHospitalAsync(tenantId, "Clinical Duplicate Review Hospital");
+        using var client = CreateClient(tenantId, subject);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/patients/duplicate-candidates",
+            new PatientDuplicateCheckRequest("Asha", null, "Patil", new DateOnly(1990, 4, 12)));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Asha", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Patil", body, StringComparison.Ordinal);
+
+        using var auditScope = _factory.Services.CreateScope();
+        auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var audit = await auditDb.AuditEvents.AsNoTracking().SingleAsync(item =>
+            item.TenantId == tenantId &&
+            item.ActorSubject == subject &&
+            item.Action == "FindPatientDuplicateCandidates");
+
+        Assert.Equal(tenantId, audit.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, audit.ActorIssuer);
+        Assert.Equal(subject, audit.ActorSubject);
+        Assert.Equal("Patients", audit.ResourceType);
+        Assert.Equal(hospitalId, audit.ResourceId);
+        Assert.Equal("Denied", audit.Outcome);
+        Assert.Equal((int)HttpStatusCode.Forbidden, audit.StatusCode);
+    }
+
     private async Task<PatientDto> RegisterPatientAsync(
         HttpClient client,
         Guid hospitalId,
