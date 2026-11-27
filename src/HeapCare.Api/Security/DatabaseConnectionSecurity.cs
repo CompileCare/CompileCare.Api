@@ -11,11 +11,11 @@ public static class DatabaseConnectionSecurity
         if (environment.IsDevelopment() || environment.IsEnvironment("Testing"))
             return;
 
-        var connectionString = configuration.GetConnectionString("CompileCare");
+        var connectionString = configuration.GetConnectionString("HeapCare") ?? configuration.GetConnectionString("CompileCare");
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
-                "ConnectionStrings:CompileCare must be configured outside Development.");
+                "ConnectionStrings:HeapCare (or legacy ConnectionStrings:CompileCare) must be configured outside Development.");
         }
 
         NpgsqlConnectionStringBuilder connection;
@@ -28,7 +28,7 @@ public static class DatabaseConnectionSecurity
             // Do not include the original connection string in the exception;
             // it may contain credentials and will be surfaced in startup logs.
             throw new InvalidOperationException(
-                "ConnectionStrings:CompileCare must be a valid PostgreSQL connection string.");
+                "ConnectionStrings:HeapCare (or legacy ConnectionStrings:CompileCare) must be a valid PostgreSQL connection string.");
         }
 
         if (connection.SslMode != SslMode.VerifyFull)
