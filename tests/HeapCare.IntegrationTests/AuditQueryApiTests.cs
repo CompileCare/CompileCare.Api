@@ -262,6 +262,41 @@ public sealed class AuditQueryApiTests
         Assert.Equal(expectedIds.Skip(2), secondPage!.Items.Select(item => item.Id));
     }
 
+    [Fact]
+    public async Task CsvExportNeutralizesAllSpreadsheetFormulaPrefixesAndLeadingWhitespace()
+    {
+        var tenantId = Guid.NewGuid();
+        const string exporter = "audit-csv-exporter";
+        var subjects = new[]
+        {
+            "=1+1",
+            "+1+1",
+            "-1+1",
+            "@SUM(1,1)",
+            " \t=1+1"
+        };
+
+        await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin, subject: exporter);
+        foreach (var subject in subjects)
+        {
+            await _factory.SeedTenantMembershipAsync(tenantId, TenantRoles.HospitalAdmin, subject: subject);
+            using var actor = CreateAuthenticatedClient(tenantId, subject);
+            Assert.Equal(HttpStatusCode.OK, (await actor.GetAsync("/api/v1/hospitals")).StatusCode);
+        }
+
+        using var exportClient = CreateAuthenticatedClient(tenantId, exporter);
+        var query = BuildQuery(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(1));
+        var response = await exportClient.GetAsync($"/api/v1/audit/events/export?{query}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var csv = await response.Content.ReadAsStringAsync();
+        Assert.Contains("\"'=1+1\"", csv, StringComparison.Ordinal);
+        Assert.Contains("\"'+1+1\"", csv, StringComparison.Ordinal);
+        Assert.Contains("\"'-1+1\"", csv, StringComparison.Ordinal);
+        Assert.Contains("\"'@SUM(1,1)\"", csv, StringComparison.Ordinal);
+        Assert.Contains("\"' \t=1+1\"", csv, StringComparison.Ordinal);
+    }
+
     private async Task SeedHospitalAsync(Guid tenantId, Guid hospitalId)
     {
         using var scope = _factory.Services.CreateScope();
