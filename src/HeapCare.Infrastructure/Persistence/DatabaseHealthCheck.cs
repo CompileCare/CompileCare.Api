@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace CompileCare.Infrastructure.Persistence;
+namespace HeapCare.Infrastructure.Persistence;
 
-public sealed class DatabaseHealthCheck(CompileCareDbContext dbContext) : IHealthCheck
+public sealed class DatabaseHealthCheck(HeapCareDbContext dbContext) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace CompileCare.Infrastructure.Persistence.Configurations;
+namespace HeapCare.Infrastructure.Persistence.Configurations;
 
 public sealed class StaffProfileConfiguration : IEntityTypeConfiguration<StaffProfile>
 {

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace CompileCare.Infrastructure.Persistence.Migrations
+namespace HeapCare.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class InitialFacilityHierarchy : Migration
