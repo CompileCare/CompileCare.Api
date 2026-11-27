@@ -1,6 +1,6 @@
 # Audit events and traceability
 
-CompileCare records metadata-only audit events for tenant-scoped, user-scoped and platform-operator API requests. Audit records support accountability and incident investigation; they are not application logs and must never contain clinical note text, request/response bodies, credentials, query strings or patient payloads.
+HeapCare records metadata-only audit events for tenant-scoped, user-scoped and platform-operator API requests. Audit records support accountability and incident investigation; they are not application logs and must never contain clinical note text, request/response bodies, credentials, query strings or patient payloads.
 
 ## Recorded metadata
 
