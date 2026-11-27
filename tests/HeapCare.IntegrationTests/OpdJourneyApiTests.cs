@@ -351,9 +351,25 @@ public sealed class OpdJourneyApiTests
         var patient = await registration.Content.ReadFromJsonAsync<PatientDto>();
         Assert.NotNull(patient);
 
+        var authorizedWalkIn = await admin.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins",
+            new WalkInCreateInput(authorizedDepartmentId, patient!.Id, "Asia/Kolkata"));
+        Assert.Equal(HttpStatusCode.Created, authorizedWalkIn.StatusCode);
+        var authorizedQueueEntry = await authorizedWalkIn.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(authorizedQueueEntry);
+        Assert.Equal(authorizedDepartmentId, authorizedQueueEntry!.DepartmentId);
+
+        var allowed = await registrar.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/queue/{authorizedQueueEntry.Id:D}/call",
+            new QueueActionInput(null));
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        var calledQueueEntry = await allowed.Content.ReadFromJsonAsync<QueueEntryDto>();
+        Assert.NotNull(calledQueueEntry);
+        Assert.Equal("Called", calledQueueEntry!.Status);
+
         var walkIn = await admin.PostAsJsonAsync(
             $"/api/v1/hospitals/{hospitalId:D}/queue/walk-ins",
-            new WalkInCreateInput(unrelatedDepartmentId, patient!.Id, "Asia/Kolkata"));
+            new WalkInCreateInput(unrelatedDepartmentId, patient.Id, "Asia/Kolkata"));
         Assert.Equal(HttpStatusCode.Created, walkIn.StatusCode);
         var queueEntry = await walkIn.Content.ReadFromJsonAsync<QueueEntryDto>();
         Assert.NotNull(queueEntry);
@@ -367,18 +383,29 @@ public sealed class OpdJourneyApiTests
         using var auditScope = _factory.Services.CreateScope();
         auditScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
         var auditDb = auditScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
-        var auditEvent = await auditDb.AuditEvents
+        var auditEvents = await auditDb.AuditEvents
             .AsNoTracking()
-            .SingleAsync(item =>
+            .Where(item =>
                 item.TenantId == tenantId &&
                 item.Action == "TransitionQueueEntry" &&
-                item.ActorSubject == registrarSubject);
+                item.ActorSubject == registrarSubject)
+            .OrderBy(item => item.OccurredAtUtc)
+            .ToListAsync();
 
-        Assert.Equal(tenantId, auditEvent.RequestedTenantId);
-        Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
-        Assert.Equal(registrarSubject, auditEvent.ActorSubject);
-        Assert.Equal("Rejected", auditEvent.Outcome);
-        Assert.Equal((int)HttpStatusCode.NotFound, auditEvent.StatusCode);
+        Assert.Equal(2, auditEvents.Count);
+        var allowedAudit = Assert.Single(auditEvents, item => item.ResourceId == authorizedQueueEntry.Id);
+        Assert.Equal(tenantId, allowedAudit.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, allowedAudit.ActorIssuer);
+        Assert.Equal(registrarSubject, allowedAudit.ActorSubject);
+        Assert.Equal("Succeeded", allowedAudit.Outcome);
+        Assert.Equal((int)HttpStatusCode.OK, allowedAudit.StatusCode);
+
+        var deniedAudit = Assert.Single(auditEvents, item => item.ResourceId == queueEntry.Id);
+        Assert.Equal(tenantId, deniedAudit.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, deniedAudit.ActorIssuer);
+        Assert.Equal(registrarSubject, deniedAudit.ActorSubject);
+        Assert.Equal("Rejected", deniedAudit.Outcome);
+        Assert.Equal((int)HttpStatusCode.NotFound, deniedAudit.StatusCode);
 
         var queueAfterDenial = await admin.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/queue?departmentId={unrelatedDepartmentId:D}&date={queueEntry.QueueDateLocal:yyyy-MM-dd}&page=1&pageSize=25");
