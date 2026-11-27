@@ -37,8 +37,10 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      ConnectionStrings__HeapCareTests: Host=localhost;Port=5432;Database=compilecare_upgrade;Username=postgres;Password=postgres
-      ConnectionStrings__HeapCare: Host=localhost;Port=5432;Database=compilecare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__HeapCareTests: Host=localhost;Port=5432;Database=heapcare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__CompileCareTests: Host=localhost;Port=5432;Database=heapcare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__HeapCare: Host=localhost;Port=5432;Database=heapcare_upgrade;Username=postgres;Password=postgres
+      ConnectionStrings__CompileCare: Host=localhost;Port=5432;Database=heapcare_upgrade;Username=postgres;Password=postgres
       BASE_SHA: ${{ github.event.pull_request.base.sha }}
       PGPASSWORD: postgres
     steps:
@@ -118,25 +120,25 @@ jobs:
       - name: Prepare isolated PostgreSQL databases
         run: |
           set -euo pipefail
-          createdb --host=localhost --username=postgres compilecare_upgrade
-          createdb --host=localhost --username=postgres compilecare_fresh
+          createdb --host=localhost --username=postgres heapcare_upgrade
+          createdb --host=localhost --username=postgres heapcare_fresh
 
       - name: Check out the base migration model
         run: |
           set -euo pipefail
           git fetch origin "$BASE_SHA"
-          git worktree add /tmp/compilecare-base "$BASE_SHA"
-          cp "$GITHUB_WORKSPACE/.legacy-nuget.config" /tmp/compilecare-base/NuGet.Config
+          git worktree add /tmp/heapcare-base "$BASE_SHA"
+          cp "$GITHUB_WORKSPACE/.legacy-nuget.config" /tmp/heapcare-base/NuGet.Config
 
       - name: Restore and build base revision
-        working-directory: /tmp/compilecare-base
+        working-directory: /tmp/heapcare-base
         run: |
           dotnet restore CompileCare.Api.slnx --configfile NuGet.Config
           dotnet tool restore --configfile NuGet.Config
           dotnet build CompileCare.Api.slnx --configuration Release --no-restore
 
       - name: Apply base migrations to the upgrade database
-        working-directory: /tmp/compilecare-base
+        working-directory: /tmp/heapcare-base
         run: |
           dotnet ef database update \
             --project src/CompileCare.Infrastructure \
@@ -155,20 +157,20 @@ jobs:
             --project src/HeapCare.Infrastructure \
             --startup-project src/HeapCare.Api \
             --context HeapCareDbContext \
-            --output /tmp/compilecare-current-migrations.sql
+            --output /tmp/heapcare-current-migrations.sql
 
       - name: Rehearse upgrade and fresh-database installation
         run: |
           set -euo pipefail
-          for database in compilecare_upgrade compilecare_fresh; do
+          for database in heapcare_upgrade heapcare_fresh; do
             connection="postgresql://postgres:postgres@localhost:5432/$database"
-            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
+            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/heapcare-current-migrations.sql
             # Reapply the idempotent script to prove it safely handles an already-current schema.
-            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/compilecare-current-migrations.sql
+            psql "$connection" --set ON_ERROR_STOP=1 --file=/tmp/heapcare-current-migrations.sql
           done
-          upgrade_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_upgrade" \
+          upgrade_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/heapcare_upgrade" \
             --command='SELECT string_agg("MigrationId", chr(44) ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
-          fresh_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/compilecare_fresh" \
+          fresh_ids=$(psql -X -qAt "postgresql://postgres:postgres@localhost:5432/heapcare_fresh" \
             --command='SELECT string_agg("MigrationId", chr(44) ORDER BY "MigrationId") FROM "__EFMigrationsHistory";')
           if [[ -z "$upgrade_ids" || -z "$fresh_ids" ]]; then
             echo "::error::EF migration history was not populated in both rehearsal databases."
