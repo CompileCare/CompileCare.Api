@@ -500,18 +500,18 @@ public sealed class AppointmentSchedulingApiTests
 
         Assert.Equal(3, cancellationAudits.Count);
         var successfulCancellation = Assert.Single(
-            cancellationAudits.Where(audit => audit.ActorSubject == registrarSubject && audit.Outcome == "Succeeded"));
+            cancellationAudits, audit => audit.ActorSubject == registrarSubject && audit.Outcome == "Succeeded");
         Assert.Equal((int)HttpStatusCode.OK, successfulCancellation.StatusCode);
         Assert.Equal(TestJwtTokenFactory.Issuer, successfulCancellation.ActorIssuer);
         Assert.Equal(tenantId, successfulCancellation.RequestedTenantId);
 
         var rejectedRepeat = Assert.Single(
-            cancellationAudits.Where(audit => audit.ActorSubject == registrarSubject && audit.Outcome == "Rejected"));
+            cancellationAudits, audit => audit.ActorSubject == registrarSubject && audit.Outcome == "Rejected");
         Assert.Equal((int)HttpStatusCode.Conflict, rejectedRepeat.StatusCode);
         Assert.Equal(TestJwtTokenFactory.Issuer, rejectedRepeat.ActorIssuer);
 
         var deniedByRole = Assert.Single(
-            cancellationAudits.Where(audit => audit.ActorSubject == clinicalSubject && audit.Outcome == "Rejected"));
+            cancellationAudits, audit => audit.ActorSubject == clinicalSubject && audit.Outcome == "Rejected");
         Assert.Equal((int)HttpStatusCode.Forbidden, deniedByRole.StatusCode);
         Assert.Equal(TestJwtTokenFactory.Issuer, deniedByRole.ActorIssuer);
 
