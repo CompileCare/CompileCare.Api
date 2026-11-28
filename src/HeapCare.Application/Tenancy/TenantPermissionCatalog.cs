@@ -214,7 +214,7 @@ public static class TenantPermissionCatalog
                 TenantRoles.HospitalAdmin,
                 "Hospital Administrator",
                 "Current broad tenant/hospital administration role. Effective access remains constrained by membership organization scopes.",
-                Permissions(
+                PermissionCodes(
                     TenantPermissions.FacilityRead,
                     TenantPermissions.FacilityWrite,
                     TenantPermissions.FacilityDelete,
@@ -245,17 +245,17 @@ public static class TenantPermissionCatalog
                 TenantRoles.FacilityManager,
                 "Facility Manager",
                 "Can read and create/update facility structure; cannot delete facilities or administer memberships.",
-                Permissions(TenantPermissions.FacilityRead, TenantPermissions.FacilityWrite)),
+                PermissionCodes(TenantPermissions.FacilityRead, TenantPermissions.FacilityWrite)),
             new TenantSystemRoleDefinition(
                 TenantRoles.FacilityViewer,
                 "Facility Viewer",
                 "Read-only access to facility structure.",
-                Permissions(TenantPermissions.FacilityRead)),
+                PermissionCodes(TenantPermissions.FacilityRead)),
             new TenantSystemRoleDefinition(
                 TenantRoles.PatientRegistrar,
                 "Patient Registrar",
                 "Current reception/registration baseline, including appointment, queue and cashier operations already present in the API.",
-                Permissions(
+                PermissionCodes(
                     TenantPermissions.FacilityRead,
                     PatientPermissions.Read,
                     PatientPermissions.IdentityRead,
@@ -276,7 +276,7 @@ public static class TenantPermissionCatalog
                 TenantRoles.ClinicalUser,
                 "Clinical User",
                 "Current OPD clinical baseline. Professional registration, specialty, department assignment and clinical privileges remain separate controls.",
-                Permissions(
+                PermissionCodes(
                     PatientPermissions.IdentityRead,
                     TenantPermissions.FacilityRead,
                     QueuePermissions.Read,
@@ -289,7 +289,7 @@ public static class TenantPermissionCatalog
     private static readonly IReadOnlyDictionary<string, TenantPermissionDefinition> PermissionLookup =
         PermissionDefinitions.ToDictionary(permission => permission.Code, StringComparer.Ordinal);
 
-    public static IReadOnlyList<TenantPermissionDefinition> Permissions => PermissionDefinitions;
+    public static IReadOnlyList<TenantPermissionDefinition> Definitions => PermissionDefinitions;
 
     public static IReadOnlyList<TenantSystemRoleDefinition> SystemRoles => SystemRoleDefinitions;
 
@@ -314,6 +314,6 @@ public static class TenantPermissionCatalog
     public static bool IsAssignable(string? permissionCode) =>
         Find(permissionCode) is { IsAssignable: true };
 
-    private static IReadOnlyList<string> Permissions(params string[] values) =>
+    private static IReadOnlyList<string> PermissionCodes(params string[] values) =>
         Array.AsReadOnly(values);
 }
