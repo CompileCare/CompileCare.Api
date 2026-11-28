@@ -40,8 +40,8 @@ public sealed class TenantMembershipApiTests
             .Where(value => value.Subject == TestJwtTokenFactory.Subject)
             .OrderBy(value => value.TenantId)
             .ToListAsync();
-        var membershipA = Assert.Single(memberships.Where(value => value.TenantId == firstTenant));
-        var membershipB = Assert.Single(memberships.Where(value => value.TenantId == secondTenant));
+        var membershipA = Assert.Single(memberships, value => value.TenantId == firstTenant);
+        var membershipB = Assert.Single(memberships, value => value.TenantId == secondTenant);
         var platformOperator = await db.PlatformOperators.SingleAsync(
             value => value.Issuer == TestJwtTokenFactory.Issuer &&
                      value.Subject == TestJwtTokenFactory.Subject);
