@@ -3,6 +3,7 @@ using HeapCare.Application.Appointments;
 using HeapCare.Application.Auditing;
 using HeapCare.Application.Billing;
 using HeapCare.Application.Clinical;
+using HeapCare.Application.Inpatient;
 using HeapCare.Application.Patients;
 using HeapCare.Application.Staff;
 using HeapCare.Application.Tenancy;
@@ -43,6 +44,12 @@ public static class AuthorizationPolicies
     public const string BillingPaymentManage = "BillingPaymentManage";
     public const string BillingReportRead = "BillingReportRead";
     public const string AuditRead = "AuditRead";
+    public const string InpatientRead = "InpatientRead";
+    public const string InpatientAdmit = "InpatientAdmit";
+    public const string InpatientBedAssign = "InpatientBedAssign";
+    public const string InpatientBedTransfer = "InpatientBedTransfer";
+    public const string InpatientAdmissionCancel = "InpatientAdmissionCancel";
+    public const string InpatientDischarge = "InpatientDischarge";
 
     public const string TenantIdClaim = "heapcare:tenant_id";
     public const string TenantRoleClaim = "heapcare:tenant_role";
@@ -148,6 +155,24 @@ public static class AuthorizationPolicies
         options.AddPolicy(EncounterAmend, policy =>
             policy.RequireAuthenticatedUser()
                 .RequireAssertion(context => HasMembershipPermission(context.User, OpdEncounterPermissions.Amend)));
+        options.AddPolicy(InpatientRead, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, InpatientPermissions.Read)));
+        options.AddPolicy(InpatientAdmit, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, InpatientPermissions.Admit)));
+        options.AddPolicy(InpatientBedAssign, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, InpatientPermissions.BedAssign)));
+        options.AddPolicy(InpatientBedTransfer, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, InpatientPermissions.BedTransfer)));
+        options.AddPolicy(InpatientAdmissionCancel, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, InpatientPermissions.CancelAdmission)));
+        options.AddPolicy(InpatientDischarge, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context => HasMembershipPermission(context.User, InpatientPermissions.Discharge)));
         options.AddPolicy(PlatformOperator, policy =>
             policy.RequireAuthenticatedUser()
                 .AddRequirements(new PlatformOperatorRequirement()));
