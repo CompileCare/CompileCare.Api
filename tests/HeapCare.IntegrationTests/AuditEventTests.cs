@@ -33,7 +33,7 @@ public sealed class AuditEventTests
             _ => Task.CompletedTask,
             RoutePatternFactory.Parse("/api/v1/hospitals/{hospitalId:guid}/ipd/admissions"),
             0,
-            new EndpointMetadataCollection(),
+            EndpointMetadataCollection.Empty,
             "CreateInpatientAdmission");
 
         context.SetEndpoint(endpoint);
