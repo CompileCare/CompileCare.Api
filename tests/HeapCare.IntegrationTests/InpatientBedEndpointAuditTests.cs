@@ -30,7 +30,7 @@ public sealed class InpatientBedEndpointAuditTests(FacilityApiFactory factory)
             tenantId,
             TenantRoles.FacilityViewer,
             scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
-            subject);
+            subject: subject);
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
