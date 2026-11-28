@@ -81,6 +81,13 @@ public static class SecurityServiceCollectionExtensions
                             return Task.CompletedTask;
                         }
 
+                        // Remove legacy request-local claim names before adding trusted server claims.
+                        foreach (var legacyClaimType in AuthorizationPolicies.LegacyInternalClaimTypes)
+                        {
+                            foreach (var legacyClaim in identity.FindAll(legacyClaimType).ToArray())
+                                identity.RemoveClaim(legacyClaim);
+                        }
+
                         // Replace any identically named claim from the token with the
                         // issuer read from the validated SecurityToken instance.
                         foreach (var existing in identity.FindAll(AuthorizationPolicies.ValidatedIssuerClaim).ToArray())
