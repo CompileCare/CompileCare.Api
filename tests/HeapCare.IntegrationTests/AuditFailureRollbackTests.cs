@@ -64,6 +64,11 @@ public sealed class AuditFailureRollbackTests
                 new DateOnly(1990, 4, 12)));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal("about:blank", problem.GetProperty("type").GetString());
+        Assert.Equal("Service Unavailable", problem.GetProperty("title").GetString());
+        Assert.Equal("audit_unavailable", problem.GetProperty("code").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(problem.GetProperty("traceId").GetString()));
 
         using var verificationScope = _factory.Services.CreateScope();
         verificationScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
