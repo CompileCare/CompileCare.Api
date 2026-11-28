@@ -33,8 +33,12 @@ public sealed class InpatientService(
             .ToListAsync(cancellationToken);
 
         var current = placements.SingleOrDefault(item => item.EndedAtUtc is null);
-        if (!organizationScope.CanAccessHospital(hospitalId))
+        var hasHospitalWideScope = organizationScope.IsTenantWide ||
+                                   organizationScope.HospitalIds.Contains(hospitalId);
+        if (!hasHospitalWideScope)
         {
+            // A Department grant permits the caller to select its parent hospital
+            // context, but it does not grant hospital-wide patient visibility.
             // A department-scoped member may see an admission only when its current
             // placement is in that department. An unplaced admission is intentionally
             // not visible through a department-only grant.
