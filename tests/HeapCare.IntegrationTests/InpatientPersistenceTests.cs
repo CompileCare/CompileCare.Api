@@ -27,7 +27,7 @@ public sealed class InpatientPersistenceTests(FacilityApiFactory factory)
             db.Tenants.Add(CreateTenant(tenantId));
             await db.SaveChangesAsync();
 
-            graph = AddFacilityGraph(db, "Concurrency Hospital", "CONC", bedCount: 1);
+            graph = AddFacilityGraph(db, "Concurrency Hospital", "CONC", bedCount: 2);
             admissionIds = AddAdmissions(db, graph, patientCount: 2);
             await db.SaveChangesAsync();
         }
@@ -50,6 +50,54 @@ public sealed class InpatientPersistenceTests(FacilityApiFactory factory)
         var activeOccupants = Assert.Single(activePlacements);
         Assert.Equal(graph.BedIds[0], activeOccupants.BedId);
         Assert.Contains(admissionIds, id => id == activeOccupants.AdmissionId);
+
+        using var transferScope = factory.Services.CreateScope();
+        transferScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var transferDb = transferScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var currentAdmissionId = activeOccupants.AdmissionId;
+
+        transferDb.InpatientBedPlacements.Add(new InpatientBedPlacement
+        {
+            HospitalId = graph.HospitalId,
+            AdmissionId = currentAdmissionId,
+            DepartmentId = graph.DepartmentId,
+            WardId = graph.WardId,
+            RoomId = graph.RoomId,
+            BedId = graph.BedIds[1],
+            StartedAtUtc = DateTimeOffset.UtcNow
+        });
+
+        var secondCurrentBed = await Assert.ThrowsAsync<DbUpdateException>(
+            () => transferDb.SaveChangesAsync());
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, FindPostgresError(secondCurrentBed).SqlState);
+        transferDb.ChangeTracker.Clear();
+
+        var previousPlacement = await transferDb.InpatientBedPlacements
+            .SingleAsync(placement => placement.AdmissionId == currentAdmissionId && placement.EndedAtUtc == null);
+        previousPlacement.EndedAtUtc = previousPlacement.StartedAtUtc.AddMinutes(5);
+        await transferDb.SaveChangesAsync();
+
+        transferDb.InpatientBedPlacements.Add(new InpatientBedPlacement
+        {
+            HospitalId = graph.HospitalId,
+            AdmissionId = currentAdmissionId,
+            DepartmentId = graph.DepartmentId,
+            WardId = graph.WardId,
+            RoomId = graph.RoomId,
+            BedId = graph.BedIds[1],
+            StartedAtUtc = previousPlacement.EndedAtUtc.Value
+        });
+        await transferDb.SaveChangesAsync();
+
+        var retainedPlacements = await transferDb.InpatientBedPlacements
+            .AsNoTracking()
+            .Where(placement => placement.AdmissionId == currentAdmissionId)
+            .OrderBy(placement => placement.StartedAtUtc)
+            .ToListAsync();
+        Assert.Equal(2, retainedPlacements.Count);
+        Assert.NotNull(retainedPlacements[0].EndedAtUtc);
+        Assert.Null(retainedPlacements[1].EndedAtUtc);
+        Assert.Equal(graph.BedIds[1], retainedPlacements[1].BedId);
     }
 
     [Fact]
