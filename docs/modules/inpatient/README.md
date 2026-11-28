@@ -123,7 +123,7 @@ Request:
 }
 ```
 
-The transfer reason is required and limited to 1–250 characters. The admission and current placement must be Active. The current and destination departments must both be within the caller's manageable scope. The destination must resolve within the same Hospital, be active and differ from the current bed.
+The transfer reason is required and limited to 1–250 characters. The admission must be Active and it must have a current active bed placement. The current and destination departments must both be within the caller's manageable scope. The destination must resolve within the same Hospital, be active and differ from the current bed.
 
 The prior placement is closed and the new placement is opened in one database save/transaction. If a concurrency or destination-occupancy constraint is hit, the operation returns a conflict and no partial movement should persist. Cross-Hospital transfer is not supported.
 
@@ -144,7 +144,7 @@ Admission status values currently represented by the persistence contract are `A
 
 The routes use RFC 9457 Problem Details for errors. Important outcomes include:
 
-- `400 Bad Request`: invalid identifiers/input or an unsupported list status.
+- `400 Bad Request`: invalid request values or an unsupported list status.
 - `401 Unauthorized`: unauthenticated request or invalid actor context at the service boundary.
 - `403 Forbidden`: authenticated principal lacks the dedicated IPD permission.
 - `404 Not Found`: missing or out-of-scope Hospital, admission, patient registration or bed hierarchy resource.
