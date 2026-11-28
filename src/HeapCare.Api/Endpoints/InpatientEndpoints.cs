@@ -36,11 +36,11 @@ public static class InpatientEndpoints
 
         group.MapGet("/admissions", async (
             Guid hospitalId,
-            int page,
-            int pageSize,
-            string? status,
             IInpatientService service,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            int page = 1,
+            int pageSize = 25,
+            string? status = null) =>
         {
             var result = await service.ListAsync(
                 hospitalId,
