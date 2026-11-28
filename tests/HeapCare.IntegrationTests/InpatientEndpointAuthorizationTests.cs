@@ -34,6 +34,8 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
 
         using var client = CreateClient(tenantId, $"ipd-policy-{role}");
 
+        var list = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions");
         var read = await client.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions/{admissionId:D}");
         var assign = await client.PostAsJsonAsync(
@@ -45,6 +47,7 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
                 new InpatientBedLocation(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
                 "Authorization regression test"));
 
+        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, assign.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, transfer.StatusCode);
@@ -149,6 +152,48 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
         Assert.Equal("GET", auditEvent.HttpMethod);
         Assert.Equal(
             "/api/v1/hospitals/{hospitalId:guid}/ipd/admissions/{admissionId:guid}",
+            auditEvent.RouteTemplate);
+        Assert.Equal("Denied", auditEvent.Outcome);
+        Assert.Equal((int)HttpStatusCode.Forbidden, auditEvent.StatusCode);
+        Assert.Equal(correlationId, auditEvent.CorrelationId);
+    }
+
+    [Fact]
+    public async Task DeniedInpatientList_WritesMetadataOnlyAuditWithTrustedHospitalContext()
+    {
+        var tenantId = Guid.NewGuid();
+        var hospitalId = Guid.NewGuid();
+        var correlationId = $"ipd-list-denied-audit-{Guid.NewGuid():N}";
+
+        await factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.FacilityViewer,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
+            subject: "ipd-list-audit-denied-reader");
+
+        using var client = CreateClient(tenantId, "ipd-list-audit-denied-reader");
+        client.DefaultRequestHeaders.Add(CorrelationIdMiddleware.HeaderName, correlationId);
+
+        var response = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var auditEvent = await db.AuditEvents.SingleAsync(
+            item => item.CorrelationId == correlationId);
+
+        Assert.Equal(tenantId, auditEvent.TenantId);
+        Assert.Equal(tenantId, auditEvent.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
+        Assert.Equal("ipd-list-audit-denied-reader", auditEvent.ActorSubject);
+        Assert.Equal("ListInpatientAdmissions", auditEvent.Action);
+        Assert.Equal("IPD admissions", auditEvent.ResourceType);
+        Assert.Equal(hospitalId, auditEvent.ResourceId);
+        Assert.Equal("GET", auditEvent.HttpMethod);
+        Assert.Equal(
+            "/api/v1/hospitals/{hospitalId:guid}/ipd/admissions",
             auditEvent.RouteTemplate);
         Assert.Equal("Denied", auditEvent.Outcome);
         Assert.Equal((int)HttpStatusCode.Forbidden, auditEvent.StatusCode);
