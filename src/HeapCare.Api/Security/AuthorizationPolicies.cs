@@ -44,10 +44,21 @@ public static class AuthorizationPolicies
     public const string BillingReportRead = "BillingReportRead";
     public const string AuditRead = "AuditRead";
 
-    public const string TenantIdClaim = "compilecare:tenant_id";
-    public const string TenantRoleClaim = "compilecare:tenant_role";
-    public const string PermissionClaim = "compilecare:permission";
-    public const string ValidatedIssuerClaim = "compilecare:validated_issuer";
+    public const string TenantIdClaim = "heapcare:tenant_id";
+    public const string TenantRoleClaim = "heapcare:tenant_role";
+    public const string PermissionClaim = "heapcare:permission";
+    public const string ValidatedIssuerClaim = "heapcare:validated_issuer";
+
+    // Old request-local claim names are scrubbed on ingress. They are never
+    // accepted as an authorization source after the HeapCare namespace migration.
+    internal static readonly IReadOnlySet<string> LegacyInternalClaimTypes =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "compilecare:tenant_id",
+            "compilecare:tenant_role",
+            "compilecare:permission",
+            "compilecare:validated_issuer"
+        };
     public const string MembershipIdentityAuthenticationType = "HeapCareTenantMembership";
 
     public static void Configure(AuthorizationOptions options)
