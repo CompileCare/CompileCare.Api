@@ -409,7 +409,7 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
             triggerScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
             var db = triggerScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
             await db.Database.ExecuteSqlRawAsync("""
-                CREATE OR REPLACE FUNCTION delay_ipd_transfer_update() RETURNS trigger AS $
+                CREATE OR REPLACE FUNCTION delay_ipd_transfer_update() RETURNS trigger AS $ipd$
                 BEGIN
                     IF OLD."EndedAtUtc" IS NULL AND NEW."EndedAtUtc" IS NOT NULL THEN
                         PERFORM pg_sleep(1.5);
