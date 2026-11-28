@@ -56,7 +56,7 @@ public sealed class FacilityModelTests
         Assert.Equal(
             new[] { nameof(TenantOwnedEntity.TenantId), nameof(InpatientAdmission.HospitalId), nameof(InpatientAdmission.PatientId) },
             activeAdmission.Properties.Select(property => property.Name));
-        Assert.Equal("\\"Status\\" = 'Active'", activeAdmission.GetFilter());
+        Assert.Equal("\"Status\" = 'Active'", activeAdmission.GetFilter());
 
         AssertCompositeRestrictiveRelationship<InpatientAdmission, Hospital>(
             db,
@@ -77,12 +77,12 @@ public sealed class FacilityModelTests
         var activeAdmissionPlacement = Assert.Single(placement.GetIndexes().Where(index =>
             index.IsUnique && index.Properties.Select(property => property.Name)
                 .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.AdmissionId)])));
-        Assert.Equal("\\"EndedAtUtc\\" IS NULL", activeAdmissionPlacement.GetFilter());
+        Assert.Equal("\"EndedAtUtc\" IS NULL", activeAdmissionPlacement.GetFilter());
 
         var activeBedOccupancy = Assert.Single(placement.GetIndexes().Where(index =>
             index.IsUnique && index.Properties.Select(property => property.Name)
                 .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.BedId)])));
-        Assert.Equal("\\"EndedAtUtc\\" IS NULL", activeBedOccupancy.GetFilter());
+        Assert.Equal("\"EndedAtUtc\" IS NULL", activeBedOccupancy.GetFilter());
 
         AssertCompositeRestrictiveRelationship<InpatientBedPlacement, InpatientAdmission>(
             db,
