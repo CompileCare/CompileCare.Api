@@ -52,7 +52,7 @@ public sealed class FacilityModelTests
                     nameof(InpatientAdmission.Id)
                 ]));
 
-        var activeAdmission = Assert.Single(admission.GetIndexes().Where(index => index.IsUnique));
+        var activeAdmission = Assert.Single(admission.GetIndexes(), index => index.IsUnique);
         Assert.Equal(
             new[] { nameof(TenantOwnedEntity.TenantId), nameof(InpatientAdmission.HospitalId), nameof(InpatientAdmission.PatientId) },
             activeAdmission.Properties.Select(property => property.Name));
@@ -74,14 +74,14 @@ public sealed class FacilityModelTests
             [nameof(TenantOwnedEntity.TenantId), nameof(HospitalPatientRegistration.HospitalId), nameof(HospitalPatientRegistration.PatientId)]);
 
         var placement = db.Model.FindEntityType(typeof(InpatientBedPlacement))!;
-        var activeAdmissionPlacement = Assert.Single(placement.GetIndexes().Where(index =>
+        var activeAdmissionPlacement = Assert.Single(placement.GetIndexes(), index =>
             index.IsUnique && index.Properties.Select(property => property.Name)
-                .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.AdmissionId)])));
+                .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.AdmissionId)]));
         Assert.Equal("\"EndedAtUtc\" IS NULL", activeAdmissionPlacement.GetFilter());
 
-        var activeBedOccupancy = Assert.Single(placement.GetIndexes().Where(index =>
+        var activeBedOccupancy = Assert.Single(placement.GetIndexes(), index =>
             index.IsUnique && index.Properties.Select(property => property.Name)
-                .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.BedId)])));
+                .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.BedId)]));
         Assert.Equal("\"EndedAtUtc\" IS NULL", activeBedOccupancy.GetFilter());
 
         AssertCompositeRestrictiveRelationship<InpatientBedPlacement, InpatientAdmission>(
