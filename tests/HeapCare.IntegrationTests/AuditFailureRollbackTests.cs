@@ -52,6 +52,7 @@ public sealed class AuditFailureRollbackTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+        client.DefaultRequestHeaders.Add(CorrelationIdMiddleware.HeaderName, "audit-failure-correlation-123");
         client.DefaultRequestHeaders.Add(
             TenantContextMiddleware.HeaderName,
             tenantId.ToString("D"));
@@ -81,7 +82,7 @@ public sealed class AuditFailureRollbackTests
         var traceId = problem.GetProperty("traceId").GetString();
         Assert.False(string.IsNullOrWhiteSpace(traceId));
         Assert.Equal(
-            traceId,
+            "audit-failure-correlation-123",
             response.Headers.GetValues(CorrelationIdMiddleware.HeaderName).Single());
 
         Assert.Contains(
