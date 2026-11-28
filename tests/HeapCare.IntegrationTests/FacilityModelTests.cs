@@ -2,6 +2,7 @@ using HeapCare.Application.Facilities;
 using HeapCare.Application.Tenancy;
 using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Xunit;
 
 namespace HeapCare.IntegrationTests;
@@ -42,8 +43,9 @@ public sealed class FacilityModelTests
     public void InpatientModel_EnforcesTenantHospitalRegistrationAndSingleActiveBedPlacement()
     {
         using var db = CreateContext();
+        var model = db.GetService<IDesignTimeModel>().Model;
 
-        var admission = db.Model.FindEntityType(typeof(InpatientAdmission))!;
+        var admission = model.FindEntityType(typeof(InpatientAdmission))!;
         Assert.Contains(admission.GetKeys(), key =>
             key.Properties.Select(property => property.Name)
                 .SequenceEqual([
@@ -73,7 +75,7 @@ public sealed class FacilityModelTests
             [nameof(TenantOwnedEntity.TenantId), nameof(InpatientAdmission.HospitalId), nameof(InpatientAdmission.PatientId)],
             [nameof(TenantOwnedEntity.TenantId), nameof(HospitalPatientRegistration.HospitalId), nameof(HospitalPatientRegistration.PatientId)]);
 
-        var placement = db.Model.FindEntityType(typeof(InpatientBedPlacement))!;
+        var placement = model.FindEntityType(typeof(InpatientBedPlacement))!;
         var activeAdmissionPlacement = Assert.Single(placement.GetIndexes(), index =>
             index.IsUnique && index.Properties.Select(property => property.Name)
                 .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.AdmissionId)]));
