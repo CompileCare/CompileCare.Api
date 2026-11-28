@@ -179,6 +179,45 @@ public sealed class FacilityModelTests
         Assert.Equal(principalProperties, foreignKey.PrincipalKey.Properties.Select(property => property.Name));
     }
 
+    [Fact]
+    public async Task InpatientHistory_CannotBePhysicallyDeleted()
+    {
+        var tenantContext = new TenantContext();
+        tenantContext.SetTenant(Guid.NewGuid());
+        var options = new DbContextOptionsBuilder<HeapCareDbContext>()
+            .UseNpgsql("Host=localhost;Database=compilecare;Username=test;Password=test")
+            .Options;
+        using var db = new HeapCareDbContext(options, tenantContext);
+
+        db.InpatientAdmissions.Remove(new InpatientAdmission
+        {
+            TenantId = tenantContext.TenantId!.Value,
+            HospitalId = Guid.NewGuid(),
+            PatientId = Guid.NewGuid()
+        });
+
+        var admissionError = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => db.SaveChangesAsync());
+        Assert.Contains("cannot be physically deleted", admissionError.Message, StringComparison.Ordinal);
+
+        db.ChangeTracker.Clear();
+        db.InpatientBedPlacements.Remove(new InpatientBedPlacement
+        {
+            TenantId = tenantContext.TenantId.Value,
+            HospitalId = Guid.NewGuid(),
+            AdmissionId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            WardId = Guid.NewGuid(),
+            RoomId = Guid.NewGuid(),
+            BedId = Guid.NewGuid(),
+            StartedAtUtc = DateTimeOffset.UtcNow
+        });
+
+        var placementError = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => db.SaveChangesAsync());
+        Assert.Contains("cannot be physically deleted", placementError.Message, StringComparison.Ordinal);
+    }
+
     private static HeapCareDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<HeapCareDbContext>()
