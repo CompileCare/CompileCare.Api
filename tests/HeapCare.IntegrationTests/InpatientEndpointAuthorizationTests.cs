@@ -48,6 +48,7 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
                 "Authorization regression test"));
 
         Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, assign.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, transfer.StatusCode);
@@ -68,6 +69,8 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
 
         using var client = CreateClient(tenantId, TestJwtTokenFactory.Subject);
 
+        var list = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions");
         var read = await client.GetAsync(
             $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions/{admissionId:D}");
         var assign = await client.PostAsJsonAsync(
