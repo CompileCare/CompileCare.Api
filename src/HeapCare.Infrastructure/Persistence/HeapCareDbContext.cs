@@ -174,6 +174,18 @@ public sealed class HeapCareDbContext(
                 throw new InvalidOperationException("Platform records cannot be physically deleted.");
         }
 
+        foreach (var entry in ChangeTracker.Entries<InpatientAdmission>())
+        {
+            if (entry.State == EntityState.Deleted)
+                throw new InvalidOperationException("Inpatient admissions are retained and cannot be physically deleted.");
+        }
+
+        foreach (var entry in ChangeTracker.Entries<InpatientBedPlacement>())
+        {
+            if (entry.State == EntityState.Deleted)
+                throw new InvalidOperationException("Inpatient bed-placement history is retained and cannot be physically deleted.");
+        }
+
         foreach (var entry in ChangeTracker.Entries<BillingInvoiceLine>())
         {
             if (entry.State is EntityState.Modified or EntityState.Deleted)
