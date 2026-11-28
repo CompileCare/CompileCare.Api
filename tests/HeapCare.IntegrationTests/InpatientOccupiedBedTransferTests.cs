@@ -71,9 +71,11 @@ public sealed class InpatientOccupiedBedTransferTests(FacilityApiFactory factory
         Assert.All(placements, placement => Assert.Null(placement.EndedAtUtc));
 
         var firstAdmissionPlacement = Assert.Single(
-            placements.Where(placement => placement.AdmissionId == data.AdmissionIds[0]));
+            placements,
+            placement => placement.AdmissionId == data.AdmissionIds[0]);
         var secondAdmissionPlacement = Assert.Single(
-            placements.Where(placement => placement.AdmissionId == data.AdmissionIds[1]));
+            placements,
+            placement => placement.AdmissionId == data.AdmissionIds[1]);
 
         Assert.Equal(data.Locations[0].BedId, firstAdmissionPlacement.BedId);
         Assert.Equal(data.Locations[1].BedId, secondAdmissionPlacement.BedId);
