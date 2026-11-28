@@ -65,8 +65,11 @@ public sealed class PlatformOperatorBootstrapService(HeapCareDbContext db) : IPl
                 return new(false, true, false);
             }
 
+            var userIdentity = await UserIdentityResolver.ResolveAsync(
+                db, issuer, subject, cancellationToken);
             db.PlatformOperators.Add(new PlatformOperator
             {
+                UserIdentityId = userIdentity.Id,
                 Issuer = issuer,
                 Subject = subject,
                 IsActive = true
