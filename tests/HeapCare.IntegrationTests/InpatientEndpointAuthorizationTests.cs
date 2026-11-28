@@ -48,7 +48,6 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
                 "Authorization regression test"));
 
         Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, assign.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, transfer.StatusCode);
@@ -77,6 +76,7 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
             $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions/{admissionId:D}/bed-placement",
             new InpatientBedLocation(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
 
+        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, assign.StatusCode);
     }
