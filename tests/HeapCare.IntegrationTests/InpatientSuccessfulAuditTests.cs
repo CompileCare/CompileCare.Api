@@ -49,7 +49,7 @@ public sealed class InpatientSuccessfulAuditTests(FacilityApiFactory factory)
                 return result.StatusCode;
             });
 
-        Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
+        Assert.Equal(StatusCodes.Status200OK, response.Response.StatusCode);
 
         var auditEvent = await scope.ServiceProvider.GetRequiredService<HeapCareDbContext>()
             .AuditEvents.SingleAsync();
@@ -112,7 +112,7 @@ public sealed class InpatientSuccessfulAuditTests(FacilityApiFactory factory)
                 return result.StatusCode;
             });
 
-        Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
+        Assert.Equal(StatusCodes.Status200OK, response.Response.StatusCode);
 
         var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
         var auditEvent = await db.AuditEvents.SingleAsync();
@@ -288,5 +288,5 @@ public sealed class InpatientSuccessfulAuditTests(FacilityApiFactory factory)
 
     private sealed record TestTagsMetadata(IReadOnlyList<string> Tags) : ITagsMetadata;
 
-    private sealed record TestEndpointNameMetadata(string? EndpointName) : IEndpointNameMetadata;
+    private sealed record TestEndpointNameMetadata(string EndpointName) : IEndpointNameMetadata;
 }
