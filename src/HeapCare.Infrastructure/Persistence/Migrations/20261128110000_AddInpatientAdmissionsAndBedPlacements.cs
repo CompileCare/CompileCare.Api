@@ -187,10 +187,47 @@ public partial class AddInpatientAdmissionsAndBedPlacements : Migration
             name: "IX_inpatient_bed_placements_TenantId_HospitalId_StartedAtUtc",
             table: "inpatient_bed_placements",
             columns: new[] { "TenantId", "HospitalId", "StartedAtUtc" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_inpatient_bed_placements_TenantId_DepartmentId_WardId",
+            table: "inpatient_bed_placements",
+            columns: new[] { "TenantId", "DepartmentId", "WardId" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_inpatient_bed_placements_TenantId_HospitalId_AdmissionId",
+            table: "inpatient_bed_placements",
+            columns: new[] { "TenantId", "HospitalId", "AdmissionId" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_inpatient_bed_placements_TenantId_HospitalId_DepartmentId",
+            table: "inpatient_bed_placements",
+            columns: new[] { "TenantId", "HospitalId", "DepartmentId" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_inpatient_bed_placements_TenantId_RoomId_BedId",
+            table: "inpatient_bed_placements",
+            columns: new[] { "TenantId", "RoomId", "BedId" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_inpatient_bed_placements_TenantId_WardId_RoomId",
+            table: "inpatient_bed_placements",
+            columns: new[] { "TenantId", "WardId", "RoomId" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_inpatient_admissions_TenantId_PatientId",
+            table: "inpatient_admissions",
+            columns: new[] { "TenantId", "PatientId" });
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
+        migrationBuilder.DropIndex(name: "IX_inpatient_bed_placements_TenantId_DepartmentId_WardId", table: "inpatient_bed_placements");
+        migrationBuilder.DropIndex(name: "IX_inpatient_bed_placements_TenantId_HospitalId_AdmissionId", table: "inpatient_bed_placements");
+        migrationBuilder.DropIndex(name: "IX_inpatient_bed_placements_TenantId_HospitalId_DepartmentId", table: "inpatient_bed_placements");
+        migrationBuilder.DropIndex(name: "IX_inpatient_bed_placements_TenantId_RoomId_BedId", table: "inpatient_bed_placements");
+        migrationBuilder.DropIndex(name: "IX_inpatient_bed_placements_TenantId_WardId_RoomId", table: "inpatient_bed_placements");
+        migrationBuilder.DropIndex(name: "IX_inpatient_admissions_TenantId_PatientId", table: "inpatient_admissions");
+
         migrationBuilder.DropTable(name: "inpatient_bed_placements");
         migrationBuilder.DropTable(name: "inpatient_admissions");
 
