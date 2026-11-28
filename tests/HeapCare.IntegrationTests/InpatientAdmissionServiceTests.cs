@@ -152,6 +152,81 @@ public sealed class InpatientAdmissionServiceTests(FacilityApiFactory factory)
         Assert.Equal(401, invalidActorResult.StatusCode);
     }
 
+    [Fact]
+    public async Task GetAdmission_DoesNotDiscloseSiblingHospitalAdmissionToHospitalScopedMember()
+    {
+        factory.ResetDatabase();
+        var tenantId = Guid.NewGuid();
+        var data = await SeedAsync(tenantId);
+
+        using var creatorScope = CreateHospitalScope(tenantId, data.HospitalId);
+        var creator = creatorScope.ServiceProvider.GetRequiredService<IInpatientService>();
+        var created = await creator.CreateAdmissionAsync(
+            data.HospitalId,
+            new InpatientAdmissionInput(data.PatientId),
+            new InpatientActor("https://identity.heapcare.test/", "ipd-detail-creator"),
+            CancellationToken.None);
+        Assert.True(created.IsSuccess, created.Error);
+
+        using var siblingScope = CreateHospitalScope(tenantId, data.OtherHospitalId);
+        var siblingService = siblingScope.ServiceProvider.GetRequiredService<IInpatientService>();
+
+        // Requesting the admission under its real Hospital ID must still be denied
+        // because this member is scoped only to the sibling Hospital.
+        var actualHospitalRequest = await siblingService.GetAsync(
+            data.HospitalId, created.Value!.Id, CancellationToken.None);
+        Assert.Equal(404, actualHospitalRequest.StatusCode);
+        Assert.Null(actualHospitalRequest.Value);
+
+        // Supplying the sibling Hospital route context with the original admission
+        // identifier must also remain non-disclosing.
+        var siblingRouteRequest = await siblingService.GetAsync(
+            data.OtherHospitalId, created.Value!.Id, CancellationToken.None);
+        Assert.Equal(404, siblingRouteRequest.StatusCode);
+        Assert.Null(siblingRouteRequest.Value);
+    }
+
+    [Fact]
+    public async Task GetAdmission_DoesNotDiscloseForeignTenantAdmissionToTenantWideMember()
+    {
+        factory.ResetDatabase();
+        var tenantId = Guid.NewGuid();
+        var data = await SeedAsync(tenantId);
+
+        using var creatorScope = CreateHospitalScope(tenantId, data.HospitalId);
+        var creator = creatorScope.ServiceProvider.GetRequiredService<IInpatientService>();
+        var created = await creator.CreateAdmissionAsync(
+            data.HospitalId,
+            new InpatientAdmissionInput(data.PatientId),
+            new InpatientActor("https://identity.heapcare.test/", "ipd-foreign-tenant-creator"),
+            CancellationToken.None);
+        Assert.True(created.IsSuccess, created.Error);
+
+        var foreignTenantId = Guid.NewGuid();
+        using var foreignScope = factory.Services.CreateScope();
+        foreignScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(foreignTenantId);
+        var db = foreignScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        db.Tenants.Add(new Tenant
+        {
+            Id = foreignTenantId,
+            Name = "Foreign IPD detail tenant",
+            Slug = $"ipd-detail-foreign-{foreignTenantId:N}",
+            Status = TenantStatuses.Active
+        });
+        await db.SaveChangesAsync();
+        foreignScope.ServiceProvider.GetRequiredService<IOrganizationScopeContext>().SetMembership(
+            Guid.NewGuid(),
+            TenantRoles.HospitalAdmin,
+            [new OrganizationScope(OrganizationScopeTypes.Tenant)]);
+
+        var foreignService = foreignScope.ServiceProvider.GetRequiredService<IInpatientService>();
+        var result = await foreignService.GetAsync(
+            data.HospitalId, created.Value!.Id, CancellationToken.None);
+
+        Assert.Equal(404, result.StatusCode);
+        Assert.Null(result.Value);
+    }
+
     private async Task<InpatientOperationResult<InpatientAdmissionDto>> TryCreateAsync(
         Guid tenantId,
         Guid hospitalId,
