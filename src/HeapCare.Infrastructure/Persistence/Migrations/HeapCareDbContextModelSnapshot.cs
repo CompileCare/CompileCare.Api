@@ -25,6 +25,145 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+
+            modelBuilder.Entity("HeapCare.Infrastructure.Persistence.InpatientAdmission", b =>
+                {
+                    b.Property<DateTimeOffset>("AdmittedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DischargedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("HospitalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "HospitalId", "Id");
+
+                    b.HasIndex("TenantId", "HospitalId", "PatientId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 'Active'");
+
+                    b.HasIndex("TenantId", "HospitalId", "Status", "AdmittedAtUtc");
+
+                    b.HasIndex("TenantId", "PatientId");
+
+                    b.ToTable("inpatient_admissions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_inpatient_admissions_status", "\"Status\" IN ('Active', 'Cancelled', 'Discharged')");
+
+                            t.HasCheckConstraint("CK_inpatient_admissions_lifecycle", """
+                ("Status" = 'Active' AND "CancelledAtUtc" IS NULL AND "DischargedAtUtc" IS NULL)
+                OR ("Status" = 'Cancelled' AND "CancelledAtUtc" IS NOT NULL AND "DischargedAtUtc" IS NULL)
+                OR ("Status" = 'Discharged' AND "DischargedAtUtc" IS NOT NULL AND "CancelledAtUtc" IS NULL)
+                """);
+                        });
+                });
+
+            modelBuilder.Entity("HeapCare.Infrastructure.Persistence.InpatientBedPlacement", b =>
+                {
+                    b.Property<Guid>("AdmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BedId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("EndedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<Guid>("HospitalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WardId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "AdmissionId")
+                        .IsUnique()
+                        .HasFilter("\"EndedAtUtc\" IS NULL");
+
+                    b.HasIndex("TenantId", "BedId")
+                        .IsUnique()
+                        .HasFilter("\"EndedAtUtc\" IS NULL");
+
+                    b.HasIndex("TenantId", "HospitalId", "StartedAtUtc");
+
+                    b.HasIndex("TenantId", "DepartmentId", "WardId");
+
+                    b.HasIndex("TenantId", "HospitalId", "AdmissionId");
+
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+
+                    b.HasIndex("TenantId", "RoomId", "BedId");
+
+                    b.HasIndex("TenantId", "WardId", "RoomId");
+
+                    b.ToTable("inpatient_bed_placements", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_inpatient_bed_placements_time_range", "\"EndedAtUtc\" IS NULL OR \"EndedAtUtc\" > \"StartedAtUtc\"");
+                        });
+                });
+
             modelBuilder.Entity("HeapCare.Infrastructure.Persistence.Appointment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -205,6 +344,8 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasAlternateKey("TenantId", "RoomId", "Id");
 
                     b.HasIndex("TenantId", "RoomId", "Number")
                         .IsUnique();
@@ -1165,6 +1306,8 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("TenantId", "WardId", "Id");
+
                     b.HasIndex("TenantId", "WardId", "Name")
                         .IsUnique();
 
@@ -1454,6 +1597,8 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "DepartmentId", "Id");
 
                     b.HasIndex("TenantId", "DepartmentId", "Name")
                         .IsUnique();
@@ -1980,6 +2125,94 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Department");
+                });
+
+
+            modelBuilder.Entity("HeapCare.Infrastructure.Persistence.InpatientAdmission", b =>
+                {
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Hospital", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PatientId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.HospitalPatientRegistration", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "PatientId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                });
+
+            modelBuilder.Entity("HeapCare.Infrastructure.Persistence.InpatientBedPlacement", b =>
+                {
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.InpatientAdmission", null)
+                        .WithMany("BedPlacements")
+                        .HasForeignKey("TenantId", "HospitalId", "AdmissionId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Hospital", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Department", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "HospitalId", "DepartmentId")
+                        .HasPrincipalKey("TenantId", "HospitalId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Ward", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DepartmentId", "WardId")
+                        .HasPrincipalKey("TenantId", "DepartmentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Room", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "WardId", "RoomId")
+                        .HasPrincipalKey("TenantId", "WardId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HeapCare.Infrastructure.Persistence.Bed", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RoomId", "BedId")
+                        .HasPrincipalKey("TenantId", "RoomId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HeapCare.Infrastructure.Persistence.InpatientAdmission", b =>
+                {
+                    b.Navigation("BedPlacements");
                 });
 
             modelBuilder.Entity("HeapCare.Infrastructure.Persistence.Department", b =>

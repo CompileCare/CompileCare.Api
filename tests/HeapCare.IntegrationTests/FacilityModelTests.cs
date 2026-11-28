@@ -2,6 +2,8 @@ using HeapCare.Application.Facilities;
 using HeapCare.Application.Tenancy;
 using HeapCare.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit;
 
 namespace HeapCare.IntegrationTests;
@@ -36,6 +38,145 @@ public sealed class FacilityModelTests
         Assert.Equal(3, result.TotalPages);
         Assert.Equal(2, result.Page);
         Assert.Equal(5, result.TotalCount);
+    }
+
+    [Fact]
+    public void InpatientModel_EnforcesTenantHospitalRegistrationAndSingleActiveBedPlacement()
+    {
+        using var db = CreateContext();
+        var model = db.GetService<IDesignTimeModel>().Model;
+
+        var admission = model.FindEntityType(typeof(InpatientAdmission))!;
+        Assert.Contains(admission.GetKeys(), key =>
+            key.Properties.Select(property => property.Name)
+                .SequenceEqual([
+                    nameof(TenantOwnedEntity.TenantId),
+                    nameof(InpatientAdmission.HospitalId),
+                    nameof(InpatientAdmission.Id)
+                ]));
+
+        var activeAdmission = Assert.Single(admission.GetIndexes(), index => index.IsUnique);
+        Assert.Equal(
+            new[] { nameof(TenantOwnedEntity.TenantId), nameof(InpatientAdmission.HospitalId), nameof(InpatientAdmission.PatientId) },
+            activeAdmission.Properties.Select(property => property.Name));
+        Assert.Equal("\"Status\" = 'Active'", activeAdmission.GetFilter());
+
+        AssertCompositeRestrictiveRelationship<InpatientAdmission, Hospital>(
+            db,
+            [nameof(TenantOwnedEntity.TenantId), nameof(InpatientAdmission.HospitalId)],
+            [nameof(TenantOwnedEntity.TenantId), nameof(TenantOwnedEntity.Id)]);
+
+        AssertCompositeRestrictiveRelationship<InpatientAdmission, Patient>(
+            db,
+            [nameof(TenantOwnedEntity.TenantId), nameof(InpatientAdmission.PatientId)],
+            [nameof(TenantOwnedEntity.TenantId), nameof(TenantOwnedEntity.Id)]);
+
+        AssertCompositeRestrictiveRelationship<InpatientAdmission, HospitalPatientRegistration>(
+            db,
+            [nameof(TenantOwnedEntity.TenantId), nameof(InpatientAdmission.HospitalId), nameof(InpatientAdmission.PatientId)],
+            [nameof(TenantOwnedEntity.TenantId), nameof(HospitalPatientRegistration.HospitalId), nameof(HospitalPatientRegistration.PatientId)]);
+
+        var placement = model.FindEntityType(typeof(InpatientBedPlacement))!;
+        var activeAdmissionPlacement = Assert.Single(placement.GetIndexes(), index =>
+            index.IsUnique && index.Properties.Select(property => property.Name)
+                .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.AdmissionId)]));
+        Assert.Equal("\"EndedAtUtc\" IS NULL", activeAdmissionPlacement.GetFilter());
+
+        var activeBedOccupancy = Assert.Single(placement.GetIndexes(), index =>
+            index.IsUnique && index.Properties.Select(property => property.Name)
+                .SequenceEqual([nameof(TenantOwnedEntity.TenantId), nameof(InpatientBedPlacement.BedId)]));
+        Assert.Equal("\"EndedAtUtc\" IS NULL", activeBedOccupancy.GetFilter());
+
+        AssertCompositeRestrictiveRelationship<InpatientBedPlacement, InpatientAdmission>(
+            db,
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(InpatientBedPlacement.HospitalId),
+                nameof(InpatientBedPlacement.AdmissionId)
+            ],
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(InpatientAdmission.HospitalId),
+                nameof(InpatientAdmission.Id)
+            ]);
+
+        AssertCompositeRestrictiveRelationship<InpatientBedPlacement, Department>(
+            db,
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(InpatientBedPlacement.HospitalId),
+                nameof(InpatientBedPlacement.DepartmentId)
+            ],
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(Department.HospitalId),
+                nameof(Department.Id)
+            ]);
+
+        AssertCompositeRestrictiveRelationship<InpatientBedPlacement, Ward>(
+            db,
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(InpatientBedPlacement.DepartmentId),
+                nameof(InpatientBedPlacement.WardId)
+            ],
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(Ward.DepartmentId),
+                nameof(Ward.Id)
+            ]);
+
+        AssertCompositeRestrictiveRelationship<InpatientBedPlacement, Room>(
+            db,
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(InpatientBedPlacement.WardId),
+                nameof(InpatientBedPlacement.RoomId)
+            ],
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(Room.WardId),
+                nameof(Room.Id)
+            ]);
+
+        AssertCompositeRestrictiveRelationship<InpatientBedPlacement, Bed>(
+            db,
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(InpatientBedPlacement.RoomId),
+                nameof(InpatientBedPlacement.BedId)
+            ],
+            [
+                nameof(TenantOwnedEntity.TenantId),
+                nameof(Bed.RoomId),
+                nameof(Bed.Id)
+            ]);
+
+        Assert.Contains(
+            admission.GetCheckConstraints(),
+            constraint => constraint.Name == "CK_inpatient_admissions_status");
+        Assert.Contains(
+            admission.GetCheckConstraints(),
+            constraint => constraint.Name == "CK_inpatient_admissions_lifecycle");
+        Assert.Contains(
+            placement.GetCheckConstraints(),
+            constraint => constraint.Name == "CK_inpatient_bed_placements_time_range");
+    }
+
+    private static void AssertCompositeRestrictiveRelationship<TChild, TParent>(
+        HeapCareDbContext db,
+        string[] dependentProperties,
+        string[] principalProperties)
+        where TChild : TenantOwnedEntity
+        where TParent : TenantOwnedEntity
+    {
+        var child = db.Model.FindEntityType(typeof(TChild))!;
+        var parent = db.Model.FindEntityType(typeof(TParent))!;
+        var foreignKey = child.GetForeignKeys().Single(value => value.PrincipalEntityType == parent);
+
+        Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior);
+        Assert.Equal(dependentProperties, foreignKey.Properties.Select(property => property.Name));
+        Assert.Equal(principalProperties, foreignKey.PrincipalKey.Properties.Select(property => property.Name));
     }
 
     private static HeapCareDbContext CreateContext()
