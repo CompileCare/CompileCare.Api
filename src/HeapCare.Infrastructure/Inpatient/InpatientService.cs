@@ -10,6 +10,99 @@ public sealed class InpatientService(
     HeapCareDbContext db,
     IOrganizationScopeContext organizationScope) : IInpatientService
 {
+    public async Task<InpatientOperationResult<InpatientAdmissionPage>> ListAsync(
+        Guid hospitalId,
+        InpatientAdmissionPageRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (hospitalId == Guid.Empty || request is null)
+            return InpatientOperationResult<InpatientAdmissionPage>.Failure(
+                "A valid hospital and admission-list request are required.", 400);
+
+        var status = string.IsNullOrWhiteSpace(request.Status) ? null : request.Status.Trim();
+        if (status is not null &&
+            status != InpatientAdmissionStatuses.Active &&
+            status != InpatientAdmissionStatuses.Cancelled &&
+            status != InpatientAdmissionStatuses.Discharged)
+        {
+            return InpatientOperationResult<InpatientAdmissionPage>.Failure(
+                "Admission status must be Active, Cancelled or Discharged.", 400);
+        }
+
+        var hasHospitalWideScope = organizationScope.IsTenantWide ||
+                                   organizationScope.HospitalIds.Contains(hospitalId);
+        var visibleDepartmentIds = organizationScope.Scopes
+            .Where(scope => scope.ScopeType == OrganizationScopeTypes.Department &&
+                            scope.HospitalId == hospitalId &&
+                            scope.DepartmentId.HasValue)
+            .Select(scope => scope.DepartmentId!.Value)
+            .Distinct()
+            .ToArray();
+
+        // Department-only membership must not turn the hospital context selector
+        // into hospital-wide patient discovery. Only admissions whose current
+        // placement is in one of the member's departments are visible.
+        if (!hasHospitalWideScope && visibleDepartmentIds.Length == 0)
+            return InpatientOperationResult<InpatientAdmissionPage>.Failure(
+                "Hospital not found.", 404);
+
+        var query = db.InpatientAdmissions.AsNoTracking()
+            .Where(admission => admission.HospitalId == hospitalId);
+
+        if (status is not null)
+            query = query.Where(admission => admission.Status == status);
+
+        if (!hasHospitalWideScope)
+        {
+            query = query.Where(admission =>
+                db.InpatientBedPlacements.Any(placement =>
+                    placement.HospitalId == hospitalId &&
+                    placement.AdmissionId == admission.Id &&
+                    placement.EndedAtUtc == null &&
+                    visibleDepartmentIds.Contains(placement.DepartmentId)));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var page = request.SafePage;
+        var pageSize = request.SafePageSize;
+        var admissions = await query
+            .OrderByDescending(admission => admission.AdmittedAtUtc)
+            .ThenBy(admission => admission.Id)
+            .Skip(request.Skip)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var admissionIds = admissions.Select(admission => admission.Id).ToArray();
+        var placementQuery = db.InpatientBedPlacements.AsNoTracking()
+            .Where(placement => placement.HospitalId == hospitalId &&
+                                admissionIds.Contains(placement.AdmissionId));
+
+        if (!hasHospitalWideScope)
+            placementQuery = placementQuery.Where(
+                placement => visibleDepartmentIds.Contains(placement.DepartmentId));
+
+        var placements = await placementQuery
+            .OrderBy(placement => placement.StartedAtUtc)
+            .ThenBy(placement => placement.Id)
+            .ToListAsync(cancellationToken);
+
+        var placementsByAdmission = placements
+            .GroupBy(placement => placement.AdmissionId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<InpatientBedPlacement>)group.ToArray());
+
+        var items = admissions.Select(admission =>
+        {
+            var history = placementsByAdmission.TryGetValue(admission.Id, out var visibleHistory)
+                ? visibleHistory
+                : Array.Empty<InpatientBedPlacement>();
+            var current = history.SingleOrDefault(placement => placement.EndedAtUtc is null);
+            return ToDto(admission, history, current);
+        }).ToArray();
+
+        return InpatientOperationResult<InpatientAdmissionPage>.Success(
+            new InpatientAdmissionPage(items, page, pageSize, totalCount));
+    }
+
     public async Task<InpatientOperationResult<InpatientAdmissionDto>> CreateAdmissionAsync(
         Guid hospitalId,
         InpatientAdmissionInput input,
