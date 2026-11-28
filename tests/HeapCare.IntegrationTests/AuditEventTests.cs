@@ -3,6 +3,9 @@ using System.Net.Http.Headers;
 using HeapCare.Api.Middleware;
 using HeapCare.Application.Tenancy;
 using HeapCare.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -18,6 +21,27 @@ public sealed class AuditEventTests
     {
         _factory = factory;
         _factory.ResetDatabase();
+    }
+
+    [Fact]
+    public void ExplicitAuditResourceId_OverridesParentHospitalRouteIdentifier()
+    {
+        var hospitalId = Guid.NewGuid();
+        var admissionId = Guid.NewGuid();
+        var context = new DefaultHttpContext();
+        var endpoint = new RouteEndpoint(
+            _ => Task.CompletedTask,
+            RoutePatternFactory.Parse("/api/v1/hospitals/{hospitalId:guid}/ipd/admissions"),
+            0,
+            EndpointMetadataCollection.Empty,
+            "CreateInpatientAdmission");
+
+        context.SetEndpoint(endpoint);
+        context.Request.RouteValues["hospitalId"] = hospitalId;
+        context.Items[AuditEventMiddleware.ResourceIdItemKey] = admissionId;
+
+        Assert.Equal(admissionId, AuditEventMiddleware.ParseRouteResourceId(context));
+        Assert.NotEqual(hospitalId, AuditEventMiddleware.ParseRouteResourceId(context));
     }
 
     [Fact]

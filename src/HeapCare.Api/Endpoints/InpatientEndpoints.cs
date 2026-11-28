@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HeapCare.Api.Middleware;
 using HeapCare.Api.Security;
 using HeapCare.Application.Inpatient;
 
@@ -17,19 +18,24 @@ public static class InpatientEndpoints
             Guid hospitalId,
             InpatientAdmissionInput request,
             ClaimsPrincipal user,
+            HttpContext httpContext,
             IInpatientService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.CreateAdmissionAsync(
                 hospitalId, request, GetActor(user), cancellationToken);
-            return result.IsSuccess
-                ? Results.Created(
-                    $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions/{result.Value!.Id:D}",
-                    result.Value)
-                : Results.Problem(
+            if (!result.IsSuccess)
+            {
+                return Results.Problem(
                     title: "IPD admission creation failed",
                     detail: result.Error,
                     statusCode: result.StatusCode);
+            }
+
+            httpContext.Items[AuditEventMiddleware.ResourceIdItemKey] = result.Value!.Id;
+            return Results.Created(
+                $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions/{result.Value.Id:D}",
+                result.Value);
         })
         .WithName("CreateInpatientAdmission")
         .RequireAuthorization(AuthorizationPolicies.InpatientAdmit);
