@@ -181,7 +181,7 @@ public sealed class InpatientAdmissionServiceTests(FacilityApiFactory factory)
         // Supplying the sibling Hospital route context with the original admission
         // identifier must also remain non-disclosing.
         var siblingRouteRequest = await siblingService.GetAsync(
-            data.OtherHospitalId, created.Value.Id, CancellationToken.None);
+            data.OtherHospitalId, created.Value!.Id, CancellationToken.None);
         Assert.Equal(404, siblingRouteRequest.StatusCode);
         Assert.Null(siblingRouteRequest.Value);
     }
