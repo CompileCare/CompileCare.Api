@@ -86,6 +86,7 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             "roles",
             ClaimTypes.Role
         };
+        reservedClaimTypes.UnionWith(AuthorizationPolicies.LegacyInternalClaimTypes);
         foreach (var identity in context.User.Identities)
         {
             foreach (var claim in identity.Claims.Where(claim => reservedClaimTypes.Contains(claim.Type)).ToArray())
