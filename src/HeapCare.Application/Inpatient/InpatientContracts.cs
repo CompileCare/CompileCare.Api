@@ -41,8 +41,30 @@ public sealed record InpatientBedLocation(
 
 public sealed record InpatientBedTransferInput(InpatientBedLocation Destination, string Reason);
 
+public sealed record InpatientAdmissionPageRequest(
+    int Page = 1,
+    int PageSize = 25,
+    string? Status = null)
+{
+    public int SafePageSize => PageSize < 1 ? 25 : Math.Min(PageSize, 100);
+    public int SafePage => Page < 1 ? 1 : Math.Min(Page, int.MaxValue / SafePageSize);
+    public int Skip => (SafePage - 1) * SafePageSize;
+}
+
+public sealed record InpatientAdmissionPage(
+    IReadOnlyList<InpatientAdmissionDto> Items,
+    int Page,
+    int PageSize,
+    int TotalCount)
+{
+    public int TotalPages => TotalCount == 0 ? 0 : (int)Math.Ceiling((double)TotalCount / PageSize);
+}
+
 public interface IInpatientService
 {
+    Task<InpatientOperationResult<InpatientAdmissionPage>> ListAsync(
+        Guid hospitalId, InpatientAdmissionPageRequest request,
+        CancellationToken cancellationToken);
     Task<InpatientOperationResult<InpatientAdmissionDto>> CreateAdmissionAsync(
         Guid hospitalId, InpatientAdmissionInput input, InpatientActor actor,
         CancellationToken cancellationToken);

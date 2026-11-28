@@ -178,6 +178,114 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
         Assert.Equal(0, await verifyDb.InpatientBedPlacements.CountAsync());
     }
 
+    [Fact]
+    public async Task ListAdmissions_HospitalWideScopeSupportsPaginationAndStatusFilter()
+    {
+        factory.ResetDatabase();
+        var tenantId = Guid.NewGuid();
+        var data = await SeedAsync(tenantId, departmentCount: 1, bedsPerDepartment: 1, admissionCount: 3);
+
+        using var scope = CreateScope(tenantId, data, hospitalWide: true);
+        var service = scope.ServiceProvider.GetRequiredService<IInpatientService>();
+
+        var secondPage = await service.ListAsync(
+            data.HospitalId,
+            new InpatientAdmissionPageRequest(2, 2, "active"),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess, secondPage.Error);
+        Assert.NotNull(secondPage.Value);
+        Assert.Equal(2, secondPage.Value!.Page);
+        Assert.Equal(2, secondPage.Value.PageSize);
+        Assert.Equal(3, secondPage.Value.TotalCount);
+        Assert.Equal(2, secondPage.Value.TotalPages);
+        Assert.Single(secondPage.Value.Items);
+        Assert.All(secondPage.Value.Items, item =>
+        {
+            Assert.Equal(InpatientAdmissionStatuses.Active, item.Status);
+            Assert.Null(item.CurrentPlacement);
+            Assert.Empty(item.PlacementHistory);
+        });
+
+        var invalidStatus = await service.ListAsync(
+            data.HospitalId,
+            new InpatientAdmissionPageRequest(1, 25, "Pending"),
+            CancellationToken.None);
+        Assert.Equal(400, invalidStatus.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListAdmissions_DepartmentScopeFiltersByCurrentPlacementAndHidesOtherDepartmentHistory()
+    {
+        factory.ResetDatabase();
+        var tenantId = Guid.NewGuid();
+        var data = await SeedAsync(tenantId, departmentCount: 2, bedsPerDepartment: 2, admissionCount: 2);
+        var actor = new InpatientActor("https://identity.heapcare.test/", "ipd-list-scope-user");
+
+        // Use hospital scope to create one admission that moves from Department 0
+        // to Department 1, and another admission that remains in Department 0.
+        using (var hospitalScope = CreateScope(tenantId, data, hospitalWide: true))
+        {
+            var service = hospitalScope.ServiceProvider.GetRequiredService<IInpatientService>();
+            var firstAssigned = await service.AssignBedAsync(
+                data.HospitalId, data.AdmissionIds[0], data.Locations[0], actor, CancellationToken.None);
+            Assert.True(firstAssigned.IsSuccess, firstAssigned.Error);
+
+            var firstTransferred = await service.TransferBedAsync(
+                data.HospitalId,
+                data.AdmissionIds[0],
+                new InpatientBedTransferInput(data.Locations[2], "Move to Department 1"),
+                actor,
+                CancellationToken.None);
+            Assert.True(firstTransferred.IsSuccess, firstTransferred.Error);
+
+            var secondAssigned = await service.AssignBedAsync(
+                data.HospitalId, data.AdmissionIds[1], data.Locations[1], actor, CancellationToken.None);
+            Assert.True(secondAssigned.IsSuccess, secondAssigned.Error);
+        }
+
+        using (var departmentZeroScope = CreateDepartmentScope(tenantId, data, departmentIndex: 0))
+        {
+            var service = departmentZeroScope.ServiceProvider.GetRequiredService<IInpatientService>();
+            var page = await service.ListAsync(
+                data.HospitalId,
+                new InpatientAdmissionPageRequest(1, 25),
+                CancellationToken.None);
+
+            Assert.True(page.IsSuccess, page.Error);
+            Assert.Equal(1, page.Value!.TotalCount);
+            var visible = Assert.Single(page.Value.Items);
+            Assert.Equal(data.AdmissionIds[1], visible.Id);
+            Assert.Equal(data.Locations[1], visible.CurrentPlacement!.Location);
+            Assert.Single(visible.PlacementHistory);
+
+            var movedAdmission = await service.GetAsync(
+                data.HospitalId, data.AdmissionIds[0], CancellationToken.None);
+            Assert.Equal(404, movedAdmission.StatusCode);
+        }
+
+        using (var departmentOneScope = CreateDepartmentScope(tenantId, data, departmentIndex: 1))
+        {
+            var service = departmentOneScope.ServiceProvider.GetRequiredService<IInpatientService>();
+            var page = await service.ListAsync(
+                data.HospitalId,
+                new InpatientAdmissionPageRequest(1, 25),
+                CancellationToken.None);
+
+            Assert.True(page.IsSuccess, page.Error);
+            Assert.Equal(1, page.Value!.TotalCount);
+            var visible = Assert.Single(page.Value.Items);
+            Assert.Equal(data.AdmissionIds[0], visible.Id);
+            Assert.Equal(data.Locations[2], visible.CurrentPlacement!.Location);
+
+            // Historical movement in Department 0 is not disclosed to a member
+            // whose only scope is Department 1.
+            var placement = Assert.Single(visible.PlacementHistory);
+            Assert.Equal(data.Locations[2], placement.Location);
+            Assert.Null(placement.EndedAtUtc);
+        }
+    }
+
     private async Task<InpatientOperationResult<InpatientAdmissionDto>> TryAssignAsync(
         Guid tenantId,
         TestData data,

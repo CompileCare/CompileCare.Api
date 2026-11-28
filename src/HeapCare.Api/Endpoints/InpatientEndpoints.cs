@@ -34,6 +34,28 @@ public static class InpatientEndpoints
         .WithName("CreateInpatientAdmission")
         .RequireAuthorization(AuthorizationPolicies.InpatientAdmit);
 
+        group.MapGet("/admissions", async (
+            Guid hospitalId,
+            IInpatientService service,
+            CancellationToken cancellationToken,
+            int page = 1,
+            int pageSize = 25,
+            string? status = null) =>
+        {
+            var result = await service.ListAsync(
+                hospitalId,
+                new InpatientAdmissionPageRequest(page, pageSize, status),
+                cancellationToken);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.Problem(
+                    title: "IPD admission list could not be retrieved",
+                    detail: result.Error,
+                    statusCode: result.StatusCode);
+        })
+        .WithName("ListInpatientAdmissions")
+        .RequireAuthorization(AuthorizationPolicies.InpatientRead);
+
         group.MapGet("/admissions/{admissionId:guid}", async (
             Guid hospitalId,
             Guid admissionId,
