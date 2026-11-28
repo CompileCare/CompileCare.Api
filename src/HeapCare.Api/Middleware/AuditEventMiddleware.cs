@@ -15,6 +15,9 @@ namespace HeapCare.Api.Middleware;
 /// </summary>
 public sealed class AuditEventMiddleware(RequestDelegate next)
 {
+    /// <summary>HttpContext.Items key for the resource ID created or targeted by a route.</summary>
+    public const string ResourceIdItemKey = "HeapCare.Audit.ResourceId";
+
     private const string Succeeded = "Succeeded";
     private const string Denied = "Denied";
     private const string Rejected = "Rejected";
@@ -208,8 +211,18 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         return $"{context.Request.Method} {route}";
     }
 
-    private static Guid? ParseRouteResourceId(HttpContext context)
+    public static Guid? ParseRouteResourceId(HttpContext context)
     {
+        // Create routes may not contain the newly created resource ID in their URL.
+        // Let the endpoint provide that ID explicitly after a successful write; this
+        // value takes precedence over parent identifiers such as hospitalId.
+        if (context.Items.TryGetValue(ResourceIdItemKey, out var explicitResource) &&
+            explicitResource is Guid explicitResourceId &&
+            explicitResourceId != Guid.Empty)
+        {
+            return explicitResourceId;
+        }
+
         // Route values are already matched and typed by ASP.NET routing. The last
         // GUID parameter in the route template identifies the target resource for
         // both conventional {id} routes and named routes such as {encounterId},
