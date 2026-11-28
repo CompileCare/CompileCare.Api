@@ -122,9 +122,12 @@ public sealed class TenantMembershipAdministrationService(
                 409);
         }
 
+        var userIdentity = await UserIdentityResolver.ResolveAsync(
+            db, normalizedIssuer!, normalizedSubject!, cancellationToken);
         var membership = new TenantMembership
         {
             TenantId = tenantId,
+            UserIdentityId = userIdentity.Id,
             Issuer = normalizedIssuer!,
             Subject = normalizedSubject!,
             Role = TenantRoles.HospitalAdmin,
@@ -178,9 +181,12 @@ public sealed class TenantMembershipAdministrationService(
                 "The requested organization scope exceeds your assigned scope.",
                 403);
 
+        var userIdentity = await UserIdentityResolver.ResolveAsync(
+            db, issuer!, subject!, cancellationToken);
         var membership = new TenantMembership
         {
             TenantId = tenantId,
+            UserIdentityId = userIdentity.Id,
             Issuer = issuer!,
             Subject = subject!,
             Role = input.Role!,
