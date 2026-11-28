@@ -281,9 +281,15 @@ public sealed class PatientIdentifierApiTests(FacilityApiFactory factory)
 
         await factory.SeedSystemRolesAsync(tenantId);
 
+        var userIdentity = await UserIdentityResolver.ResolveAsync(
+            db,
+            TestJwtTokenFactory.Issuer,
+            subject,
+            CancellationToken.None);
         var membership = new TenantMembership
         {
             TenantId = tenantId,
+            UserIdentityId = userIdentity.Id,
             Issuer = TestJwtTokenFactory.Issuer,
             Subject = subject,
             Role = role,
