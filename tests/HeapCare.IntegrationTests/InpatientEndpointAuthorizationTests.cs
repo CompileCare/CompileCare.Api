@@ -26,7 +26,7 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
         await factory.SeedTenantMembershipAsync(
             tenantId,
             role,
-            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
             subject: $"ipd-policy-{role}");
 
         using var client = CreateClient(tenantId, $"ipd-policy-{role}");
@@ -53,6 +53,11 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
         var tenantId = Guid.NewGuid();
         var hospitalId = Guid.NewGuid();
         var admissionId = Guid.NewGuid();
+        await factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.FacilityViewer,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
+            subject: TestJwtTokenFactory.Subject);
         await factory.SeedPlatformOperatorAsync();
 
         using var client = CreateClient(tenantId, TestJwtTokenFactory.Subject);
@@ -77,7 +82,7 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
         await factory.SeedTenantMembershipAsync(
             tenantId,
             TenantRoles.FacilityViewer,
-            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)],
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
             subject: "ipd-forged-permission");
 
         using var client = factory.CreateClient();
