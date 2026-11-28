@@ -1102,6 +1102,9 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid>("UserIdentityId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Issuer")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -1124,9 +1127,50 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                     b.HasIndex("Issuer", "Subject")
                         .IsUnique();
 
+                    b.HasIndex("UserIdentityId", "Issuer", "Subject");
+
                     b.ToTable("platform_operators", null, t =>
                         {
                             t.HasCheckConstraint("CK_platform_operators_identity", "\"Issuer\" <> '' AND \"Subject\" <> ''");
+                        });
+                });
+
+            modelBuilder.Entity("HeapCare.Infrastructure.Persistence.UserIdentity", b =>
+                {
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "Issuer", "Subject");
+
+                    b.HasIndex("Issuer", "Subject")
+                        .IsUnique();
+
+                    b.ToTable("user_identities", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_user_identities_identity", "\"Issuer\" <> '' AND \"Subject\" <> ''");
                         });
                 });
 
@@ -1660,6 +1704,9 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid>("UserIdentityId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Issuer")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -1691,6 +1738,8 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("TenantId", "Role");
+
+                    b.HasIndex("UserIdentityId", "Issuer", "Subject");
 
                     b.ToTable("tenant_memberships", (string)null);
                 });
@@ -2129,6 +2178,16 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                     b.Navigation("Registration");
                 });
 
+            modelBuilder.Entity("HeapCare.Infrastructure.Persistence.PlatformOperator", b =>
+                {
+                    b.HasOne("HeapCare.Infrastructure.Persistence.UserIdentity", null)
+                        .WithMany()
+                        .HasForeignKey("UserIdentityId", "Issuer", "Subject")
+                        .HasPrincipalKey("Id", "Issuer", "Subject")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HeapCare.Infrastructure.Persistence.ProviderAvailabilitySession", b =>
                 {
                     b.HasOne("HeapCare.Infrastructure.Persistence.Tenant", null)
@@ -2253,6 +2312,13 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HeapCare.Infrastructure.Persistence.TenantMembership", b =>
                 {
+                    b.HasOne("HeapCare.Infrastructure.Persistence.UserIdentity", null)
+                        .WithMany()
+                        .HasForeignKey("UserIdentityId", "Issuer", "Subject")
+                        .HasPrincipalKey("Id", "Issuer", "Subject")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HeapCare.Infrastructure.Persistence.TenantRole", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "Role")

@@ -19,6 +19,7 @@ public sealed class HeapCareDbContext(
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Bed> Beds => Set<Bed>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<UserIdentity> UserIdentities => Set<UserIdentity>();
     public DbSet<PlatformOperator> PlatformOperators => Set<PlatformOperator>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<TenantMembershipScope> TenantMembershipScopes => Set<TenantMembershipScope>();

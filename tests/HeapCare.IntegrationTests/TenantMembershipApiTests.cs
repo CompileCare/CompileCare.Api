@@ -22,6 +22,49 @@ public sealed class TenantMembershipApiTests
         _factory.ResetDatabase();
     }
 
+
+    [Fact]
+    public async Task GlobalIdentity_IsSharedAcrossTenantMembershipsAndPlatformOperator()
+    {
+        var firstTenant = Guid.NewGuid();
+        var secondTenant = Guid.NewGuid();
+
+        await _factory.SeedTenantMembershipAsync(firstTenant, TenantRoles.HospitalAdmin);
+        await _factory.SeedTenantMembershipAsync(secondTenant, TenantRoles.ClinicalUser);
+        await _factory.SeedPlatformOperatorAsync();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+
+        var memberships = await db.TenantMemberships.IgnoreQueryFilters()
+            .Where(value => value.Subject == TestJwtTokenFactory.Subject)
+            .OrderBy(value => value.TenantId)
+            .ToListAsync();
+        var membershipA = Assert.Single(memberships, value => value.TenantId == firstTenant);
+        var membershipB = Assert.Single(memberships, value => value.TenantId == secondTenant);
+        var platformOperator = await db.PlatformOperators.SingleAsync(
+            value => value.Issuer == TestJwtTokenFactory.Issuer &&
+                     value.Subject == TestJwtTokenFactory.Subject);
+
+        Assert.NotEqual(Guid.Empty, membershipA.UserIdentityId);
+        Assert.Equal(membershipA.UserIdentityId, membershipB.UserIdentityId);
+        Assert.Equal(membershipA.UserIdentityId, platformOperator.UserIdentityId);
+
+        var identityCount = await db.UserIdentities.CountAsync(
+            value => value.Issuer == TestJwtTokenFactory.Issuer &&
+                     value.Subject == TestJwtTokenFactory.Subject);
+        Assert.Equal(1, identityCount);
+
+        // Issuer is part of the identity key. The same subject from another
+        // OIDC authority must remain a distinct global identity.
+        var otherIssuerIdentity = await UserIdentityResolver.ResolveAsync(
+            db,
+            "https://other-issuer.example",
+            TestJwtTokenFactory.Subject,
+            CancellationToken.None);
+        Assert.NotEqual(membershipA.UserIdentityId, otherIssuerIdentity.Id);
+    }
+
     [Fact]
     public async Task InitialAdministrator_IsPlatformProvisionedAndOnlyOneBootstrapWins()
     {

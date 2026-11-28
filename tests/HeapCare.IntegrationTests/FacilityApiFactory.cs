@@ -95,11 +95,15 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
 
         await EnsureSystemRolesSeededAsync(db, tenantId);
 
+        var memberSubject = subject ?? TestJwtTokenFactory.Subject;
+        var userIdentity = await UserIdentityResolver.ResolveAsync(
+            db, TestJwtTokenFactory.Issuer, memberSubject, CancellationToken.None);
         var membership = new TenantMembership
         {
             TenantId = tenantId,
+            UserIdentityId = userIdentity.Id,
             Issuer = TestJwtTokenFactory.Issuer,
-            Subject = subject ?? TestJwtTokenFactory.Subject,
+            Subject = memberSubject,
             Role = role,
             IsActive = isActive
         };
@@ -187,8 +191,11 @@ public sealed class FacilityApiFactory : WebApplicationFactory<Program>
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var userIdentity = await UserIdentityResolver.ResolveAsync(
+            db, TestJwtTokenFactory.Issuer, TestJwtTokenFactory.Subject, CancellationToken.None);
         db.PlatformOperators.Add(new PlatformOperator
         {
+            UserIdentityId = userIdentity.Id,
             Issuer = TestJwtTokenFactory.Issuer,
             Subject = TestJwtTokenFactory.Subject,
             IsActive = isActive
