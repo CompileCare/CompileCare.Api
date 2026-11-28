@@ -75,6 +75,8 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "HospitalId", "Status", "AdmittedAtUtc");
 
+                    b.HasIndex("TenantId", "PatientId");
+
                     b.ToTable("inpatient_admissions", null, t =>
                         {
                             t.HasCheckConstraint("CK_inpatient_admissions_status", "\"Status\" IN ('Active', 'Cancelled', 'Discharged')");
@@ -145,6 +147,16 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                         .HasFilter("\"EndedAtUtc\" IS NULL");
 
                     b.HasIndex("TenantId", "HospitalId", "StartedAtUtc");
+
+                    b.HasIndex("TenantId", "DepartmentId", "WardId");
+
+                    b.HasIndex("TenantId", "HospitalId", "AdmissionId");
+
+                    b.HasIndex("TenantId", "HospitalId", "DepartmentId");
+
+                    b.HasIndex("TenantId", "RoomId", "BedId");
+
+                    b.HasIndex("TenantId", "WardId", "RoomId");
 
                     b.ToTable("inpatient_bed_placements", null, t =>
                         {
