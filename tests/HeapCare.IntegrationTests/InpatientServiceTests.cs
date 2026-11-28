@@ -119,6 +119,47 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
     }
 
     [Fact]
+    public async Task DepartmentScopedMember_SeesOnlyPlacementHistoryWithinItsDepartment()
+    {
+        factory.ResetDatabase();
+        var tenantId = Guid.NewGuid();
+        var data = await SeedAsync(tenantId, departmentCount: 2, bedsPerDepartment: 1, admissionCount: 1);
+        var actor = new InpatientActor("https://identity.heapcare.test/", "ipd-history-scope-user");
+
+        using (var hospitalScope = CreateScope(tenantId, data, hospitalWide: true))
+        {
+            var service = hospitalScope.ServiceProvider.GetRequiredService<IInpatientService>();
+            var assigned = await service.AssignBedAsync(
+                data.HospitalId, data.AdmissionIds[0], data.Locations[0], actor, CancellationToken.None);
+            Assert.True(assigned.IsSuccess, assigned.Error);
+
+            var transferred = await service.TransferBedAsync(
+                data.HospitalId,
+                data.AdmissionIds[0],
+                new InpatientBedTransferInput(data.Locations[1], "Approved synthetic department move"),
+                actor,
+                CancellationToken.None);
+            Assert.True(transferred.IsSuccess, transferred.Error);
+            Assert.Equal(2, transferred.Value!.PlacementHistory.Count);
+        }
+
+        using var destinationDepartmentScope = CreateDepartmentScope(tenantId, data, departmentIndex: 1);
+        var scopedService = destinationDepartmentScope.ServiceProvider.GetRequiredService<IInpatientService>();
+        var visible = await scopedService.GetAsync(
+            data.HospitalId, data.AdmissionIds[0], CancellationToken.None);
+
+        Assert.True(visible.IsSuccess, visible.Error);
+        Assert.NotNull(visible.Value);
+        Assert.Equal(data.Locations[1], visible.Value!.CurrentPlacement!.Location);
+        var visibleHistory = Assert.Single(visible.Value.PlacementHistory);
+        Assert.Equal(data.Locations[1], visibleHistory.Location);
+        Assert.Null(visibleHistory.EndedAtUtc);
+        Assert.DoesNotContain(
+            visible.Value.PlacementHistory,
+            placement => placement.Location.DepartmentId == data.Locations[0].DepartmentId);
+    }
+
+    [Fact]
     public async Task ConcurrentAssignments_ForOneBed_ReturnOneSuccessAndOneConflict()
     {
         factory.ResetDatabase();
