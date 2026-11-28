@@ -2145,7 +2145,6 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("BedPlacements");
                 });
 
             modelBuilder.Entity("HeapCare.Infrastructure.Persistence.InpatientBedPlacement", b =>
@@ -2197,6 +2196,11 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "RoomId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("HeapCare.Infrastructure.Persistence.InpatientAdmission", b =>
+                {
+                    b.Navigation("BedPlacements");
                 });
 
             modelBuilder.Entity("HeapCare.Infrastructure.Persistence.Department", b =>
