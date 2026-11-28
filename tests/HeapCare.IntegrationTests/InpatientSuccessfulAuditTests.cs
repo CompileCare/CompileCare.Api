@@ -142,6 +142,132 @@ public sealed class InpatientSuccessfulAuditTests(FacilityApiFactory factory)
         Assert.Equal(data.Locations[1].BedId, placements[1].BedId);
     }
 
+    [Fact]
+    public async Task AuditInsertFailure_RollsBackSuccessfulBedAssignment()
+    {
+        factory.ResetDatabase();
+        var data = await SeedAsync(bedCount: 2);
+        using var scope = CreateRequestScope(data);
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        await InstallAuditFailureTriggerAsync(db);
+
+        try
+        {
+            var service = scope.ServiceProvider.GetRequiredService<IInpatientService>();
+            var tenant = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+            var response = await InvokeAuditedAsync(
+                scope,
+                tenant,
+                data,
+                "AssignInpatientBed",
+                "/api/v1/hospitals/{hospitalId:guid}/ipd/admissions/{admissionId:guid}/bed-placement",
+                async () =>
+                {
+                    var result = await service.AssignBedAsync(
+                        data.HospitalId,
+                        data.AdmissionId,
+                        data.Locations[0],
+                        new InpatientActor(Issuer, Subject),
+                        CancellationToken.None);
+                    Assert.True(result.IsSuccess, result.Error);
+                    return result.StatusCode;
+                });
+
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, response.Response.StatusCode);
+            db.ChangeTracker.Clear();
+            Assert.Empty(await db.InpatientBedPlacements.AsNoTracking().ToListAsync());
+            Assert.Empty(await db.AuditEvents.AsNoTracking().ToListAsync());
+        }
+        finally
+        {
+            await RemoveAuditFailureTriggerAsync(db);
+        }
+    }
+
+    [Fact]
+    public async Task AuditInsertFailure_RollsBackTransferAndPreservesOriginalActivePlacement()
+    {
+        factory.ResetDatabase();
+        var data = await SeedAsync(bedCount: 2);
+        using var scope = CreateRequestScope(data);
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var service = scope.ServiceProvider.GetRequiredService<IInpatientService>();
+        var actor = new InpatientActor(Issuer, Subject);
+
+        var initialAssignment = await service.AssignBedAsync(
+            data.HospitalId,
+            data.AdmissionId,
+            data.Locations[0],
+            actor,
+            CancellationToken.None);
+        Assert.True(initialAssignment.IsSuccess, initialAssignment.Error);
+
+        await InstallAuditFailureTriggerAsync(db);
+        try
+        {
+            var tenant = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+            var response = await InvokeAuditedAsync(
+                scope,
+                tenant,
+                data,
+                "TransferInpatientBed",
+                "/api/v1/hospitals/{hospitalId:guid}/ipd/admissions/{admissionId:guid}/bed-transfer",
+                async () =>
+                {
+                    var result = await service.TransferBedAsync(
+                        data.HospitalId,
+                        data.AdmissionId,
+                        new InpatientBedTransferInput(data.Locations[1], "Synthetic audit-failure transfer"),
+                        actor,
+                        CancellationToken.None);
+                    Assert.True(result.IsSuccess, result.Error);
+                    return result.StatusCode;
+                });
+
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, response.Response.StatusCode);
+            db.ChangeTracker.Clear();
+            var placements = await db.InpatientBedPlacements
+                .AsNoTracking()
+                .Where(item => item.AdmissionId == data.AdmissionId)
+                .ToListAsync();
+            var retained = Assert.Single(placements);
+            Assert.Equal(data.Locations[0].BedId, retained.BedId);
+            Assert.Null(retained.EndedAtUtc);
+            Assert.Null(retained.EndReason);
+            Assert.Empty(await db.AuditEvents.AsNoTracking().ToListAsync());
+        }
+        finally
+        {
+            await RemoveAuditFailureTriggerAsync(db);
+        }
+    }
+
+    private static async Task InstallAuditFailureTriggerAsync(HeapCareDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE OR REPLACE FUNCTION reject_ipd_audit_event_insert() RETURNS trigger AS $ipd$
+            BEGIN
+                RAISE EXCEPTION 'synthetic IPD audit sink failure';
+            END;
+            $ipd$ LANGUAGE plpgsql;
+            """);
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TRIGGER reject_ipd_audit_event_insert_trigger
+            BEFORE INSERT ON audit_events
+            FOR EACH ROW EXECUTE FUNCTION reject_ipd_audit_event_insert();
+            """);
+    }
+
+    private static async Task RemoveAuditFailureTriggerAsync(HeapCareDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            DROP TRIGGER IF EXISTS reject_ipd_audit_event_insert_trigger ON audit_events;
+            """);
+        await db.Database.ExecuteSqlRawAsync("""
+            DROP FUNCTION IF EXISTS reject_ipd_audit_event_insert();
+            """);
+    }
+
     private static async Task<DefaultHttpContext> InvokeAuditedAsync(
         IServiceScope scope,
         ITenantContext tenant,
