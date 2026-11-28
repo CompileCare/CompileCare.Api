@@ -66,6 +66,7 @@ public sealed class SecurityAuthorizationTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         using var problem = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(401, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("about:blank", problem.RootElement.GetProperty("type").GetString());
         Assert.Equal("Authentication required", problem.RootElement.GetProperty("title").GetString());
         Assert.True(problem.RootElement.TryGetProperty("traceId", out _));
     }
@@ -78,6 +79,11 @@ public sealed class SecurityAuthorizationTests
         var response = await client.GetAsync("/api/v1/hospitals");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(403, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("about:blank", problem.RootElement.GetProperty("type").GetString());
+        Assert.Equal("Access denied", problem.RootElement.GetProperty("title").GetString());
+        Assert.True(problem.RootElement.TryGetProperty("traceId", out _));
     }
 
     [Fact]
