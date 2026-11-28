@@ -143,6 +143,8 @@ public sealed class AuditQueryApiTests
             [
                 new("compilecare:permission", "audit.read"),
                 new("compilecare:tenant_role", TenantRoles.HospitalAdmin),
+                new("heapcare:permission", "audit.read"),
+                new("heapcare:tenant_role", TenantRoles.HospitalAdmin),
                 new("role", TenantRoles.HospitalAdmin),
                 new(System.Security.Claims.ClaimTypes.Role, TenantRoles.HospitalAdmin)
             ]);
