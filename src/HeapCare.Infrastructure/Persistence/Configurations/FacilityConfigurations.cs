@@ -41,6 +41,7 @@ public sealed class WardConfiguration : IEntityTypeConfiguration<Ward>
         b.ToTable("wards");
         b.Property(x => x.Name).HasMaxLength(200).IsRequired();
         b.HasAlternateKey(x => new { x.TenantId, x.Id });
+        b.HasAlternateKey(x => new { x.TenantId, x.DepartmentId, x.Id });
         b.HasIndex(x => new { x.TenantId, x.DepartmentId, x.Name }).IsUnique();
         b.HasMany(x => x.Rooms).WithOne(x => x.Ward)
             .HasForeignKey(x => new { x.TenantId, x.WardId })
@@ -54,6 +55,7 @@ public sealed class RoomConfiguration : IEntityTypeConfiguration<Room>
         b.ToTable("rooms");
         b.Property(x => x.Name).HasMaxLength(100).IsRequired();
         b.HasAlternateKey(x => new { x.TenantId, x.Id });
+        b.HasAlternateKey(x => new { x.TenantId, x.WardId, x.Id });
         b.HasIndex(x => new { x.TenantId, x.WardId, x.Name }).IsUnique();
         b.HasMany(x => x.Beds).WithOne(x => x.Room)
             .HasForeignKey(x => new { x.TenantId, x.RoomId })
@@ -67,6 +69,7 @@ public sealed class BedConfiguration : IEntityTypeConfiguration<Bed>
         b.ToTable("beds");
         b.Property(x => x.Number).HasMaxLength(50).IsRequired();
         b.HasAlternateKey(x => new { x.TenantId, x.Id });
+        b.HasAlternateKey(x => new { x.TenantId, x.RoomId, x.Id });
         b.HasIndex(x => new { x.TenantId, x.RoomId, x.Number }).IsUnique();
     }
 }
