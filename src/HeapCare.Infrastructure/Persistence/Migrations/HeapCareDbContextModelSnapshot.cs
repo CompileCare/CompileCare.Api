@@ -71,13 +71,13 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "HospitalId", "PatientId")
                         .IsUnique()
-                        .HasFilter("\\"Status\\" = 'Active'");
+                        .HasFilter("\"Status\" = 'Active'");
 
                     b.HasIndex("TenantId", "HospitalId", "Status", "AdmittedAtUtc");
 
                     b.ToTable("inpatient_admissions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_inpatient_admissions_status", "\\"Status\\" IN ('Active', 'Cancelled', 'Discharged')");
+                            t.HasCheckConstraint("CK_inpatient_admissions_status", "\"Status\" IN ('Active', 'Cancelled', 'Discharged')");
 
                             t.HasCheckConstraint("CK_inpatient_admissions_lifecycle", """
                 ("Status" = 'Active' AND "CancelledAtUtc" IS NULL AND "DischargedAtUtc" IS NULL)
@@ -138,17 +138,17 @@ namespace HeapCare.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "AdmissionId")
                         .IsUnique()
-                        .HasFilter("\\"EndedAtUtc\\" IS NULL");
+                        .HasFilter("\"EndedAtUtc\" IS NULL");
 
                     b.HasIndex("TenantId", "BedId")
                         .IsUnique()
-                        .HasFilter("\\"EndedAtUtc\\" IS NULL");
+                        .HasFilter("\"EndedAtUtc\" IS NULL");
 
                     b.HasIndex("TenantId", "HospitalId", "StartedAtUtc");
 
                     b.ToTable("inpatient_bed_placements", null, t =>
                         {
-                            t.HasCheckConstraint("CK_inpatient_bed_placements_time_range", "\\"EndedAtUtc\\" IS NULL OR \\"EndedAtUtc\\" > \\"StartedAtUtc\\"");
+                            t.HasCheckConstraint("CK_inpatient_bed_placements_time_range", "\"EndedAtUtc\" IS NULL OR \"EndedAtUtc\" > \"StartedAtUtc\"");
                         });
                 });
 
