@@ -173,6 +173,17 @@ public sealed class TenantRoleAdministrationApiTests(FacilityApiFactory factory)
         Assert.DoesNotContain(tenantBRoles!, value => value.Id == role!.Id);
         Assert.DoesNotContain(tenantBRoles!, value => value.Code == role!.Code);
 
+        var foreignRoleAssignment = await adminB.PostAsJsonAsync(
+            "/api/v1/tenant/memberships",
+            new
+            {
+                issuer = TestJwtTokenFactory.Issuer,
+                subject = "rbac-cross-tenant-role-assignment",
+                role = role!.Code,
+                scopes = new[] { new { scopeType = OrganizationScopeTypes.Tenant } }
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, foreignRoleAssignment.StatusCode);
+
         var crossTenantUpdate = await adminB.PutAsJsonAsync(
             $"/api/v1/tenant/roles/{role!.Id:D}",
             new
@@ -195,8 +206,14 @@ public sealed class TenantRoleAdministrationApiTests(FacilityApiFactory factory)
         Assert.Equal(HttpStatusCode.NotFound, crossTenantReactivate.StatusCode);
 
         using var scope = factory.Services.CreateScope();
-        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantA);
         var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var crossTenantMembershipWasCreated = await db.TenantMemberships.IgnoreQueryFilters()
+            .AnyAsync(value =>
+                value.TenantId == tenantB &&
+                value.Subject == "rbac-cross-tenant-role-assignment");
+        Assert.False(crossTenantMembershipWasCreated);
+
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantA);
         var persistedRole = await db.TenantRoles.AsNoTracking()
             .SingleAsync(value => value.Id == role.Id);
         Assert.Equal("Tenant A Private Role", persistedRole.Name);
