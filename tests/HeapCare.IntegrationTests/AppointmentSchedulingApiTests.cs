@@ -351,6 +351,56 @@ public sealed class AppointmentSchedulingApiTests
     }
 
     [Fact]
+    public async Task ConcurrentAvailabilityPublicationAllowsOnlyOneOverlappingProviderSession()
+    {
+        var tenantId = Guid.NewGuid();
+        var (hospitalId, departmentId, providerId, _) = await SeedSchedulingDataAsync(tenantId);
+        await _factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.HospitalAdmin,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
+
+        using var admin = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
+        var input = new AvailabilitySessionCreateInput(
+            departmentId,
+            providerId,
+            date,
+            new TimeOnly(9, 0),
+            new TimeOnly(10, 0),
+            30,
+            "Asia/Kolkata");
+        var endpoint = $"/api/v1/hospitals/{hospitalId:D}/availability-sessions";
+
+        // The application-level overlap check is only advisory under concurrency.
+        // PostgreSQL's EXCLUDE constraint must serialize simultaneous inserts for
+        // the same tenant/provider even when every request passes the initial read.
+        var attempts = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+            admin.PostAsJsonAsync(endpoint, input)));
+        var outcomes = await Task.WhenAll(attempts.Select(async response => new
+        {
+            response.StatusCode,
+            Body = await response.Content.ReadAsStringAsync()
+        }));
+
+        Assert.True(
+            outcomes.Count(response => response.StatusCode == HttpStatusCode.Created) == 1,
+            $"Expected one availability publication. Actual: {string.Join("; ", outcomes.Select(x => $"{(int)x.StatusCode} {x.Body}"))}");
+        Assert.True(
+            outcomes.Count(response => response.StatusCode == HttpStatusCode.Conflict) == 7,
+            $"Every competing overlapping publication must return 409. Actual: {string.Join("; ", outcomes.Select(x => $"{(int)x.StatusCode} {x.Body}"))}");
+        Assert.All(outcomes, response =>
+            Assert.Contains(response.StatusCode, new[] { HttpStatusCode.Created, HttpStatusCode.Conflict }));
+
+        var page = await admin.GetFromJsonAsync<AvailabilitySessionPage>(
+            $"{endpoint}?date={date:yyyy-MM-dd}&page=1&pageSize=10");
+        Assert.NotNull(page);
+        Assert.Single(page!.Items);
+        Assert.Equal(providerId, page.Items[0].ProviderStaffId);
+        Assert.Equal(date, page.Items[0].LocalDate);
+    }
+
+    [Fact]
     public async Task ReschedulingPersistsTenantScopedAppointmentLineage()
     {
         var tenantId = Guid.NewGuid();
