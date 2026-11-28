@@ -72,6 +72,9 @@ jobs:
         working-directory: HeapCare.Observability
         run: |
           mkdir -p "$GITHUB_WORKSPACE/.ci-nuget"
+          # The PR revision consumes Observability 1.0.2; the base API revision still consumes 1.0.1.
+          dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.2 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
+          dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.2 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
           dotnet pack src/HeapCare.Observability/HeapCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
           dotnet pack src/HeapCare.Observability.AspNetCore/HeapCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
           cat > "$GITHUB_WORKSPACE/.ci-nuget.config" <<EOF
