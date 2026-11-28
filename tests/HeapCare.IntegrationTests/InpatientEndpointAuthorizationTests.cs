@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using HeapCare.Api.Middleware;
+using HeapCare.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using HeapCare.Application.Inpatient;
 using HeapCare.Application.Tenancy;
 using Xunit;
@@ -107,6 +110,49 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
 
         Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, assign.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeniedInpatientRead_WritesMetadataOnlyAuditWithTrustedActorAndAdmissionId()
+    {
+        var tenantId = Guid.NewGuid();
+        var hospitalId = Guid.NewGuid();
+        var admissionId = Guid.NewGuid();
+        var correlationId = $"ipd-denied-audit-{Guid.NewGuid():N}";
+
+        await factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.FacilityViewer,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
+            subject: "ipd-audit-denied-reader");
+
+        using var client = CreateClient(tenantId, "ipd-audit-denied-reader");
+        client.DefaultRequestHeaders.Add(CorrelationIdMiddleware.HeaderName, correlationId);
+
+        var response = await client.GetAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions/{admissionId:D}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var auditEvent = await db.AuditEvents.SingleAsync(
+            item => item.CorrelationId == correlationId);
+
+        Assert.Equal(tenantId, auditEvent.TenantId);
+        Assert.Equal(tenantId, auditEvent.RequestedTenantId);
+        Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
+        Assert.Equal("ipd-audit-denied-reader", auditEvent.ActorSubject);
+        Assert.Equal("GetInpatientAdmission", auditEvent.Action);
+        Assert.Equal("IPD admissions", auditEvent.ResourceType);
+        Assert.Equal(admissionId, auditEvent.ResourceId);
+        Assert.Equal("GET", auditEvent.HttpMethod);
+        Assert.Equal(
+            "/api/v1/hospitals/{hospitalId:guid}/ipd/admissions/{admissionId:guid}",
+            auditEvent.RouteTemplate);
+        Assert.Equal("Denied", auditEvent.Outcome);
+        Assert.Equal((int)HttpStatusCode.Forbidden, auditEvent.StatusCode);
+        Assert.Equal(correlationId, auditEvent.CorrelationId);
     }
 
     private HttpClient CreateClient(Guid tenantId, string subject)
