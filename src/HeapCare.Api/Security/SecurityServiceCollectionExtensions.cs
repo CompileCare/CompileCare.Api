@@ -97,7 +97,7 @@ public static class SecurityServiceCollectionExtensions
                     {
                         context.HandleResponse();
                         await Results.Problem(
-                            type: "https://compilecare.in/problems/authentication-required",
+                            type: "about:blank",
                             title: "Authentication required",
                             detail: "A valid bearer access token is required.",
                             statusCode: StatusCodes.Status401Unauthorized,
@@ -110,7 +110,7 @@ public static class SecurityServiceCollectionExtensions
                     OnForbidden = async context =>
                     {
                         await Results.Problem(
-                            type: "https://compilecare.in/problems/access-denied",
+                            type: "about:blank",
                             title: "Access denied",
                             detail: "The authenticated identity is not authorized for this operation.",
                             statusCode: StatusCodes.Status403Forbidden,
