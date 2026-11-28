@@ -286,6 +286,101 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
         }
     }
 
+    [Fact]
+    public async Task ListAdmissions_HospitalScopeCannotReadSiblingHospitalAdmissionsWithinSameTenant()
+    {
+        factory.ResetDatabase();
+        var tenantId = Guid.NewGuid();
+        var data = await SeedAsync(
+            tenantId,
+            departmentCount: 1,
+            bedsPerDepartment: 1,
+            admissionCount: 2);
+
+        Guid siblingHospitalId;
+        Guid siblingAdmissionId;
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            seedScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = seedScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+
+            var siblingHospital = new Hospital
+            {
+                Name = "Sibling IPD Hospital",
+                Code = $"SIB-{Guid.NewGuid():N}"[..12]
+            };
+            var siblingPatient = new Patient
+            {
+                GivenName = "Sibling",
+                FamilyName = "Hospital Patient"
+            };
+            var siblingAdmission = new InpatientAdmission
+            {
+                HospitalId = siblingHospital.Id,
+                PatientId = siblingPatient.Id,
+                Status = InpatientAdmissionStatuses.Active,
+                AdmittedAtUtc = DateTimeOffset.UtcNow
+            };
+
+            db.Hospitals.Add(siblingHospital);
+            db.Patients.Add(siblingPatient);
+            db.HospitalPatientRegistrations.Add(new HospitalPatientRegistration
+            {
+                PatientId = siblingPatient.Id,
+                HospitalId = siblingHospital.Id,
+                RegisteredAtUtc = DateTimeOffset.UtcNow
+            });
+            db.InpatientAdmissions.Add(siblingAdmission);
+            await db.SaveChangesAsync();
+
+            siblingHospitalId = siblingHospital.Id;
+            siblingAdmissionId = siblingAdmission.Id;
+        }
+
+        using (var hospitalAScope = CreateHospitalScope(tenantId, data.HospitalId))
+        {
+            var service = hospitalAScope.ServiceProvider.GetRequiredService<IInpatientService>();
+
+            var hospitalAList = await service.ListAsync(
+                data.HospitalId,
+                new InpatientAdmissionPageRequest(1, 100),
+                CancellationToken.None);
+
+            Assert.True(hospitalAList.IsSuccess, hospitalAList.Error);
+            Assert.Equal(2, hospitalAList.Value!.TotalCount);
+            Assert.Equal(2, hospitalAList.Value.Items.Count);
+            Assert.All(hospitalAList.Value.Items, item =>
+            {
+                Assert.Equal(data.HospitalId, item.HospitalId);
+                Assert.DoesNotContain(item.Id, data.AdmissionIds.Where(id => id == siblingAdmissionId));
+            });
+
+            var siblingHospitalRequest = await service.ListAsync(
+                siblingHospitalId,
+                new InpatientAdmissionPageRequest(1, 100),
+                CancellationToken.None);
+            Assert.Equal(404, siblingHospitalRequest.StatusCode);
+            Assert.Null(siblingHospitalRequest.Value);
+        }
+
+        using (var hospitalBScope = CreateHospitalScope(tenantId, siblingHospitalId))
+        {
+            var service = hospitalBScope.ServiceProvider.GetRequiredService<IInpatientService>();
+            var hospitalBList = await service.ListAsync(
+                siblingHospitalId,
+                new InpatientAdmissionPageRequest(1, 100),
+                CancellationToken.None);
+
+            Assert.True(hospitalBList.IsSuccess, hospitalBList.Error);
+            var sibling = Assert.Single(hospitalBList.Value!.Items);
+            Assert.Equal(siblingAdmissionId, sibling.Id);
+            Assert.Equal(siblingHospitalId, sibling.HospitalId);
+            Assert.DoesNotContain(
+                hospitalBList.Value.Items,
+                item => data.AdmissionIds.Contains(item.Id));
+        }
+    }
+
     private async Task<InpatientOperationResult<InpatientAdmissionDto>> TryAssignAsync(
         Guid tenantId,
         TestData data,
@@ -310,6 +405,17 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
             hospitalWide
                 ? [new OrganizationScope(OrganizationScopeTypes.Hospital, data.HospitalId)]
                 : [new OrganizationScope(OrganizationScopeTypes.Department, data.HospitalId, data.DepartmentIds[0])]);
+        return scope;
+    }
+
+    private IServiceScope CreateHospitalScope(Guid tenantId, Guid hospitalId)
+    {
+        var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        scope.ServiceProvider.GetRequiredService<IOrganizationScopeContext>().SetMembership(
+            Guid.NewGuid(),
+            TenantRoles.HospitalAdmin,
+            [new OrganizationScope(OrganizationScopeTypes.Hospital, hospitalId)]);
         return scope;
     }
 
