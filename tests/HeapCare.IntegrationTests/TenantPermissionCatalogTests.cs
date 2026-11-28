@@ -47,7 +47,7 @@ public sealed class TenantPermissionCatalogTests
 
         Assert.Equal(26, TenantPermissionCatalog.GetDefaultPermissions(TenantRoles.HospitalAdmin).Count);
         Assert.Equal(2, TenantPermissionCatalog.GetDefaultPermissions(TenantRoles.FacilityManager).Count);
-        Assert.Equal(1, TenantPermissionCatalog.GetDefaultPermissions(TenantRoles.FacilityViewer).Count);
+        Assert.Single(TenantPermissionCatalog.GetDefaultPermissions(TenantRoles.FacilityViewer));
         Assert.Equal(16, TenantPermissionCatalog.GetDefaultPermissions(TenantRoles.PatientRegistrar).Count);
         Assert.Equal(7, TenantPermissionCatalog.GetDefaultPermissions(TenantRoles.ClinicalUser).Count);
 
