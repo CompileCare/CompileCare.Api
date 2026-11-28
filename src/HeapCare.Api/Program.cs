@@ -120,6 +120,7 @@ app.MapPatientIdentifierEndpoints();
 app.MapAppointmentEndpoints();
 app.MapOpdEncounterEndpoints();
 app.MapBillingEndpoints();
+app.MapInpatientEndpoints();
 app.Run();
 
 public partial class Program;
