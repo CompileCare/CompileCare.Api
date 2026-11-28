@@ -381,6 +381,103 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
         }
     }
 
+    [Fact]
+    public async Task ConcurrentTransfers_FromSameActivePlacement_ReturnOneSuccessAndOneConflict()
+    {
+        factory.ResetDatabase();
+        var tenantId = Guid.NewGuid();
+        var data = await SeedAsync(tenantId, departmentCount: 1, bedsPerDepartment: 3, admissionCount: 1);
+        var actor = new InpatientActor("https://identity.heapcare.test/", "ipd-concurrent-transfer-user");
+
+        using (var assignScope = CreateScope(tenantId, data, hospitalWide: true))
+        {
+            var service = assignScope.ServiceProvider.GetRequiredService<IInpatientService>();
+            var assigned = await service.AssignBedAsync(
+                data.HospitalId,
+                data.AdmissionIds[0],
+                data.Locations[0],
+                actor,
+                CancellationToken.None);
+            Assert.True(assigned.IsSuccess, assigned.Error);
+        }
+
+        // Hold the first row update briefly so both service requests read the same
+        // active placement before either transaction can commit. PostgreSQL rechecks
+        // the Version concurrency predicate after the row lock is released.
+        using (var triggerScope = factory.Services.CreateScope())
+        {
+            triggerScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = triggerScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+            await db.Database.ExecuteSqlRawAsync("""
+                CREATE OR REPLACE FUNCTION delay_ipd_transfer_update() RETURNS trigger AS $ipd$
+                BEGIN
+                    IF OLD."EndedAtUtc" IS NULL AND NEW."EndedAtUtc" IS NOT NULL THEN
+                        PERFORM pg_sleep(1.5);
+                    END IF;
+                    RETURN NEW;
+                END;
+                $ipd$ LANGUAGE plpgsql;
+
+                CREATE TRIGGER delay_ipd_transfer_update_trigger
+                BEFORE UPDATE ON inpatient_bed_placements
+                FOR EACH ROW EXECUTE FUNCTION delay_ipd_transfer_update();
+                """);
+        }
+
+        InpatientOperationResult<InpatientAdmissionDto>[] results;
+        try
+        {
+            results = await Task.WhenAll(
+                TryTransferAsync(tenantId, data, data.Locations[1], actor),
+                TryTransferAsync(tenantId, data, data.Locations[2], actor));
+        }
+        finally
+        {
+            using var cleanupScope = factory.Services.CreateScope();
+            cleanupScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+            var db = cleanupScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+            await db.Database.ExecuteSqlRawAsync("""
+                DROP TRIGGER IF EXISTS delay_ipd_transfer_update_trigger ON inpatient_bed_placements;
+                DROP FUNCTION IF EXISTS delay_ipd_transfer_update();
+                """);
+        }
+
+        Assert.Single(results, result => result.IsSuccess);
+        Assert.Single(results, result => result.StatusCode == 409);
+
+        using var verifyScope = factory.Services.CreateScope();
+        verifyScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var placements = await verifyDb.InpatientBedPlacements
+            .AsNoTracking()
+            .Where(placement => placement.AdmissionId == data.AdmissionIds[0])
+            .OrderBy(placement => placement.StartedAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, placements.Count);
+        Assert.NotNull(placements[0].EndedAtUtc);
+        Assert.Null(placements[1].EndedAtUtc);
+        Assert.Contains(
+            placements[1].BedId,
+            new[] { data.Locations[1].BedId, data.Locations[2].BedId });
+    }
+
+    private async Task<InpatientOperationResult<InpatientAdmissionDto>> TryTransferAsync(
+        Guid tenantId,
+        TestData data,
+        InpatientBedLocation destination,
+        InpatientActor actor)
+    {
+        using var scope = CreateScope(tenantId, data, hospitalWide: true);
+        var service = scope.ServiceProvider.GetRequiredService<IInpatientService>();
+        return await service.TransferBedAsync(
+            data.HospitalId,
+            data.AdmissionIds[0],
+            new InpatientBedTransferInput(destination, "Concurrent transfer regression"),
+            actor,
+            CancellationToken.None);
+    }
+
     private async Task<InpatientOperationResult<InpatientAdmissionDto>> TryAssignAsync(
         Guid tenantId,
         TestData data,
