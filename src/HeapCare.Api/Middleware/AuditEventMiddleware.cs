@@ -281,13 +281,14 @@ public sealed class AuditEventMiddleware(RequestDelegate next)
         context.Response.Headers[CorrelationIdMiddleware.HeaderName] = context.TraceIdentifier;
 
         await Results.Problem(
-            type: "https://compilecare.in/problems/audit-unavailable",
-            title: "Audit service unavailable",
+            type: "about:blank",
+            title: "Service Unavailable",
             detail: "The operation could not be completed because its audit record could not be stored.",
             statusCode: StatusCodes.Status503ServiceUnavailable,
             instance: context.Request.Path,
             extensions: new Dictionary<string, object?>
             {
+                ["code"] = "audit_unavailable",
                 ["traceId"] = context.TraceIdentifier
             }).ExecuteAsync(context);
     }
