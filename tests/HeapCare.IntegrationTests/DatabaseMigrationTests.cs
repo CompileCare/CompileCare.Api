@@ -87,6 +87,11 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
         Assert.Equal(tenantId, membership.TenantId);
         Assert.Equal(TestJwtTokenFactory.Issuer, membership.Issuer);
         Assert.Equal(TestJwtTokenFactory.Subject, membership.Subject);
+        Assert.NotEqual(Guid.Empty, membership.UserIdentityId);
+        var identity = await db.UserIdentities.SingleAsync(
+            value => value.Id == membership.UserIdentityId);
+        Assert.Equal(membership.Issuer, identity.Issuer);
+        Assert.Equal(membership.Subject, identity.Subject);
     }
 
     [Fact]
@@ -120,16 +125,30 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
         var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
         tenantContext.SetTenant(tenantId);
 
-        db.TenantMemberships.Add(new TenantMembership
-        {
-            Id = membershipId,
-            TenantId = tenantId,
-            Issuer = TestJwtTokenFactory.Issuer,
-            Subject = "legacy-member",
-            Role = TenantRoles.FacilityManager,
-            IsActive = true
-        });
-        await db.SaveChangesAsync();
+        // Insert through the pre-scope/pre-identity schema. The current EF model
+        // intentionally contains the later UserIdentityId column, which does not
+        // exist until the final migration in this rehearsal.
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO "tenant_memberships"
+                ("Id", "Issuer", "Subject", "Role", "IsActive", "TenantId",
+                 "CreatedAtUtc", "UpdatedAtUtc", "Version")
+            VALUES
+                ({membershipId}, {TestJwtTokenFactory.Issuer}, {TestJwtTokenFactory.Subject},
+                 {TenantRoles.FacilityManager}, TRUE, {tenantId},
+                 {DateTimeOffset.UtcNow}, {DateTimeOffset.UtcNow}, {Guid.NewGuid()});
+            """);
+
+        var platformOperatorId = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO "platform_operators"
+                ("Id", "Issuer", "Subject", "IsActive",
+                 "CreatedAtUtc", "UpdatedAtUtc", "Version")
+            VALUES
+                ({platformOperatorId}, {TestJwtTokenFactory.Issuer}, {TestJwtTokenFactory.Subject},
+                 TRUE, {DateTimeOffset.UtcNow}, {DateTimeOffset.UtcNow}, {Guid.NewGuid()});
+            """);
 
         await migrator.MigrateAsync();
 
@@ -141,6 +160,18 @@ public sealed class DatabaseMigrationTests(FacilityApiFactory factory)
         Assert.Equal(OrganizationScopeTypes.Tenant, scopeRecord.ScopeType);
         Assert.Null(scopeRecord.HospitalId);
         Assert.Null(scopeRecord.DepartmentId);
+
+        var migratedMembership = await db.TenantMemberships.IgnoreQueryFilters()
+            .SingleAsync(value => value.Id == membershipId);
+        var migratedOperator = await db.PlatformOperators.SingleAsync(
+            value => value.Id == platformOperatorId);
+        Assert.NotEqual(Guid.Empty, migratedMembership.UserIdentityId);
+        Assert.Equal(migratedMembership.UserIdentityId, migratedOperator.UserIdentityId);
+        Assert.Equal(
+            1,
+            await db.UserIdentities.CountAsync(value =>
+                value.Issuer == TestJwtTokenFactory.Issuer &&
+                value.Subject == TestJwtTokenFactory.Subject));
     }
 
     [Fact]
