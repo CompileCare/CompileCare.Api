@@ -46,6 +46,40 @@ public sealed class AuditEndpointCoverageTests
             Environment.NewLine + string.Join(Environment.NewLine, unauditedRoutes));
     }
 
+    [Fact]
+    public void EveryApiRoute_RequiresAuthorizationOrExplicitAnonymousMetadata()
+    {
+        // Non-API infrastructure routes (health, metrics and development OpenAPI)
+        // have separate exposure rules. Every versioned API route must explicitly
+        // require authorization or opt into an audited anonymous boundary.
+        using var client = _factory.CreateClient();
+
+        var apiEndpoints = _factory.Services
+            .GetServices<EndpointDataSource>()
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Where(endpoint =>
+                (endpoint.RoutePattern.RawText ?? string.Empty)
+                    .StartsWith("/api/", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.NotEmpty(apiEndpoints);
+
+        var routesWithoutSecurityMetadata = apiEndpoints
+            .Where(endpoint =>
+                endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count == 0 &&
+                endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null)
+            .Select(endpoint =>
+                $"{endpoint.RoutePattern.RawText ?? endpoint.DisplayName} ({endpoint.DisplayName})")
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.True(
+            routesWithoutSecurityMetadata.Length == 0,
+            "Every API route must require authorization or explicitly declare an anonymous boundary:" +
+            Environment.NewLine + string.Join(Environment.NewLine, routesWithoutSecurityMetadata));
+    }
+
     private static bool HasAuditMetadata(RouteEndpoint endpoint) =>
         endpoint.Metadata.GetMetadata<TenantScopedEndpointMetadata>() is not null ||
         endpoint.Metadata.GetMetadata<UserScopedEndpointMetadata>() is not null ||
