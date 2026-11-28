@@ -38,6 +38,8 @@ public sealed class HeapCareDbContext(
     public DbSet<BillingInvoice> BillingInvoices => Set<BillingInvoice>();
     public DbSet<BillingInvoiceLine> BillingInvoiceLines => Set<BillingInvoiceLine>();
     public DbSet<BillingPayment> BillingPayments => Set<BillingPayment>();
+    public DbSet<InpatientAdmission> InpatientAdmissions => Set<InpatientAdmission>();
+    public DbSet<InpatientBedPlacement> InpatientBedPlacements => Set<InpatientBedPlacement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +99,10 @@ public sealed class HeapCareDbContext(
         modelBuilder.Entity<BillingInvoiceLine>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<BillingPayment>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InpatientAdmission>().HasOne<Tenant>().WithMany()
+            .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InpatientBedPlacement>().HasOne<Tenant>().WithMany()
             .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
 
         TenantModelConfiguration.ApplyTenantFilters(modelBuilder, this);
