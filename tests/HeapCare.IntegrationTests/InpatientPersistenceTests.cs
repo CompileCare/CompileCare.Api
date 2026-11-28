@@ -35,8 +35,8 @@ public sealed class InpatientPersistenceTests(FacilityApiFactory factory)
         var results = await Task.WhenAll(admissionIds.Select(admissionId =>
             TryCreatePlacementAsync(tenantId, graph, admissionId, graph.BedIds[0])));
 
-        Assert.Single(results.Where(result => result));
-        Assert.Single(results.Where(result => !result));
+        Assert.Single(results, result => result);
+        Assert.Single(results, result => !result);
 
         using var verifyScope = factory.Services.CreateScope();
         verifyScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
