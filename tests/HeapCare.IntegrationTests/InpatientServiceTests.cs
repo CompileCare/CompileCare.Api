@@ -350,10 +350,10 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
             Assert.Equal(2, hospitalAList.Value!.TotalCount);
             Assert.Equal(2, hospitalAList.Value.Items.Count);
             Assert.All(hospitalAList.Value.Items, item =>
-            {
-                Assert.Equal(data.HospitalId, item.HospitalId);
-                Assert.DoesNotContain(item.Id, data.AdmissionIds.Where(id => id == siblingAdmissionId));
-            });
+                Assert.Equal(data.HospitalId, item.HospitalId));
+            Assert.DoesNotContain(
+                hospitalAList.Value.Items,
+                item => item.Id == siblingAdmissionId);
 
             var siblingHospitalRequest = await service.ListAsync(
                 siblingHospitalId,
