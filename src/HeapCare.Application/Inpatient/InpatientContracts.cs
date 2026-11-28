@@ -29,6 +29,9 @@ public sealed record InpatientOperationResult<T>(T? Value, string? Error, int St
         new(default, error, statusCode);
 }
 
+/// <summary>Starts an inpatient episode for a patient already registered at the selected hospital.</summary>
+public sealed record InpatientAdmissionInput(Guid PatientId);
+
 public sealed record InpatientBedLocation(
     Guid DepartmentId,
     Guid WardId,
@@ -40,6 +43,9 @@ public sealed record InpatientBedTransferInput(InpatientBedLocation Destination,
 
 public interface IInpatientService
 {
+    Task<InpatientOperationResult<InpatientAdmissionDto>> CreateAdmissionAsync(
+        Guid hospitalId, InpatientAdmissionInput input, InpatientActor actor,
+        CancellationToken cancellationToken);
     Task<InpatientOperationResult<InpatientAdmissionDto>> GetAsync(
         Guid hospitalId, Guid admissionId, CancellationToken cancellationToken);
     Task<InpatientOperationResult<InpatientAdmissionDto>> AssignBedAsync(

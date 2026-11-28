@@ -13,6 +13,27 @@ public static class InpatientEndpoints
             .WithMetadata(TenantScopedEndpointMetadata.Instance)
             .RequireAuthorization();
 
+        group.MapPost("/admissions", async (
+            Guid hospitalId,
+            InpatientAdmissionInput request,
+            ClaimsPrincipal user,
+            IInpatientService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.CreateAdmissionAsync(
+                hospitalId, request, GetActor(user), cancellationToken);
+            return result.IsSuccess
+                ? Results.Created(
+                    $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions/{result.Value!.Id:D}",
+                    result.Value)
+                : Results.Problem(
+                    title: "IPD admission creation failed",
+                    detail: result.Error,
+                    statusCode: result.StatusCode);
+        })
+        .WithName("CreateInpatientAdmission")
+        .RequireAuthorization(AuthorizationPolicies.InpatientAdmit);
+
         group.MapGet("/admissions/{admissionId:guid}", async (
             Guid hospitalId,
             Guid admissionId,

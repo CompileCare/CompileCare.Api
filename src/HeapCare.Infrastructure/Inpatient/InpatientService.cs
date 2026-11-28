@@ -10,6 +10,81 @@ public sealed class InpatientService(
     HeapCareDbContext db,
     IOrganizationScopeContext organizationScope) : IInpatientService
 {
+    public async Task<InpatientOperationResult<InpatientAdmissionDto>> CreateAdmissionAsync(
+        Guid hospitalId,
+        InpatientAdmissionInput input,
+        InpatientActor actor,
+        CancellationToken cancellationToken)
+    {
+        if (!IsValidActor(actor))
+            return InpatientOperationResult<InpatientAdmissionDto>.Failure(
+                "A validated inpatient actor is required.", 401);
+        if (hospitalId == Guid.Empty || input is null || input.PatientId == Guid.Empty)
+            return InpatientOperationResult<InpatientAdmissionDto>.Failure(
+                "A valid hospital and patient identifier are required.", 400);
+
+        // Admission is a hospital-level operation. A department-only membership
+        // cannot create an inpatient episode or infer access to all hospital patients.
+        var hasHospitalWideScope = organizationScope.IsTenantWide ||
+                                   organizationScope.HospitalIds.Contains(hospitalId);
+        if (!hasHospitalWideScope)
+            return InpatientOperationResult<InpatientAdmissionDto>.Failure(
+                "Hospital not found.", 404);
+
+        // A patient master is not sufficient: the patient must already have an
+        // explicit registration at this exact hospital within the current tenant.
+        var hasHospitalRegistration = await db.HospitalPatientRegistrations.AnyAsync(
+            registration => registration.HospitalId == hospitalId &&
+                            registration.PatientId == input.PatientId,
+            cancellationToken);
+        if (!hasHospitalRegistration)
+            return InpatientOperationResult<InpatientAdmissionDto>.Failure(
+                "The patient is not registered at the selected hospital.", 404);
+
+        var hasActiveAdmission = await db.InpatientAdmissions.AnyAsync(
+            admission => admission.HospitalId == hospitalId &&
+                         admission.PatientId == input.PatientId &&
+                         admission.Status == InpatientAdmissionStatuses.Active,
+            cancellationToken);
+        if (hasActiveAdmission)
+            return Conflict("The patient already has an active inpatient admission at this hospital.");
+
+        var admission = new InpatientAdmission
+        {
+            HospitalId = hospitalId,
+            PatientId = input.PatientId,
+            Status = InpatientAdmissionStatuses.Active,
+            AdmittedAtUtc = DateTimeOffset.UtcNow
+        };
+        db.InpatientAdmissions.Add(admission);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict("The admission changed concurrently. Reload and retry.");
+        }
+        catch (DbUpdateException exception) when (
+            FindPostgresError(exception) is { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // The filtered unique index is the final arbiter when simultaneous
+            // admission requests pass the pre-check at the same time.
+            return Conflict("The patient already has an active inpatient admission at this hospital.");
+        }
+        catch (DbUpdateException exception) when (
+            FindPostgresError(exception) is { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            // The registration may have become unavailable between validation
+            // and persistence. Do not disclose patient or hospital existence.
+            return InpatientOperationResult<InpatientAdmissionDto>.Failure(
+                "The patient is not registered at the selected hospital.", 404);
+        }
+
+        return await GetAsync(hospitalId, admission.Id, cancellationToken);
+    }
+
     public async Task<InpatientOperationResult<InpatientAdmissionDto>> GetAsync(
         Guid hospitalId,
         Guid admissionId,
