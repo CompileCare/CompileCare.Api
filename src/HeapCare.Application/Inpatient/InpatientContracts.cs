@@ -35,6 +35,21 @@ public sealed record InpatientBedLocation(
     Guid RoomId,
     Guid BedId);
 
+
+public sealed record InpatientBedTransferInput(InpatientBedLocation Destination, string Reason);
+
+public interface IInpatientService
+{
+    Task<InpatientOperationResult<InpatientAdmissionDto>> GetAsync(
+        Guid hospitalId, Guid admissionId, CancellationToken cancellationToken);
+    Task<InpatientOperationResult<InpatientAdmissionDto>> AssignBedAsync(
+        Guid hospitalId, Guid admissionId, InpatientBedLocation location,
+        InpatientActor actor, CancellationToken cancellationToken);
+    Task<InpatientOperationResult<InpatientAdmissionDto>> TransferBedAsync(
+        Guid hospitalId, Guid admissionId, InpatientBedTransferInput input,
+        InpatientActor actor, CancellationToken cancellationToken);
+}
+
 public sealed record InpatientBedPlacementDto(
     Guid Id,
     Guid AdmissionId,
