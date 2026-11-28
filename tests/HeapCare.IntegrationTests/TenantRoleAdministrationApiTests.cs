@@ -136,6 +136,90 @@ public sealed class TenantRoleAdministrationApiTests(FacilityApiFactory factory)
     }
 
     [Fact]
+    public async Task TenantRoleAdministration_CannotReadOrMutateAnotherTenantsCustomRole()
+    {
+        factory.ResetDatabase();
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        await factory.SeedTenantMembershipAsync(
+            tenantA,
+            TenantRoles.HospitalAdmin,
+            subject: "rbac-isolation-admin-a");
+        await factory.SeedTenantMembershipAsync(
+            tenantB,
+            TenantRoles.HospitalAdmin,
+            subject: "rbac-isolation-admin-b");
+
+        using var adminA = CreateClient("rbac-isolation-admin-a", tenantA);
+        using var adminB = CreateClient("rbac-isolation-admin-b", tenantB);
+
+        var createRole = await adminA.PostAsJsonAsync(
+            "/api/v1/tenant/roles",
+            new
+            {
+                name = "Tenant A Private Role",
+                description = "A custom role owned exclusively by tenant A.",
+                permissionCodes = new[] { TenantPermissions.FacilityRead },
+                reason = "Create a private role for tenant isolation testing."
+            });
+        Assert.Equal(HttpStatusCode.Created, createRole.StatusCode);
+        var role = await createRole.Content.ReadFromJsonAsync<TenantRoleResponse>();
+        Assert.NotNull(role);
+
+        var tenantBRolesResponse = await adminB.GetAsync("/api/v1/tenant/roles");
+        Assert.Equal(HttpStatusCode.OK, tenantBRolesResponse.StatusCode);
+        var tenantBRoles = await tenantBRolesResponse.Content.ReadFromJsonAsync<TenantRoleResponse[]>();
+        Assert.NotNull(tenantBRoles);
+        Assert.DoesNotContain(tenantBRoles!, value => value.Id == role!.Id);
+        Assert.DoesNotContain(tenantBRoles!, value => value.Code == role!.Code);
+
+        var crossTenantUpdate = await adminB.PutAsJsonAsync(
+            $"/api/v1/tenant/roles/{role!.Id:D}",
+            new
+            {
+                name = "Attacked Role",
+                description = "A cross-tenant update must never be applied.",
+                permissionCodes = new[] { TenantPermissions.FacilityWrite },
+                reason = "Attempt a cross-tenant role mutation."
+            });
+        Assert.Equal(HttpStatusCode.NotFound, crossTenantUpdate.StatusCode);
+
+        var crossTenantDeactivate = await adminB.PostAsJsonAsync(
+            $"/api/v1/tenant/roles/{role.Id:D}/deactivate",
+            new { reason = "Attempt to deactivate another tenant's role." });
+        Assert.Equal(HttpStatusCode.NotFound, crossTenantDeactivate.StatusCode);
+
+        var crossTenantReactivate = await adminB.PostAsJsonAsync(
+            $"/api/v1/tenant/roles/{role.Id:D}/reactivate",
+            new { reason = "Attempt to reactivate another tenant's role." });
+        Assert.Equal(HttpStatusCode.NotFound, crossTenantReactivate.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantA);
+        var db = scope.ServiceProvider.GetRequiredService<HeapCareDbContext>();
+        var persistedRole = await db.TenantRoles.AsNoTracking()
+            .SingleAsync(value => value.Id == role.Id);
+        Assert.Equal("Tenant A Private Role", persistedRole.Name);
+        Assert.True(persistedRole.IsActive);
+        Assert.Equal(1, persistedRole.PermissionsRevision);
+
+        var persistedGrants = await db.TenantRolePermissions.AsNoTracking()
+            .Where(value => value.RoleId == role.Id)
+            .Select(value => value.PermissionCode)
+            .ToArrayAsync();
+        Assert.Equal(new[] { TenantPermissions.FacilityRead }, persistedGrants);
+
+        var auditActions = await db.TenantRoleChangeAudits.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(value => value.TenantId == tenantA && value.RoleId == role.Id)
+            .Select(value => new { value.Action, value.ActorSubject })
+            .ToArrayAsync();
+        var audit = Assert.Single(auditActions);
+        Assert.Equal("Created", audit.Action);
+        Assert.Equal("rbac-isolation-admin-a", audit.ActorSubject);
+    }
+
+    [Fact]
     public async Task TenantRoleAdministration_RejectsIpdGrantsAndHospitalScopedRoleChanges()
     {
         factory.ResetDatabase();
