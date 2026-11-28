@@ -42,6 +42,28 @@ public sealed class InpatientAdmissionAuthorizationTests(FacilityApiFactory fact
     }
 
     [Fact]
+    public async Task PlatformOperator_DoesNotReceiveTenantIPDAdmissionAccess()
+    {
+        factory.ResetDatabase();
+        var tenantId = Guid.NewGuid();
+        var hospitalId = Guid.NewGuid();
+
+        await factory.SeedTenantMembershipAsync(
+            tenantId,
+            TenantRoles.FacilityViewer,
+            scopes: [new OrganizationScope(OrganizationScopeTypes.Tenant)],
+            subject: TestJwtTokenFactory.Subject);
+        await factory.SeedPlatformOperatorAsync();
+
+        using var client = CreateClient(tenantId, TestJwtTokenFactory.Subject);
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/hospitals/{hospitalId:D}/ipd/admissions",
+            new InpatientAdmissionInput(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ForgedExternalAdmissionPermission_CannotGrantAdmissionAccess()
     {
         factory.ResetDatabase();
