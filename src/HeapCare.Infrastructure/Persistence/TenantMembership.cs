@@ -6,6 +6,7 @@ namespace HeapCare.Infrastructure.Persistence;
 /// </summary>
 public sealed class TenantMembership : TenantOwnedEntity
 {
+    public Guid UserIdentityId { get; set; }
     public string Issuer { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
