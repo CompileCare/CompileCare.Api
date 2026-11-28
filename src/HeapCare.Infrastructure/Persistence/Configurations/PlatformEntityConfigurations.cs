@@ -27,8 +27,13 @@ public sealed class PlatformOperatorConfiguration : IEntityTypeConfiguration<Pla
             table.HasCheckConstraint(
                 "CK_platform_operators_identity",
                 "\"Issuer\" <> '' AND \"Subject\" <> ''"));
+        builder.Property(x => x.UserIdentityId).IsRequired();
         builder.Property(x => x.Issuer).HasMaxLength(255).IsRequired();
         builder.Property(x => x.Subject).HasMaxLength(255).IsRequired();
         builder.HasIndex(x => new { x.Issuer, x.Subject }).IsUnique();
+        builder.HasOne<UserIdentity>().WithMany()
+            .HasForeignKey(x => new { x.UserIdentityId, x.Issuer, x.Subject })
+            .HasPrincipalKey(x => new { x.Id, x.Issuer, x.Subject })
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
