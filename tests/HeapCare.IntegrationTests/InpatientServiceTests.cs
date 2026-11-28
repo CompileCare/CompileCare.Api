@@ -416,7 +416,7 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
                     END IF;
                     RETURN NEW;
                 END;
-                $ LANGUAGE plpgsql;
+                $ipd$ LANGUAGE plpgsql;
 
                 CREATE TRIGGER delay_ipd_transfer_update_trigger
                 BEFORE UPDATE ON inpatient_bed_placements
