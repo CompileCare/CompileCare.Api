@@ -190,7 +190,7 @@ public sealed class InpatientServiceTests(FacilityApiFactory factory)
 
         var secondPage = await service.ListAsync(
             data.HospitalId,
-            new InpatientAdmissionPageRequest(2, 2, InpatientAdmissionStatuses.Active),
+            new InpatientAdmissionPageRequest(2, 2, "active"),
             CancellationToken.None);
 
         Assert.True(secondPage.IsSuccess, secondPage.Error);
