@@ -70,6 +70,15 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore HeapCare.Api.slnx --configfile .ci-nuget.config
       - run: dotnet build HeapCare.Api.slnx --configuration Release --no-restore
+      - name: TEMP diagnose IPD EF model snapshot drift
+        if: github.event.pull_request.number == 134
+        run: |
+          dotnet ef migrations add DiagnoseIpdSnapshot --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output-dir Persistence/Migrations
+          echo "=== GENERATED MIGRATION ==="
+          generated="$(find src/HeapCare.Infrastructure/Persistence/Migrations -maxdepth 1 -name '*_DiagnoseIpdSnapshot.cs' -print -quit)"
+          cat "$generated"
+          echo "=== SNAPSHOT DIFF ==="
+          git --no-pager diff -- src/HeapCare.Infrastructure/Persistence/Migrations/HeapCareDbContextModelSnapshot.cs
       - name: Restore .NET tools
         run: dotnet tool restore
       - name: Detect pending EF Core model changes
