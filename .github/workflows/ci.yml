@@ -71,7 +71,7 @@ jobs:
       - run: dotnet restore HeapCare.Api.slnx --configfile .ci-nuget.config
       - run: dotnet build HeapCare.Api.slnx --configuration Release --no-restore
       - name: TEMP diagnose IPD EF model snapshot drift
-        if: github.event.pull_request.number == 134
+        if: github.ref == 'refs/heads/feature/ipd-admission-bed-placement-foundation'
         run: |
           dotnet ef migrations add DiagnoseIpdSnapshot --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output-dir Persistence/Migrations
           echo "=== GENERATED MIGRATION ==="
