@@ -73,6 +73,7 @@ jobs:
       - name: TEMP diagnose IPD EF model snapshot drift
         if: github.ref == 'refs/heads/feature/ipd-admission-bed-placement-foundation'
         run: |
+          dotnet tool restore
           dotnet ef migrations add DiagnoseIpdSnapshot --project src/HeapCare.Infrastructure --startup-project src/HeapCare.Api --output-dir Persistence/Migrations
           echo "=== GENERATED MIGRATION ==="
           generated="$(find src/HeapCare.Infrastructure/Persistence/Migrations -maxdepth 1 -name '*_DiagnoseIpdSnapshot.cs' -print -quit)"
