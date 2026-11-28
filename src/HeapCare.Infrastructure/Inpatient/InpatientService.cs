@@ -20,13 +20,19 @@ public sealed class InpatientService(
                 "A valid hospital and admission-list request are required.", 400);
 
         var status = string.IsNullOrWhiteSpace(request.Status) ? null : request.Status.Trim();
-        if (status is not null &&
-            status != InpatientAdmissionStatuses.Active &&
-            status != InpatientAdmissionStatuses.Cancelled &&
-            status != InpatientAdmissionStatuses.Discharged)
+        if (status is not null)
         {
-            return InpatientOperationResult<InpatientAdmissionPage>.Failure(
-                "Admission status must be Active, Cancelled or Discharged.", 400);
+            status = status.ToUpperInvariant() switch
+            {
+                "ACTIVE" => InpatientAdmissionStatuses.Active,
+                "CANCELLED" => InpatientAdmissionStatuses.Cancelled,
+                "DISCHARGED" => InpatientAdmissionStatuses.Discharged,
+                _ => null
+            };
+
+            if (status is null)
+                return InpatientOperationResult<InpatientAdmissionPage>.Failure(
+                    "Admission status must be Active, Cancelled or Discharged.", 400);
         }
 
         var hasHospitalWideScope = organizationScope.IsTenantWide ||
@@ -92,9 +98,10 @@ public sealed class InpatientService(
 
         var items = admissions.Select(admission =>
         {
-            var history = placementsByAdmission.TryGetValue(admission.Id, out var visibleHistory)
-                ? visibleHistory
-                : Array.Empty<InpatientBedPlacement>();
+            IReadOnlyList<InpatientBedPlacement> history =
+                placementsByAdmission.TryGetValue(admission.Id, out var visibleHistory)
+                    ? visibleHistory
+                    : Array.Empty<InpatientBedPlacement>();
             var current = history.SingleOrDefault(placement => placement.EndedAtUtc is null);
             return ToDto(admission, history, current);
         }).ToArray();
