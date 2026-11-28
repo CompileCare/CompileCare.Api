@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using HeapCare.Api.Middleware;
 using HeapCare.Application.Patients;
 using HeapCare.Application.Tenancy;
@@ -51,6 +52,7 @@ public sealed class AuditFailureRollbackTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TestJwtTokenFactory.CreateToken());
+        client.DefaultRequestHeaders.Add(CorrelationIdMiddleware.HeaderName, "audit-failure-correlation-123");
         client.DefaultRequestHeaders.Add(
             TenantContextMiddleware.HeaderName,
             tenantId.ToString("D"));
@@ -64,11 +66,30 @@ public sealed class AuditFailureRollbackTests
                 new DateOnly(1990, 4, 12)));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        var problem = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+
+        var responseBody = await response.Content.ReadAsStringAsync();
+        using var problemDocument = JsonDocument.Parse(responseBody);
+        var problem = problemDocument.RootElement;
+
         Assert.Equal("about:blank", problem.GetProperty("type").GetString());
         Assert.Equal("Service Unavailable", problem.GetProperty("title").GetString());
+        Assert.Equal((int)HttpStatusCode.ServiceUnavailable, problem.GetProperty("status").GetInt32());
         Assert.Equal("audit_unavailable", problem.GetProperty("code").GetString());
-        Assert.False(string.IsNullOrWhiteSpace(problem.GetProperty("traceId").GetString()));
+        Assert.Equal(
+            $"/api/v1/hospitals/{hospitalId:D}/patients",
+            problem.GetProperty("instance").GetString());
+
+        var traceId = problem.GetProperty("traceId").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(traceId));
+        Assert.Equal(
+            "audit-failure-correlation-123",
+            response.Headers.GetValues(CorrelationIdMiddleware.HeaderName).Single());
+
+        Assert.Contains(
+            "audit record could not be stored",
+            problem.GetProperty("detail").GetString(),
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("synthetic audit sink failure", responseBody, StringComparison.OrdinalIgnoreCase);
 
         using var verificationScope = _factory.Services.CreateScope();
         verificationScope.ServiceProvider.GetRequiredService<ITenantContext>().SetTenant(tenantId);
