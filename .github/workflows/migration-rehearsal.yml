@@ -58,7 +58,7 @@ jobs:
         with:
           repository: HeapCare/HeapCare.Observability
           ref: 935f6629d5abb92296385ec2e0c1ec04060b3fb7
-          path: CompileCare.Observability.Legacy
+          path: Observability.Legacy
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -67,7 +67,7 @@ jobs:
       - name: Pin compatible SDK for shared package builds
         run: |
           echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}' > HeapCare.Observability/global.json
-          echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}' > CompileCare.Observability.Legacy/global.json
+          echo '{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}' > Observability.Legacy/global.json
       - name: Pack HeapCare observability packages for the PR revision
         working-directory: HeapCare.Observability
         run: |
@@ -97,7 +97,7 @@ jobs:
           EOF
 
       - name: Pack legacy CompileCare observability packages for the base revision
-        working-directory: CompileCare.Observability.Legacy
+        working-directory: Observability.Legacy
         run: |
           dotnet pack src/CompileCare.Observability/CompileCare.Observability.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
           dotnet pack src/CompileCare.Observability.AspNetCore/CompileCare.Observability.AspNetCore.csproj --configuration Release -p:Version=1.0.1 -p:ManagePackageVersionsCentrally=false -p:NoWarn=NU5104 -o "$GITHUB_WORKSPACE/.ci-nuget"
