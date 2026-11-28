@@ -139,7 +139,7 @@ public sealed class InpatientEndpointAuthorizationTests(FacilityApiFactory facto
         var auditEvent = await db.AuditEvents.SingleAsync(
             item => item.CorrelationId == correlationId);
 
-        Assert.Null(auditEvent.TenantId);
+        Assert.Equal(tenantId, auditEvent.TenantId);
         Assert.Equal(tenantId, auditEvent.RequestedTenantId);
         Assert.Equal(TestJwtTokenFactory.Issuer, auditEvent.ActorIssuer);
         Assert.Equal("ipd-audit-denied-reader", auditEvent.ActorSubject);
