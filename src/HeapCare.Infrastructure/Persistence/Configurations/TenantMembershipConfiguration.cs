@@ -12,6 +12,10 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
         builder.Property(x => x.Subject).HasMaxLength(255).IsRequired();
         builder.Property(x => x.Role).HasMaxLength(50).IsRequired();
         builder.HasAlternateKey(x => new { x.TenantId, x.Id });
+        builder.HasOne<UserIdentity>().WithMany()
+            .HasForeignKey(x => new { x.UserIdentityId, x.Issuer, x.Subject })
+            .HasPrincipalKey(x => new { x.Id, x.Issuer, x.Subject })
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<TenantRole>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.Role })
             .HasPrincipalKey(x => new { x.TenantId, x.Code })
